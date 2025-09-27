@@ -46,7 +46,7 @@ def setup_logging():
     log_file = settings.LOG_PATH / f"app-{current_date}.log"
 
     # Set log level
-    log_level = getattr(logging, settings.LOG_LEVEL)
+    log_level = getattr(logging, settings.LOG_LEVEL.upper())
 
     # Configure root logger
     logger = logging.getLogger()
