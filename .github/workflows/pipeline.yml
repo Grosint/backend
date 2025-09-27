@@ -93,6 +93,12 @@ jobs:
                   coverage xml
                   coverage html
 
+            - name: Prepare SonarCloud scan
+              run: |
+                  # Create target directory for SonarCloud metadata
+                  mkdir -p target/sonar
+                  echo "SonarCloud scan preparation completed"
+
             - name: Check coverage threshold
               run: |
                   COVERAGE=$(coverage report --format=total)
@@ -106,22 +112,83 @@ jobs:
                     echo "✅ Coverage $COVERAGE% meets threshold"
                   fi
 
+            - name: Check SonarCloud Configuration
+              run: |
+                  if [ -z "${{ secrets.SONARCLOUD_TOKEN }}" ]; then
+                    echo "❌ SONARCLOUD_TOKEN secret is not configured"
+                    echo "Skipping SonarCloud scan"
+                    exit 0
+                  else
+                    echo "✅ SonarCloud token is configured"
+                  fi
+
+                  if [ -z "${{ secrets.SONARCLOUD_ORG }}" ]; then
+                    echo "⚠️  SONARCLOUD_ORG secret is not configured, attempting to auto-detect..."
+
+                    # Try to get organization from SonarCloud API
+                    ORG_RESPONSE=$(curl -s -u "${{ secrets.SONARCLOUD_TOKEN }}:" "https://sonarcloud.io/api/organizations/search" || echo "")
+
+                    if [ -n "$ORG_RESPONSE" ] && echo "$ORG_RESPONSE" | grep -q '"key"'; then
+                      # Extract the first organization key
+                      ORG_KEY=$(echo "$ORG_RESPONSE" | grep -o '"key":"[^"]*"' | head -1 | cut -d'"' -f4)
+                      if [ -n "$ORG_KEY" ]; then
+                        echo "✅ Auto-detected organization: $ORG_KEY"
+                        echo "SONARCLOUD_ORG=$ORG_KEY" >> $GITHUB_ENV
+                      else
+                        echo "❌ Could not extract organization key from API response"
+                        echo "Please set SONARCLOUD_ORG secret manually"
+                        echo "You can find it at: https://sonarcloud.io/organizations/"
+                        exit 1
+                      fi
+                    else
+                      echo "❌ Could not connect to SonarCloud API or no organizations found"
+                      echo "Trying alternative method..."
+
+                      # Alternative: Try to get organization from project info
+                      PROJECT_RESPONSE=$(curl -s -u "${{ secrets.SONARCLOUD_TOKEN }}:" "https://sonarcloud.io/api/projects/search?projects=Grosint_backend" || echo "")
+                      if [ -n "$PROJECT_RESPONSE" ] && echo "$PROJECT_RESPONSE" | grep -q '"organization"'; then
+                        ORG_KEY=$(echo "$PROJECT_RESPONSE" | grep -o '"organization":"[^"]*"' | head -1 | cut -d'"' -f4)
+                        if [ -n "$ORG_KEY" ]; then
+                          echo "✅ Auto-detected organization from project: $ORG_KEY"
+                          echo "SONARCLOUD_ORG=$ORG_KEY" >> $GITHUB_ENV
+                        else
+                          echo "❌ Could not extract organization from project info"
+                          echo "Please set SONARCLOUD_ORG secret manually"
+                          echo "You can find it at: https://sonarcloud.io/organizations/"
+                          exit 1
+                        fi
+                      else
+                        echo "❌ Could not connect to SonarCloud API or project not found"
+                        echo "Please set SONARCLOUD_ORG secret manually"
+                        echo "You can find it at: https://sonarcloud.io/organizations/"
+                        exit 1
+                      fi
+                    fi
+                  else
+                    echo "✅ SonarCloud organization is configured"
+                    echo "SONARCLOUD_ORG=${{ secrets.SONARCLOUD_ORG }}" >> $GITHUB_ENV
+                  fi
+
             - name: SonarCloud Scan
+              if: secrets.SONARCLOUD_TOKEN != ''
               uses: SonarSource/sonarqube-scan-action@master
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
               with:
                   args: >
-                      -Dsonar.projectKey=grosint-backend
-                      -Dsonar.organization=your-org
+                      -Dsonar.projectKey=Grosint_backend
+                      -Dsonar.organization=${{ env.SONARCLOUD_ORG }}
+                      -Dsonar.host.url=https://sonarcloud.io
                       -Dsonar.python.coverage.reportPaths=coverage.xml
-                      -Dsonar.coverage.exclusions=tests/**,logs/**,venv/**
+                      -Dsonar.coverage.exclusions=tests/**,logs/**,venv/**,__pycache__/**
                       -Dsonar.sources=app
                       -Dsonar.tests=tests
                       -Dsonar.qualitygate.wait=true
+                      -Dsonar.scanner.metadataFilePath=target/sonar/report-task.txt
 
             - name: SonarCloud Quality Gate
+              if: secrets.SONARCLOUD_TOKEN != ''
               uses: SonarSource/sonarqube-quality-gate-action@master
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
