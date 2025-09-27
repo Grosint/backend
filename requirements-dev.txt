@@ -1,5 +1,5 @@
 bandit>=1.7.5
-black==23.12.1
+black==25.9.0
 coverage>=7.3.0
 faker>=19.0.0
 httpx>=0.24.0
