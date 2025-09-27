@@ -322,8 +322,8 @@ jobs:
 
                   [Service]
                   Type=exec
-                  User=ubuntu
-                  Group=ubuntu
+                  User=root
+                  Group=root
                   WorkingDirectory=/opt/grosint-backend
                   Environment=PYTHONPATH=/opt/grosint-backend
                   ExecStart=/opt/grosint-backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 4
@@ -456,6 +456,14 @@ jobs:
                       echo "Files in deployment directory:"
                       ls -la
 
+                      # Debug: Check user and permissions
+                      echo "Current user: $(whoami)"
+                      echo "User ID: $(id)"
+                      echo "Virtual environment check:"
+                      ls -la venv/bin/uvicorn || echo "uvicorn not found in venv/bin/"
+                      echo "Python check:"
+                      which python3.12 || echo "python3.12 not found"
+
                       # Set up application
                       chmod +x deploy.sh
                       ./deploy.sh
@@ -487,7 +495,8 @@ jobs:
                       sudo systemctl enable grosint-backend
 
                       # Set proper ownership for all files
-                      sudo chown -R $USER:$USER /opt/grosint-backend
+                      sudo chown -R root:root /opt/grosint-backend
+                      sudo chmod -R 755 /opt/grosint-backend
 
                       # Set up nginx
                       sudo cp nginx-grosint.conf /etc/nginx/sites-available/grosint-backend
