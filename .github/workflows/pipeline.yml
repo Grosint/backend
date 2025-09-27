@@ -107,7 +107,7 @@ jobs:
                   fi
 
             - name: SonarCloud Scan
-              uses: SonarSource/sonarcloud-github-action@master
+              uses: sonarqube-scan-action@master
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
@@ -120,6 +120,15 @@ jobs:
                       -Dsonar.sources=app
                       -Dsonar.tests=tests
                       -Dsonar.qualitygate.wait=true
+
+            - name: SonarCloud Quality Gate
+              uses: sonarqube-quality-gate-action@master
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+              with:
+                  scanMetadataReportFile: target/sonar/report-task.txt
+                  timeout: 5
 
             - name: Stop MongoDB container
               if: always()
@@ -363,6 +372,16 @@ jobs:
               run: |
                   echo "DEPLOYMENT_URL=http://${{ secrets.DOMAIN_NAME }}:8000" >> $GITHUB_ENV
 
+            - name: Check Slack Configuration
+              run: |
+                  if [ -z "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+                    echo "❌ SLACK_WEBHOOK_URL secret is not configured"
+                    echo "Please add SLACK_WEBHOOK_URL to your repository secrets"
+                    exit 1
+                  else
+                    echo "✅ Slack webhook URL is configured"
+                  fi
+
             - name: Notify Success
               if: needs.deploy.result == 'success'
               uses: 8398a7/action-slack@v3
@@ -415,7 +434,7 @@ jobs:
                       }
 
             - name: Notify Failure
-              if: failure()
+              if: needs.lint.result == 'failure' || needs.test.result == 'failure' || needs.build.result == 'failure' || needs.deploy.result == 'failure' || needs.lint.result == 'cancelled' || needs.test.result == 'cancelled' || needs.build.result == 'cancelled' || needs.deploy.result == 'cancelled'
               uses: 8398a7/action-slack@v3
               with:
                   status: failure
@@ -460,6 +479,52 @@ jobs:
                         ]
                       }
 
+            - name: Notify Skipped
+              if: needs.deploy.result == 'skipped' && (needs.lint.result == 'success' && needs.test.result == 'success' && needs.build.result == 'success')
+              uses: 8398a7/action-slack@v3
+              with:
+                  status: success
+                  channel: '#deployments'
+                  webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+                  custom_payload: |
+                      {
+                        "attachments": [
+                          {
+                            "color": "warning",
+                            "title": "⚠️ Pipeline Passed (No Deployment)",
+                            "fields": [
+                              {
+                                "title": "Repository",
+                                "value": "${{ github.repository }}",
+                                "short": true
+                              },
+                              {
+                                "title": "Branch",
+                                "value": "${{ github.ref_name }}",
+                                "short": true
+                              },
+                              {
+                                "title": "Reason",
+                                "value": "Not on main branch - deployment skipped",
+                                "short": false
+                              },
+                              {
+                                "title": "Author",
+                                "value": "${{ github.actor }}",
+                                "short": true
+                              }
+                            ],
+                            "actions": [
+                              {
+                                "type": "button",
+                                "text": "View Logs",
+                                "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+
             - name: Debug Slack Configuration
               if: always()
               run: |
@@ -468,3 +533,6 @@ jobs:
                   echo "Lint result: ${{ needs.lint.result }}"
                   echo "Test result: ${{ needs.test.result }}"
                   echo "Build result: ${{ needs.build.result }}"
+                  echo "Event name: ${{ github.event_name }}"
+                  echo "Ref: ${{ github.ref }}"
+                  echo "Ref name: ${{ github.ref_name }}"
