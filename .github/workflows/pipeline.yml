@@ -117,9 +117,11 @@ jobs:
                   if [ -z "${{ secrets.SONARCLOUD_TOKEN }}" ]; then
                     echo "❌ SONARCLOUD_TOKEN secret is not configured"
                     echo "Skipping SonarCloud scan"
+                    echo "SONARCLOUD_TOKEN=" >> $GITHUB_ENV
                     exit 0
                   else
                     echo "✅ SonarCloud token is configured"
+                    echo "SONARCLOUD_TOKEN=${{ secrets.SONARCLOUD_TOKEN }}" >> $GITHUB_ENV
                   fi
 
                   if [ -z "${{ secrets.SONARCLOUD_ORG }}" ]; then
@@ -170,7 +172,7 @@ jobs:
                   fi
 
             - name: SonarCloud Scan
-              if: secrets.SONARCLOUD_TOKEN != ''
+              if: env.SONARCLOUD_TOKEN != ''
               uses: SonarSource/sonarqube-scan-action@master
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -188,7 +190,7 @@ jobs:
                       -Dsonar.scanner.metadataFilePath=target/sonar/report-task.txt
 
             - name: SonarCloud Quality Gate
-              if: secrets.SONARCLOUD_TOKEN != ''
+              if: env.SONARCLOUD_TOKEN != ''
               uses: SonarSource/sonarqube-quality-gate-action@master
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
