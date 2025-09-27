@@ -126,7 +126,7 @@ jobs:
               run: docker-compose -f docker-compose.test.yml down -v
 
             - name: Upload coverage reports
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                   name: coverage-reports
                   path: |
@@ -242,7 +242,7 @@ jobs:
                   ls -la dist/
 
             - name: Upload build artifacts
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                   name: build-artifacts
                   path: dist/
@@ -262,13 +262,13 @@ jobs:
                   echo "DEPLOYMENT_URL=http://${{ secrets.DOMAIN_NAME }}:8000" >> $GITHUB_ENV
 
             - name: Download build artifacts
-              uses: actions/download-artifact@v3
+              uses: actions/download-artifact@v4
               with:
                   name: build-artifacts
                   path: dist/
 
             - name: Deploy to Azure VM
-              uses: appleboy/ssh-action@v1.0.0
+              uses: appleboy/ssh-action@v1.1.0
               with:
                   host: ${{ secrets.AZURE_VM_HOST }}
                   username: ${{ secrets.AZURE_VM_USERNAME }}
@@ -359,6 +359,10 @@ jobs:
         if: always()
 
         steps:
+            - name: Set deployment URL
+              run: |
+                  echo "DEPLOYMENT_URL=http://${{ secrets.DOMAIN_NAME }}:8000" >> $GITHUB_ENV
+
             - name: Notify Success
               if: needs.deploy.result == 'success'
               uses: 8398a7/action-slack@v3
@@ -455,3 +459,12 @@ jobs:
                           }
                         ]
                       }
+
+            - name: Debug Slack Configuration
+              if: always()
+              run: |
+                  echo "Slack webhook configured: ${{ secrets.SLACK_WEBHOOK_URL != '' }}"
+                  echo "Deploy result: ${{ needs.deploy.result }}"
+                  echo "Lint result: ${{ needs.lint.result }}"
+                  echo "Test result: ${{ needs.test.result }}"
+                  echo "Build result: ${{ needs.build.result }}"
