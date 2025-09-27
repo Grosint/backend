@@ -252,9 +252,13 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         environment:
             name: production
-            url: http://${{ secrets.DOMAIN_NAME }}:8000
 
         steps:
+            - name: Set deployment URL
+              run: |
+                  echo "Deployment URL: http://${{ secrets.DOMAIN_NAME }}:8000"
+                  echo "DEPLOYMENT_URL=http://${{ secrets.DOMAIN_NAME }}:8000" >> $GITHUB_ENV
+
             - name: Download build artifacts
               uses: actions/download-artifact@v3
               with:
@@ -392,7 +396,7 @@ jobs:
                               {
                                 "type": "button",
                                 "text": "View App",
-                                "url": "http://${{ secrets.DOMAIN_NAME }}:8000"
+                                "url": "${{ env.DEPLOYMENT_URL }}"
                               },
                               {
                                 "type": "button",
