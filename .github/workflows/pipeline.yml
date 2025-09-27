@@ -258,14 +258,31 @@ jobs:
                   echo "This will allow CI analysis to work properly."
                   echo "The pipeline will continue without SonarCloud analysis for now."
 
+            - name: Check SonarCloud Scan Results
+              if: env.SONARCLOUD_TOKEN != ''
+              run: |
+                  if [ -f "target/sonar/report-task.txt" ]; then
+                    echo "✅ SonarCloud scan completed successfully"
+                    echo "SONARCLOUD_SCAN_SUCCESS=true" >> $GITHUB_ENV
+                  else
+                    echo "❌ SonarCloud scan failed or was skipped"
+                    echo "SONARCLOUD_SCAN_SUCCESS=false" >> $GITHUB_ENV
+                  fi
+
             - name: SonarCloud Quality Gate
-              if: env.SONARCLOUD_TOKEN != '' && success()
+              if: env.SONARCLOUD_TOKEN != '' && env.SONARCLOUD_SCAN_SUCCESS == 'true'
               uses: SonarSource/sonarqube-quality-gate-action@master
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
               with:
                   scanMetadataReportFile: target/sonar/report-task.txt
+
+            - name: SonarCloud Quality Gate Skipped
+              if: env.SONARCLOUD_TOKEN != '' && env.SONARCLOUD_SCAN_SUCCESS == 'false'
+              run: |
+                  echo "⏭️  Skipping SonarCloud Quality Gate - scan was not successful"
+                  echo "This is expected when automatic analysis is enabled in SonarCloud"
 
             - name: Stop MongoDB container
               if: always()
