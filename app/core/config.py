@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
     PROJECT_NAME: str = "GROSINT V2"
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    DEBUG: bool = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
 
     # CORS
     CORS_ORIGINS: list[str] = ["*"]
@@ -57,6 +58,7 @@ class Settings(BaseSettings):
     class Config:
         case_sensitive = True
         env_file = ".env"
+        extra = "ignore"  # Ignore extra fields from .env file
 
 
 # Create settings instance
