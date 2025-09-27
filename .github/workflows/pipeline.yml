@@ -107,7 +107,7 @@ jobs:
                   fi
 
             - name: SonarCloud Scan
-              uses: sonarqube-scan-action@master
+              uses: SonarSource/sonarcloud-github-action@master
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
@@ -120,15 +120,6 @@ jobs:
                       -Dsonar.sources=app
                       -Dsonar.tests=tests
                       -Dsonar.qualitygate.wait=true
-
-            - name: SonarCloud Quality Gate
-              uses: sonarqube-quality-gate-action@master
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
-              with:
-                  scanMetadataReportFile: target/sonar/report-task.txt
-                  waitForQualityGate: true
 
             - name: Stop MongoDB container
               if: always()
