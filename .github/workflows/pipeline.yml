@@ -359,7 +359,7 @@ jobs:
 
                       # Health check endpoint
                       location /health {
-                          proxy_pass http://127.0.0.1:8000/health;
+                          proxy_pass http://127.0.0.1:8000/api/health;
                           access_log off;
                       }
                   }
@@ -513,11 +513,13 @@ jobs:
 
                       # Health check
                       for i in {1..6}; do
-                        if curl -f http://127.0.0.1:8000/health >/dev/null 2>&1; then
+                        if curl -f http://127.0.0.1:8000/api/health >/dev/null 2>&1; then
                           echo "✅ Application health check passed!"
                           break
                         elif [ $i -eq 6 ]; then
                           echo "❌ Health check failed!"
+                          echo "Trying to get health check response:"
+                          curl -v http://127.0.0.1:8000/api/health || echo "Health check request failed"
                           sudo journalctl -u grosint-backend --no-pager -n 20
                           exit 1
                         else
