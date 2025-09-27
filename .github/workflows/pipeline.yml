@@ -441,6 +441,7 @@ jobs:
                   key: ${{ secrets.AZURE_VM_SSH_KEY }}
                   source: 'dist/*'
                   target: '/opt/grosint-backend'
+                  strip_components: 1
 
             - name: Complete deployment
               uses: appleboy/ssh-action@v1.0.0
