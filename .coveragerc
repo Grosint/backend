@@ -1,0 +1,23 @@
+[run]
+source = app
+omit =
+    */venv/*
+    */tests/*
+    */__pycache__/*
+    */logs/*
+    run.py
+    run_tests.py
+    test_setup.py
+
+[report]
+precision = 2
+show_missing = True
+skip_covered = False
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+
+[html]
+directory = htmlcov

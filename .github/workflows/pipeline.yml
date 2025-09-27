@@ -1,0 +1,451 @@
+name: Grosint Backend CI/CD Pipeline
+
+on:
+    push:
+        branches: [main] # Currently set to main for testing
+    pull_request:
+        branches: [develop, production, main]
+
+env:
+    PYTHON_VERSION: '3.12.7'
+    COVERAGE_THRESHOLD: 98
+
+jobs:
+    lint:
+        name: 🔍 Lint Code
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Python ${{ env.PYTHON_VERSION }}
+              uses: actions/setup-python@v4
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  cache: 'pip'
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements.txt
+                  pip install -r requirements-dev.txt
+
+            - name: Black formatting check
+              run: black --check --diff app/ tests/
+
+            - name: Ruff linting and import sorting check
+              run: |
+                  ruff check app/ tests/
+                  ruff check --select I app/ tests/
+
+            - name: Security check with Bandit
+              run: bandit -r app/ --skip B101
+
+    test:
+        name: 🧪 Test & Coverage
+        runs-on: ubuntu-latest
+        needs: lint
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Python ${{ env.PYTHON_VERSION }}
+              uses: actions/setup-python@v4
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  cache: 'pip'
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements.txt
+                  pip install -r requirements-dev.txt
+
+            - name: Start MongoDB container for testing
+              run: |
+                  docker-compose -f docker-compose.test.yml up -d mongodb
+
+                  # Wait for MongoDB to be ready
+                  echo "Waiting for MongoDB to be ready..."
+                  for i in {1..12}; do
+                    if docker-compose -f docker-compose.test.yml exec -T mongodb mongosh --eval "db.adminCommand('ping')" --quiet; then
+                      echo "✅ MongoDB is ready!"
+                      break
+                    elif [ $i -eq 12 ]; then
+                      echo "❌ MongoDB failed to start"
+                      docker-compose -f docker-compose.test.yml logs mongodb
+                      exit 1
+                    fi
+                    sleep 5
+                  done
+
+            - name: Run tests with coverage
+              env:
+                  MONGODB_URL: mongodb://testuser:testpass@localhost:27017/testdb?authSource=admin
+                  PYTHONPATH: ${{ github.workspace }}
+              run: |
+                  # Run tests with coverage
+                  coverage run -m pytest tests/ -v --tb=short
+                  coverage report --show-missing
+                  coverage xml
+                  coverage html
+
+            - name: Check coverage threshold
+              run: |
+                  COVERAGE=$(coverage report --format=total)
+                  echo "Current coverage: $COVERAGE%"
+                  echo "Required coverage: ${{ env.COVERAGE_THRESHOLD }}%"
+
+                  if (( $(echo "$COVERAGE < ${{ env.COVERAGE_THRESHOLD }}" | bc -l) )); then
+                    echo "❌ Coverage $COVERAGE% is below threshold ${{ env.COVERAGE_THRESHOLD }}%"
+                    exit 1
+                  else
+                    echo "✅ Coverage $COVERAGE% meets threshold"
+                  fi
+
+            - name: SonarCloud Scan
+              uses: SonarSource/sonarcloud-github-action@master
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+              with:
+                  args: >
+                      -Dsonar.projectKey=grosint-backend
+                      -Dsonar.organization=your-org
+                      -Dsonar.python.coverage.reportPaths=coverage.xml
+                      -Dsonar.coverage.exclusions=tests/**,logs/**,venv/**
+                      -Dsonar.sources=app
+                      -Dsonar.tests=tests
+                      -Dsonar.qualitygate.wait=true
+
+            - name: Stop MongoDB container
+              if: always()
+              run: docker-compose -f docker-compose.test.yml down -v
+
+            - name: Upload coverage reports
+              uses: actions/upload-artifact@v3
+              with:
+                  name: coverage-reports
+                  path: |
+                      coverage.xml
+                      htmlcov/
+
+    build:
+        name: 🏗️ Build Application
+        runs-on: ubuntu-latest
+        needs: [lint, test]
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Create deployment package
+              run: |
+                  mkdir -p dist
+
+                  # Copy application files
+                  cp -r app/ dist/
+                  cp requirements.txt dist/
+                  cp run.py dist/
+
+                  # Create systemd service file
+                  cat > dist/grosint-backend.service << 'EOF'
+                  [Unit]
+                  Description=Grosint FastAPI Backend
+                  After=network.target
+
+                  [Service]
+                  Type=exec
+                  User=grosint
+                  Group=grosint
+                  WorkingDirectory=/opt/grosint-backend
+                  Environment=PYTHONPATH=/opt/grosint-backend
+                  ExecStart=/opt/grosint-backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 4
+                  Restart=always
+                  RestartSec=10
+                  StandardOutput=journal
+                  StandardError=journal
+
+                  [Install]
+                  WantedBy=multi-user.target
+                  EOF
+
+                  # Create nginx configuration
+                  cat > dist/nginx-grosint.conf << 'EOF'
+                  server {
+                      listen 80;
+                      server_name _;  # Accept any server name (for IP access)
+
+                      # Client max body size
+                      client_max_body_size 50M;
+
+                      # Main application
+                      location / {
+                          proxy_pass http://127.0.0.1:8000;
+                          proxy_set_header Host $host;
+                          proxy_set_header X-Real-IP $remote_addr;
+                          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                          proxy_set_header X-Forwarded-Proto $scheme;
+                          proxy_connect_timeout 60s;
+                          proxy_send_timeout 60s;
+                          proxy_read_timeout 60s;
+                      }
+
+                      # Health check endpoint
+                      location /health {
+                          proxy_pass http://127.0.0.1:8000/health;
+                          access_log off;
+                      }
+                  }
+                  EOF
+
+                  # Create deployment script
+                  cat > dist/deploy.sh << 'EOF'
+                  #!/bin/bash
+                  set -e
+
+                  echo "🚀 Starting deployment..."
+
+                  # Create Python virtual environment
+                  python3.12 -m venv venv
+                  source venv/bin/activate
+                  pip install --upgrade pip
+                  pip install -r requirements.txt
+
+                  echo "✅ Dependencies installed"
+                  EOF
+                  chmod +x dist/deploy.sh
+
+                  # Create environment template
+                  cat > dist/.env.production << 'EOF'
+                  # MongoDB Atlas Configuration
+                  MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/grosint?retryWrites=true&w=majority
+
+                  # Application Configuration
+                  DEBUG=false
+                  LOG_LEVEL=info
+                  SECRET_KEY=your-production-secret-key-here
+
+                  # JWT Configuration
+                  JWT_SECRET_KEY=your-jwt-secret-here
+                  JWT_ALGORITHM=HS256
+                  JWT_EXPIRE_MINUTES=30
+
+                  # Environment
+                  ENVIRONMENT=production
+                  EOF
+
+                  echo "Build package created successfully"
+                  ls -la dist/
+
+            - name: Upload build artifacts
+              uses: actions/upload-artifact@v3
+              with:
+                  name: build-artifacts
+                  path: dist/
+
+    deploy:
+        name: 🚀 Deploy to Production
+        runs-on: ubuntu-latest
+        needs: [lint, test, build]
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        environment:
+            name: production
+            url: http://${{ secrets.DOMAIN_NAME }}:8000
+
+        steps:
+            - name: Download build artifacts
+              uses: actions/download-artifact@v3
+              with:
+                  name: build-artifacts
+                  path: dist/
+
+            - name: Deploy to Azure VM
+              uses: appleboy/ssh-action@v1.0.0
+              with:
+                  host: ${{ secrets.AZURE_VM_HOST }}
+                  username: ${{ secrets.AZURE_VM_USERNAME }}
+                  key: ${{ secrets.AZURE_VM_SSH_KEY }}
+                  script_stop: true
+                  script: |
+                      echo "🛑 Stopping current application..."
+                      sudo systemctl stop grosint-backend || echo "Service not running"
+
+                      # Create backup
+                      if [ -d "/opt/grosint-backend" ]; then
+                        sudo mv /opt/grosint-backend /opt/grosint-backend.backup.$(date +%Y%m%d_%H%M%S)
+                      fi
+
+                      # Create application directory
+                      sudo mkdir -p /opt/grosint-backend
+                      sudo chown $USER:$USER /opt/grosint-backend
+
+            - name: Copy files to server
+              uses: appleboy/scp-action@v0.1.4
+              with:
+                  host: ${{ secrets.AZURE_VM_HOST }}
+                  username: ${{ secrets.AZURE_VM_USERNAME }}
+                  key: ${{ secrets.AZURE_VM_SSH_KEY }}
+                  source: 'dist/*'
+                  target: '/opt/grosint-backend'
+                  strip_components: 1
+
+            - name: Complete deployment
+              uses: appleboy/ssh-action@v1.0.0
+              with:
+                  host: ${{ secrets.AZURE_VM_HOST }}
+                  username: ${{ secrets.AZURE_VM_USERNAME }}
+                  key: ${{ secrets.AZURE_VM_SSH_KEY }}
+                  script: |
+                      cd /opt/grosint-backend
+
+                      # Set up application
+                      chmod +x deploy.sh
+                      ./deploy.sh
+
+                      # Set up environment
+                      if [ ! -f .env ]; then
+                        cp .env.production .env
+                        echo "⚠️  Created .env from template - UPDATE WITH REAL VALUES!"
+                      fi
+
+                      # Install systemd service
+                      sudo cp grosint-backend.service /etc/systemd/system/
+                      sudo systemctl daemon-reload
+                      sudo systemctl enable grosint-backend
+
+                      # Set up nginx
+                      sudo cp nginx-grosint.conf /etc/nginx/sites-available/grosint-backend
+                      sudo ln -sf /etc/nginx/sites-available/grosint-backend /etc/nginx/sites-enabled/
+                      sudo nginx -t
+                      sudo systemctl reload nginx
+
+                      # Start application
+                      sudo systemctl start grosint-backend
+
+                      # Wait and health check
+                      echo "⏳ Waiting for application to start..."
+                      sleep 15
+
+                      # Health check
+                      for i in {1..6}; do
+                        if curl -f http://127.0.0.1:8000/health >/dev/null 2>&1; then
+                          echo "✅ Application health check passed!"
+                          break
+                        elif [ $i -eq 6 ]; then
+                          echo "❌ Health check failed!"
+                          sudo journalctl -u grosint-backend --no-pager -n 20
+                          exit 1
+                        else
+                          echo "Attempt $i/6 failed, retrying..."
+                          sleep 5
+                        fi
+                      done
+
+                      echo "✅ Deployment completed successfully!"
+                      sudo systemctl status grosint-backend --no-pager
+
+    notify:
+        name: 📢 Slack Notification
+        runs-on: ubuntu-latest
+        needs: [lint, test, build, deploy]
+        if: always()
+
+        steps:
+            - name: Notify Success
+              if: needs.deploy.result == 'success'
+              uses: 8398a7/action-slack@v3
+              with:
+                  status: success
+                  channel: '#deployments'
+                  webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+                  custom_payload: |
+                      {
+                        "attachments": [
+                          {
+                            "color": "good",
+                            "title": "🎉 Deployment Successful!",
+                            "fields": [
+                              {
+                                "title": "Repository",
+                                "value": "${{ github.repository }}",
+                                "short": true
+                              },
+                              {
+                                "title": "Branch",
+                                "value": "${{ github.ref_name }}",
+                                "short": true
+                              },
+                              {
+                                "title": "Commit",
+                                "value": "${{ github.sha }}",
+                                "short": true
+                              },
+                              {
+                                "title": "Author",
+                                "value": "${{ github.actor }}",
+                                "short": true
+                              }
+                            ],
+                            "actions": [
+                              {
+                                "type": "button",
+                                "text": "View App",
+                                "url": "http://${{ secrets.DOMAIN_NAME }}:8000"
+                              },
+                              {
+                                "type": "button",
+                                "text": "View Logs",
+                                "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+
+            - name: Notify Failure
+              if: failure()
+              uses: 8398a7/action-slack@v3
+              with:
+                  status: failure
+                  channel: '#deployments'
+                  webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+                  custom_payload: |
+                      {
+                        "attachments": [
+                          {
+                            "color": "danger",
+                            "title": "❌ Pipeline Failed!",
+                            "fields": [
+                              {
+                                "title": "Repository",
+                                "value": "${{ github.repository }}",
+                                "short": true
+                              },
+                              {
+                                "title": "Branch",
+                                "value": "${{ github.ref_name }}",
+                                "short": true
+                              },
+                              {
+                                "title": "Failed Stage",
+                                "value": "${{ needs.lint.result == 'failure' && 'Lint' || needs.test.result == 'failure' && 'Test' || needs.build.result == 'failure' && 'Build' || 'Deploy' }}",
+                                "short": true
+                              },
+                              {
+                                "title": "Author",
+                                "value": "${{ github.actor }}",
+                                "short": true
+                              }
+                            ],
+                            "actions": [
+                              {
+                                "type": "button",
+                                "text": "View Logs",
+                                "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                              }
+                            ]
+                          }
+                        ]
+                      }
