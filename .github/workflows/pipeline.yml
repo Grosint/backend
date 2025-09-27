@@ -31,7 +31,9 @@ jobs:
                   pip install -r requirements-dev.txt
 
             - name: Black formatting check
-              run: black --check --diff app/ tests/
+              run: |
+                  black --version
+                  black --check --diff app/ tests/
 
             - name: Ruff linting and import sorting check
               run: |
