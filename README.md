@@ -43,35 +43,41 @@ tests/              # Test suite
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd backend
    ```
 
 2. **Create virtual environment**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. **Install dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
 
 4. **Set up environment variables**
+
    ```bash
    cp env.example .env
    # Edit .env with your configuration
    ```
 
 5. **Start MongoDB**
+
    ```bash
    # Make sure MongoDB is running on localhost:27017
    mongod
    ```
 
 6. **Run the application**
+
    ```bash
    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```
@@ -79,15 +85,18 @@ tests/              # Test suite
 ### API Documentation
 
 Once the server is running, visit:
-- **Swagger UI**: http://localhost:8000/api/docs
-- **ReDoc**: http://localhost:8000/api/redoc
+
+- **Swagger UI**: <http://localhost:8000/api/docs>
+- **ReDoc**: <http://localhost:8000/api/redoc>
 
 ## API Endpoints
 
 ### Authentication
+
 - `POST /api/v1/auth/token` - Get access token
 
 ### Users
+
 - `POST /api/v1/users/` - Create user
 - `GET /api/v1/users/me` - Get current user
 - `PUT /api/v1/users/me` - Update current user
@@ -95,6 +104,7 @@ Once the server is running, visit:
 - `DELETE /api/v1/users/{user_id}` - Delete user (admin)
 
 ### Searches
+
 - `POST /api/v1/searches/` - Create search
 - `GET /api/v1/searches/{search_id}` - Get search results
 - `GET /api/v1/searches/` - List searches
@@ -104,11 +114,13 @@ Once the server is running, visit:
 ## Testing
 
 ### Run all tests
+
 ```bash
 pytest
 ```
 
 ### Run specific test categories
+
 ```bash
 pytest -m unit          # Unit tests only
 pytest -m integration   # Integration tests only
@@ -116,6 +128,7 @@ pytest -m e2e          # End-to-end tests only
 ```
 
 ### Run with coverage
+
 ```bash
 pytest --cov=app --cov-report=html
 ```
@@ -172,7 +185,3 @@ pytest --cov=app --cov-report=html
 4. Set up monitoring and logging
 5. Use a reverse proxy (nginx)
 6. Enable HTTPS
-
-## License
-
-[Add your license here]
