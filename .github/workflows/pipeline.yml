@@ -205,11 +205,31 @@ jobs:
               if: env.SONARCLOUD_TOKEN != ''
               run: |
                   echo "Disabling automatic analysis for CI compatibility..."
+
+                  # Check current automatic analysis status
+                  echo "Checking current automatic analysis status..."
+                  STATUS_RESPONSE=$(curl -s -u "${{ secrets.SONARCLOUD_TOKEN }}:" "https://sonarcloud.io/api/automatic_analysis/status?project=Grosint_backend")
+                  echo "Current status: $STATUS_RESPONSE"
+
                   # Disable automatic analysis via API
-                  curl -X POST \
+                  echo "Attempting to disable automatic analysis..."
+                  DISABLE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
                     -u "${{ secrets.SONARCLOUD_TOKEN }}:" \
                     "https://sonarcloud.io/api/automatic_analysis/disable" \
-                    -d "project=Grosint_backend" || echo "Failed to disable automatic analysis (may already be disabled)"
+                    -d "project=Grosint_backend")
+
+                  HTTP_CODE=$(echo "$DISABLE_RESPONSE" | tail -n1)
+                  RESPONSE_BODY=$(echo "$DISABLE_RESPONSE" | head -n -1)
+
+                  echo "HTTP Status: $HTTP_CODE"
+                  echo "Response: $RESPONSE_BODY"
+
+                  if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
+                    echo "✅ Automatic analysis disabled successfully"
+                  else
+                    echo "⚠️  Failed to disable automatic analysis via API (HTTP $HTTP_CODE)"
+                    echo "You may need to disable it manually in SonarCloud project settings"
+                  fi
 
             - name: SonarCloud Scan
               if: env.SONARCLOUD_TOKEN != ''
@@ -221,9 +241,25 @@ jobs:
                   args: >
                       -Dsonar.organization=${{ env.SONARCLOUD_ORG }}
                       -Dsonar.host.url=https://sonarcloud.io
+              continue-on-error: true
+
+            - name: SonarCloud Scan Fallback
+              if: env.SONARCLOUD_TOKEN != '' && failure()
+              run: |
+                  echo "❌ SonarCloud scan failed due to automatic analysis conflict"
+                  echo ""
+                  echo "🔧 TO FIX THIS ISSUE:"
+                  echo "1. Go to your SonarCloud project: https://sonarcloud.io/project/overview?id=Grosint_backend"
+                  echo "2. Click on 'Administration' → 'Analysis Method'"
+                  echo "3. Disable 'Automatic Analysis'"
+                  echo "4. Save the changes"
+                  echo "5. Re-run this pipeline"
+                  echo ""
+                  echo "This will allow CI analysis to work properly."
+                  echo "The pipeline will continue without SonarCloud analysis for now."
 
             - name: SonarCloud Quality Gate
-              if: env.SONARCLOUD_TOKEN != ''
+              if: env.SONARCLOUD_TOKEN != '' && success()
               uses: SonarSource/sonarqube-quality-gate-action@master
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
