@@ -22,7 +22,6 @@ def check_docker_available():
     """Check if Docker is available and running."""
     try:
         run_command(["docker", "--version"], capture_output=True)
-        run_command(["docker-compose", "--version"], capture_output=True)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
@@ -33,7 +32,7 @@ def start_test_services():
     compose_file = Path(__file__).parent / "docker-compose.test.yml"
 
     print("Starting test MongoDB container...")
-    run_command(["docker-compose", "-f", str(compose_file), "up", "-d", "--build"])
+    run_command(["docker", "compose", "-f", str(compose_file), "up", "-d", "--build"])
 
     # Wait for MongoDB to be ready
     print("Waiting for MongoDB to be ready...")
@@ -67,7 +66,9 @@ def stop_test_services():
     compose_file = Path(__file__).parent / "docker-compose.test.yml"
 
     print("Stopping test containers...")
-    run_command(["docker-compose", "-f", str(compose_file), "down", "-v"], check=False)
+    run_command(
+        ["docker", "compose", "-f", str(compose_file), "down", "-v"], check=False
+    )
 
 
 def run_tests(test_args=None):

@@ -65,7 +65,7 @@ def docker_services(docker_compose_file):
     try:
         # Start the services
         subprocess.run(
-            ["docker-compose", "-f", docker_compose_file, "up", "-d", "--build"],
+            ["docker", "compose", "-f", docker_compose_file, "up", "-d", "--build"],
             check=True,
         )
 
@@ -100,7 +100,7 @@ def docker_services(docker_compose_file):
     finally:
         # Clean up: stop and remove containers
         subprocess.run(
-            ["docker-compose", "-f", docker_compose_file, "down", "-v"], check=False
+            ["docker", "compose", "-f", docker_compose_file, "down", "-v"], check=False
         )
 
         # Restore .env file
