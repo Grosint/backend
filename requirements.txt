@@ -21,7 +21,7 @@ pytest-mock>=3.10.0,<4.0.0
 
 # Additional utilities
 python-dateutil>=2.8.2,<3.0.0
-python-dotenv>=0.20.0,<0.21.0
+python-dotenv>=0.21.0,<0.22.0
 python-jose>=3.5.0,<3.6.0
 python-multipart>=0.0.6,<0.1.0
 uvicorn>=0.35.0,<0.36.0
