@@ -99,6 +99,18 @@ jobs:
                   mkdir -p target/sonar
                   echo "SonarCloud scan preparation completed"
 
+                  # Debug: Check if coverage file exists
+                  if [ -f "coverage.xml" ]; then
+                    echo "✅ Coverage file exists: $(ls -la coverage.xml)"
+                  else
+                    echo "❌ Coverage file not found"
+                  fi
+
+                  # Debug: Check project structure
+                  echo "Project structure:"
+                  ls -la app/ || echo "app/ directory not found"
+                  ls -la tests/ || echo "tests/ directory not found"
+
             - name: Check coverage threshold
               run: |
                   COVERAGE=$(coverage report --format=total)
@@ -171,6 +183,15 @@ jobs:
                     echo "SONARCLOUD_ORG=${{ secrets.SONARCLOUD_ORG }}" >> $GITHUB_ENV
                   fi
 
+            - name: Test SonarCloud Connection
+              if: env.SONARCLOUD_TOKEN != ''
+              run: |
+                  echo "Testing SonarCloud connection..."
+                  curl -s -u "${{ secrets.SONARCLOUD_TOKEN }}:" "https://sonarcloud.io/api/authentication/validate" || echo "Connection test failed"
+
+                  echo "Organization: ${{ env.SONARCLOUD_ORG }}"
+                  echo "Project Key: Grosint_backend"
+
             - name: SonarCloud Scan
               if: env.SONARCLOUD_TOKEN != ''
               uses: SonarSource/sonarqube-scan-action@master
@@ -186,8 +207,6 @@ jobs:
                       -Dsonar.coverage.exclusions=tests/**,logs/**,venv/**,__pycache__/**
                       -Dsonar.sources=app
                       -Dsonar.tests=tests
-                      -Dsonar.qualitygate.wait=true
-                      -Dsonar.scanner.metadataFilePath=target/sonar/report-task.txt
 
             - name: SonarCloud Quality Gate
               if: env.SONARCLOUD_TOKEN != ''
@@ -197,7 +216,6 @@ jobs:
                   SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
               with:
                   scanMetadataReportFile: target/sonar/report-task.txt
-                  timeout: 5
 
             - name: Stop MongoDB container
               if: always()
@@ -454,10 +472,11 @@ jobs:
             - name: Notify Success
               if: needs.deploy.result == 'success'
               uses: 8398a7/action-slack@v3
+              env:
+                  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
               with:
                   status: success
                   channel: '#deployments'
-                  webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
                   custom_payload: |
                       {
                         "attachments": [
@@ -505,10 +524,11 @@ jobs:
             - name: Notify Failure
               if: needs.lint.result == 'failure' || needs.test.result == 'failure' || needs.build.result == 'failure' || needs.deploy.result == 'failure' || needs.lint.result == 'cancelled' || needs.test.result == 'cancelled' || needs.build.result == 'cancelled' || needs.deploy.result == 'cancelled'
               uses: 8398a7/action-slack@v3
+              env:
+                  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
               with:
                   status: failure
                   channel: '#deployments'
-                  webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
                   custom_payload: |
                       {
                         "attachments": [
@@ -551,10 +571,11 @@ jobs:
             - name: Notify Skipped
               if: needs.deploy.result == 'skipped' && (needs.lint.result == 'success' && needs.test.result == 'success' && needs.build.result == 'success')
               uses: 8398a7/action-slack@v3
+              env:
+                  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
               with:
                   status: success
                   channel: '#deployments'
-                  webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
                   custom_payload: |
                       {
                         "attachments": [
