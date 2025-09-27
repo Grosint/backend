@@ -201,6 +201,16 @@ jobs:
                   echo "Updated sonar-project.properties:"
                   cat sonar-project.properties
 
+            - name: Disable Automatic Analysis
+              if: env.SONARCLOUD_TOKEN != ''
+              run: |
+                  echo "Disabling automatic analysis for CI compatibility..."
+                  # Disable automatic analysis via API
+                  curl -X POST \
+                    -u "${{ secrets.SONARCLOUD_TOKEN }}:" \
+                    "https://sonarcloud.io/api/automatic_analysis/disable" \
+                    -d "project=Grosint_backend" || echo "Failed to disable automatic analysis (may already be disabled)"
+
             - name: SonarCloud Scan
               if: env.SONARCLOUD_TOKEN != ''
               uses: SonarSource/sonarqube-scan-action@master
@@ -211,7 +221,6 @@ jobs:
                   args: >
                       -Dsonar.organization=${{ env.SONARCLOUD_ORG }}
                       -Dsonar.host.url=https://sonarcloud.io
-                      -Dsonar.ci.disableAutomaticAnalysis=true
 
             - name: SonarCloud Quality Gate
               if: env.SONARCLOUD_TOKEN != ''
