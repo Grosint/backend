@@ -192,6 +192,15 @@ jobs:
                   echo "Organization: ${{ env.SONARCLOUD_ORG }}"
                   echo "Project Key: Grosint_backend"
 
+            - name: Update SonarCloud Properties
+              if: env.SONARCLOUD_TOKEN != ''
+              run: |
+                  echo "Updating sonar-project.properties with detected organization..."
+                  # Update the organization in sonar-project.properties
+                  sed -i "s/sonar.organization=.*/sonar.organization=${{ env.SONARCLOUD_ORG }}/" sonar-project.properties
+                  echo "Updated sonar-project.properties:"
+                  cat sonar-project.properties
+
             - name: SonarCloud Scan
               if: env.SONARCLOUD_TOKEN != ''
               uses: SonarSource/sonarqube-scan-action@master
@@ -200,13 +209,9 @@ jobs:
                   SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
               with:
                   args: >
-                      -Dsonar.projectKey=Grosint_backend
                       -Dsonar.organization=${{ env.SONARCLOUD_ORG }}
                       -Dsonar.host.url=https://sonarcloud.io
-                      -Dsonar.python.coverage.reportPaths=coverage.xml
-                      -Dsonar.coverage.exclusions=tests/**,logs/**,venv/**,__pycache__/**
-                      -Dsonar.sources=app
-                      -Dsonar.tests=tests
+                      -Dsonar.ci.disableAutomaticAnalysis=true
 
             - name: SonarCloud Quality Gate
               if: env.SONARCLOUD_TOKEN != ''
