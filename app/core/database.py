@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlparse
 
 from pymongo import AsyncMongoClient
 from pymongo.errors import ConnectionFailure
@@ -8,6 +9,23 @@ from pymongo.errors import ConnectionFailure
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def extract_database_name_from_url(mongodb_url: str) -> str:
+    """Extract database name from MongoDB URL"""
+    try:
+        parsed_url = urlparse(mongodb_url)
+        # Get the path after the first slash, remove leading slash
+        database_name = parsed_url.path.lstrip("/")
+
+        # If no database specified in URL, use default
+        if not database_name:
+            return settings.MONGODB_DATABASE
+
+        return database_name
+    except Exception as e:
+        logger.warning(f"Could not extract database name from URL: {e}. Using default.")
+        return settings.MONGODB_DATABASE
 
 
 class Database:
@@ -27,7 +45,10 @@ async def connect_to_mongo():
     """Create database connection"""
     try:
         db.client = AsyncMongoClient(settings.MONGODB_URL)
-        db.database = db.client[settings.MONGODB_DATABASE]
+
+        # Extract database name from URL or use default
+        database_name = extract_database_name_from_url(settings.MONGODB_URL)
+        db.database = db.client[database_name]
 
         # Test the connection
         await db.client.admin.command("ping")

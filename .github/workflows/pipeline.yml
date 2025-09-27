@@ -322,8 +322,8 @@ jobs:
 
                   [Service]
                   Type=exec
-                  User=grosint
-                  Group=grosint
+                  User=ubuntu
+                  Group=ubuntu
                   WorkingDirectory=/opt/grosint-backend
                   Environment=PYTHONPATH=/opt/grosint-backend
                   ExecStart=/opt/grosint-backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 4
@@ -382,24 +382,7 @@ jobs:
                   EOF
                   chmod +x dist/deploy.sh
 
-                  # Create environment template
-                  cat > dist/.env.production << 'EOF'
-                  # MongoDB Atlas Configuration
-                  MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/grosint?retryWrites=true&w=majority
-
-                  # Application Configuration
-                  DEBUG=false
-                  LOG_LEVEL=info
-                  SECRET_KEY=your-production-secret-key-here
-
-                  # JWT Configuration
-                  JWT_SECRET_KEY=your-jwt-secret-here
-                  JWT_ALGORITHM=HS256
-                  JWT_EXPIRE_MINUTES=30
-
-                  # Environment
-                  ENVIRONMENT=production
-                  EOF
+                  # Environment file will be created during deployment using GitHub Secrets
 
                   echo "Build package created successfully"
                   ls -la dist/
@@ -458,7 +441,6 @@ jobs:
                   key: ${{ secrets.AZURE_VM_SSH_KEY }}
                   source: 'dist/*'
                   target: '/opt/grosint-backend'
-                  strip_components: 1
 
             - name: Complete deployment
               uses: appleboy/ssh-action@v1.0.0
@@ -469,20 +451,42 @@ jobs:
                   script: |
                       cd /opt/grosint-backend
 
+                      # Debug: List all files to verify copying
+                      echo "Files in deployment directory:"
+                      ls -la
+
                       # Set up application
                       chmod +x deploy.sh
                       ./deploy.sh
 
-                      # Set up environment
-                      if [ ! -f .env ]; then
-                        cp .env.production .env
-                        echo "⚠️  Created .env from template - UPDATE WITH REAL VALUES!"
-                      fi
+                      # Create .env file from GitHub Secrets
+                      echo "Creating .env file from GitHub Secrets..."
+                      cat > .env << EOF
+                      # MongoDB Atlas Configuration
+                      MONGODB_URL=${{ secrets.MONGODB_URL }}
+
+                      # Application Configuration
+                      DEBUG=false
+                      LOG_LEVEL=info
+                      SECRET_KEY=${{ secrets.SECRET_KEY }}
+
+                      # Environment
+                      ENVIRONMENT=production
+                      EOF
+                      echo "✅ .env file created with production secrets"
+
+                      # Create logs directory with proper permissions
+                      sudo mkdir -p /opt/grosint-backend/logs
+                      sudo chown $USER:$USER /opt/grosint-backend/logs
+                      sudo chmod 755 /opt/grosint-backend/logs
 
                       # Install systemd service
                       sudo cp grosint-backend.service /etc/systemd/system/
                       sudo systemctl daemon-reload
                       sudo systemctl enable grosint-backend
+
+                      # Set proper ownership for all files
+                      sudo chown -R $USER:$USER /opt/grosint-backend
 
                       # Set up nginx
                       sudo cp nginx-grosint.conf /etc/nginx/sites-available/grosint-backend
