@@ -7,7 +7,7 @@ on:
         branches: [develop, production, main]
 
 env:
-    PYTHON_VERSION: '3.12.7'
+    PYTHON_VERSION: "3.12.7"
     COVERAGE_THRESHOLD: 10
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
               uses: actions/setup-python@v4
               with:
                   python-version: ${{ env.PYTHON_VERSION }}
-                  cache: 'pip'
+                  cache: "pip"
 
             - name: Install dependencies
               run: |
@@ -56,7 +56,7 @@ jobs:
               uses: actions/setup-python@v4
               with:
                   python-version: ${{ env.PYTHON_VERSION }}
-                  cache: 'pip'
+                  cache: "pip"
 
             - name: Install dependencies
               run: |
@@ -314,56 +314,8 @@ jobs:
                   cp requirements.txt dist/
                   cp run.py dist/
 
-                  # Create systemd service file
-                  cat > dist/grosint-backend.service << 'EOF'
-                  [Unit]
-                  Description=Grosint FastAPI Backend
-                  After=network.target
-
-                  [Service]
-                  Type=exec
-                  User=root
-                  Group=root
-                  WorkingDirectory=/opt/grosint-backend
-                  Environment=PYTHONPATH=/opt/grosint-backend
-                  ExecStart=/opt/grosint-backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 4
-                  Restart=always
-                  RestartSec=10
-                  StandardOutput=journal
-                  StandardError=journal
-
-                  [Install]
-                  WantedBy=multi-user.target
-                  EOF
-
-                  # Create nginx configuration
-                  cat > dist/nginx-grosint.conf << 'EOF'
-                  server {
-                      listen 80;
-                      server_name _;  # Accept any server name (for IP access)
-
-                      # Client max body size
-                      client_max_body_size 50M;
-
-                      # Main application
-                      location / {
-                          proxy_pass http://127.0.0.1:8000;
-                          proxy_set_header Host $host;
-                          proxy_set_header X-Real-IP $remote_addr;
-                          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                          proxy_set_header X-Forwarded-Proto $scheme;
-                          proxy_connect_timeout 60s;
-                          proxy_send_timeout 60s;
-                          proxy_read_timeout 60s;
-                      }
-
-                      # Health check endpoint
-                      location /api/health {
-                          proxy_pass http://127.0.0.1:8000/api/health;
-                          access_log off;
-                      }
-                  }
-                  EOF
+                  # Note: Nginx and systemd configurations are created by setup.sh
+                  # No need to create them here as they already exist on the server
 
                   # Create deployment script
                   cat > dist/deploy.sh << 'EOF'
@@ -439,8 +391,8 @@ jobs:
                   host: ${{ secrets.AZURE_VM_HOST }}
                   username: ${{ secrets.AZURE_VM_USERNAME }}
                   key: ${{ secrets.AZURE_VM_SSH_KEY }}
-                  source: 'dist/*'
-                  target: '/opt/grosint-backend'
+                  source: "dist/*"
+                  target: "/opt/grosint-backend"
                   strip_components: 1
 
             - name: Complete deployment
@@ -489,20 +441,20 @@ jobs:
                       sudo chown $USER:$USER /opt/grosint-backend/logs
                       sudo chmod 755 /opt/grosint-backend/logs
 
-                      # Install systemd service
-                      sudo cp grosint-backend.service /etc/systemd/system/
+                      # Systemd service and Nginx config are already created by setup.sh
+                      # Just reload the services
                       sudo systemctl daemon-reload
                       sudo systemctl enable grosint-backend
+                      sudo nginx -t
+                      sudo systemctl reload nginx
 
                       # Set proper ownership for all files
+                      # FastAPI runs as root, Nginx proxies to it (no direct file access needed)
                       sudo chown -R root:root /opt/grosint-backend
                       sudo chmod -R 755 /opt/grosint-backend
 
-                      # Set up nginx
-                      sudo cp nginx-grosint.conf /etc/nginx/sites-available/grosint-backend
-                      sudo ln -sf /etc/nginx/sites-available/grosint-backend /etc/nginx/sites-enabled/
-                      sudo nginx -t
-                      sudo systemctl reload nginx
+                      # Only give www-data access to logs (if Nginx needs to write logs)
+                      sudo chown -R www-data:www-data /opt/grosint-backend/logs
 
                       # Start application
                       sudo systemctl start grosint-backend
@@ -559,7 +511,7 @@ jobs:
                   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
               with:
                   status: success
-                  channel: '#deployments'
+                  channel: "#deployments"
                   custom_payload: |
                       {
                         "attachments": [
@@ -611,7 +563,7 @@ jobs:
                   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
               with:
                   status: failure
-                  channel: '#deployments'
+                  channel: "#deployments"
                   custom_payload: |
                       {
                         "attachments": [
@@ -658,7 +610,7 @@ jobs:
                   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
               with:
                   status: success
-                  channel: '#deployments'
+                  channel: "#deployments"
                   custom_payload: |
                       {
                         "attachments": [

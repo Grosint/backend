@@ -391,7 +391,8 @@ sudo apt install -y \
     zip \
     unzip \
     rsync \
-    build-essential
+    build-essential \
+    net-tools
 
 print_status "Installing Python package management tools for Python 3.12..."
 # Use Python 3.12 specifically for package installations
@@ -478,6 +479,122 @@ EOF
 sudo chmod +x /usr/local/bin/grosint-backup
 
 print_success "Helper scripts created!"
+
+# =============================================================================
+# STEP 13.5: CREATE NGINX AND SYSTEMD CONFIGURATIONS
+# =============================================================================
+print_header "STEP 13.5: CREATING NGINX AND SYSTEMD CONFIGURATIONS"
+
+print_status "Creating main Nginx configuration..."
+sudo tee /etc/nginx/nginx.conf << 'EOF'
+user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+
+events {
+    worker_connections 1024;
+    use epoll;
+    multi_accept on;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # Logging
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log /var/log/nginx/access.log main;
+    error_log /var/log/nginx/error.log;
+
+    # Performance
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        text/javascript
+        application/json
+        application/javascript
+        application/xml+rss
+        application/atom+xml
+        image/svg+xml;
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+    # Include site configurations
+    include /etc/nginx/sites-enabled/*;
+}
+EOF
+
+print_status "Creating site-specific Nginx configuration..."
+sudo tee /etc/nginx/sites-available/grosint-backend << 'EOF'
+server {
+    listen 80;
+    server_name _;
+
+    client_max_body_size 50M;
+
+    # Rate limiting
+    limit_req zone=api burst=20 nodelay;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}
+EOF
+
+print_status "Creating systemd service file..."
+sudo tee /etc/systemd/system/grosint-backend.service << 'EOF'
+[Unit]
+Description=Grosint FastAPI Backend
+After=network.target
+
+[Service]
+Type=exec
+User=root
+Group=root
+WorkingDirectory=/opt/grosint-backend
+Environment=PYTHONPATH=/opt/grosint-backend
+ExecStart=/opt/grosint-backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 4
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+print_status "Enabling Nginx site..."
+sudo ln -sf /etc/nginx/sites-available/grosint-backend /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+
+print_status "Testing configurations..."
+sudo nginx -t
+sudo systemctl daemon-reload
+
+print_success "Nginx and systemd configurations created!"
 
 # =============================================================================
 # STEP 14: FINAL VERIFICATION AND INFORMATION
