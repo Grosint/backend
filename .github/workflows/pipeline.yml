@@ -2,9 +2,10 @@ name: Grosint Backend CI/CD Pipeline
 
 on:
     push:
-        branches: [main] # Currently set to main for testing
+        branches: [main, develop, production] # Currently set to main for testing
     pull_request:
-        branches: [develop, production, main]
+        types: [closed]
+        branches: [main, develop, production]
 
 env:
     PYTHON_VERSION: "3.12.7"
@@ -87,7 +88,7 @@ jobs:
                   MONGODB_URL: mongodb://testuser:testpass@localhost:27018/test_osint_backend?authSource=admin
                   PYTHONPATH: ${{ github.workspace }}
               run: |
-                  # Run tests with coverage
+                  # Run tests with coverage (no GUI interaction)
                   coverage run -m pytest tests/ -v --tb=short
                   coverage report --show-missing
                   coverage xml
@@ -349,7 +350,7 @@ jobs:
         name: 🚀 Deploy to Production
         runs-on: ubuntu-latest
         needs: [lint, test, build]
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: (github.event_name == 'push') || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
         environment:
             name: production
 

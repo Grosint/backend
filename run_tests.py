@@ -5,6 +5,7 @@ This script handles starting/stopping Docker containers for tests.
 """
 
 import argparse
+import contextlib
 import subprocess
 import sys
 import time
@@ -71,24 +72,81 @@ def stop_test_services():
     )
 
 
-def run_tests(test_args=None):
-    """Run the tests with pytest."""
+def run_tests(
+    test_args=None,
+    use_coverage=True,
+    cov_target="app",
+    cov_branch=False,
+    generate_html=True,
+    generate_xml=True,
+):
+    """Run the tests with pytest (optionally with coverage reports)."""
     if test_args is None:
         test_args = []
 
-    cmd = ["python", "-m", "pytest"] + test_args
+    cmd = ["python", "-m", "pytest"]
+
+    if use_coverage:
+        # pytest-cov provides rich reporting: terminal, html, and xml
+        cmd += [
+            f"--cov={cov_target}",
+            "--cov-report=term-missing",
+        ]
+        if generate_html:
+            cmd += ["--cov-report=html"]  # outputs to htmlcov/
+        if generate_xml:
+            cmd += ["--cov-report=xml"]  # outputs to coverage.xml
+        if cov_branch:
+            cmd += ["--cov-branch"]
+
+    cmd += test_args
+
     return run_command(cmd)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run tests with Docker MongoDB")
+    parser = argparse.ArgumentParser(
+        description="Run tests with Docker MongoDB and coverage reports"
+    )
     parser.add_argument(
-        "test_args", nargs="*", help="Additional arguments to pass to pytest"
+        "test_args",
+        nargs="*",
+        help="Additional arguments to pass to pytest",
     )
     parser.add_argument(
         "--no-docker",
         action="store_true",
         help="Skip Docker setup (assume MongoDB is already running)",
+    )
+    parser.add_argument(
+        "--no-coverage",
+        action="store_true",
+        help="Disable coverage reporting (pytest-cov)",
+    )
+    parser.add_argument(
+        "--cov-target",
+        default="app",
+        help="Target package or path for coverage (default: app)",
+    )
+    parser.add_argument(
+        "--cov-branch",
+        action="store_true",
+        help="Measure branch coverage as well",
+    )
+    parser.add_argument(
+        "--no-html",
+        action="store_true",
+        help="Do not generate HTML coverage report",
+    )
+    parser.add_argument(
+        "--no-xml",
+        action="store_true",
+        help="Do not generate XML coverage report",
+    )
+    parser.add_argument(
+        "--open-html",
+        action="store_true",
+        help="Open the HTML coverage report after tests (htmlcov/index.html)",
     )
 
     args = parser.parse_args()
@@ -106,12 +164,39 @@ def main():
             sys.exit(1)
 
     try:
-        # Run the tests
-        result = run_tests(args.test_args)
+        # Run the tests (with optional coverage)
+        result = run_tests(
+            test_args=args.test_args,
+            use_coverage=not args.no_coverage,
+            cov_target=args.cov_target,
+            cov_branch=args.cov_branch,
+            generate_html=not args.no_html,
+            generate_xml=not args.no_xml,
+        )
         exit_code = result.returncode
     finally:
         if not args.no_docker:
             stop_test_services()
+
+    # Optionally open the HTML report
+    if (
+        exit_code == 0
+        and (not args.no_coverage)
+        and (not args.no_html)
+        and args.open_html
+    ):
+        index_path = Path("htmlcov") / "index.html"
+        if index_path.exists():
+            opener = None
+            if sys.platform.startswith("darwin"):
+                opener = ["open", str(index_path)]
+            elif sys.platform.startswith("linux"):
+                opener = ["xdg-open", str(index_path)]
+            elif sys.platform.startswith("win"):
+                opener = ["cmd", "/c", "start", str(index_path)]
+            if opener:
+                with contextlib.suppress(Exception):
+                    run_command(opener, check=False)
 
     sys.exit(exit_code)
 
