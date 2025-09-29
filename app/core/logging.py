@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -17,6 +18,59 @@ class UTCFormatter(logging.Formatter):
             return dt.strftime(datefmt)
         else:
             return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+
+class JSONFormatter(logging.Formatter):
+    """Custom JSON formatter for structured logging"""
+
+    def format(self, record):
+        log_entry = {
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+        }
+
+        # Add client IP if available
+        if hasattr(record, "client_ip"):
+            log_entry["client_ip"] = record.client_ip
+
+        # Add exception info if present
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+
+        # Add extra fields from record
+        for key, value in record.__dict__.items():
+            if key not in [
+                "name",
+                "msg",
+                "args",
+                "levelname",
+                "levelno",
+                "pathname",
+                "filename",
+                "module",
+                "lineno",
+                "funcName",
+                "created",
+                "msecs",
+                "relativeCreated",
+                "thread",
+                "threadName",
+                "processName",
+                "process",
+                "getMessage",
+                "exc_info",
+                "exc_text",
+                "stack_info",
+                "client_ip",
+            ]:
+                log_entry[key] = value
+
+        return json.dumps(log_entry, ensure_ascii=False)
 
 
 class ClientIPFilter(logging.Filter):
@@ -52,12 +106,23 @@ def setup_logging():
     logger = logging.getLogger()
     logger.setLevel(log_level)
 
-    # Create formatters with UTC timezone, seconds precision, and client IP
-    utc_formatter = UTCFormatter(
-        "%(asctime)s UTC - [%(client_ip)s] - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    file_formatter = utc_formatter
+    # Choose formatter based on environment
+    environment = os.getenv("ENVIRONMENT", "development")
+    if environment == "production":
+        # Use JSON formatter for production (better for log aggregation)
+        file_formatter = JSONFormatter()
+        console_formatter = UTCFormatter(
+            "%(asctime)s UTC - [%(client_ip)s] - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    else:
+        # Use human-readable formatter for development
+        utc_formatter = UTCFormatter(
+            "%(asctime)s UTC - [%(client_ip)s] - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        file_formatter = utc_formatter
+        console_formatter = utc_formatter
 
     # File handler with daily rotation
     file_handler = TimedRotatingFileHandler(
@@ -74,9 +139,9 @@ def setup_logging():
     logger.addHandler(file_handler)
 
     # Console handler for development
-    if os.getenv("ENVIRONMENT", "development") == "development":
+    if environment == "development":
         console_handler = logging.StreamHandler()
-        console_handler.setFormatter(utc_formatter)
+        console_handler.setFormatter(console_formatter)
         console_handler.setLevel(log_level)
         console_handler.addFilter(ClientIPFilter())
         logger.addHandler(console_handler)

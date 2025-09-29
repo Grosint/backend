@@ -1,0 +1,118 @@
+server:
+    http_listen_port: 9080
+    grpc_listen_port: 0
+
+positions:
+    filename: /var/lib/promtail/positions.yaml
+
+clients:
+    - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+    # Grosint Backend Application Logs
+    - job_name: 'grosint-app'
+      static_configs:
+          - targets: [localhost]
+            labels:
+                job: grosint-app
+                host: ${HOSTNAME}
+                app: backend
+                __path__: /opt/grosint-backend/logs/app-*.log
+      pipeline_stages:
+          - json:
+                expressions:
+                    timestamp: timestamp
+                    level: level
+                    logger: logger
+                    message: message
+                    client_ip: client_ip
+                    module: module
+                    function: function
+                    line: line
+          - timestamp:
+                source: timestamp
+                format: RFC3339
+          - labels:
+                level:
+                logger:
+                client_ip:
+                module:
+                function:
+          - output:
+                source: message
+
+    # Nginx Access Logs (JSON format)
+    - job_name: 'nginx-access'
+      static_configs:
+          - targets: [localhost]
+            labels:
+                job: nginx
+                host: ${HOSTNAME}
+                log_type: access
+                __path__: /var/log/nginx/access*.log
+      pipeline_stages:
+          - json:
+                expressions:
+                    time: time
+                    remote_addr: remote_addr
+                    request: request
+                    status: status
+                    body_bytes_sent: body_bytes_sent
+                    request_time: request_time
+                    upstream_response_time: upstream_response_time
+                    request_method: request_method
+                    uri: uri
+                    http_referrer: http_referrer
+                    http_user_agent: http_user_agent
+                    http_x_forwarded_for: http_x_forwarded_for
+                    server_name: server_name
+          - timestamp:
+                source: time
+                format: RFC3339
+          - labels:
+                status:
+                request_method:
+                server_name:
+          - regex:
+                expression: '^(?P<method>\S+) (?P<path>\S+) (?P<protocol>\S+)'
+                source: request
+          - labels:
+                method:
+                path:
+                protocol:
+          - output:
+                source: request
+
+    # Nginx Error Logs
+    - job_name: 'nginx-error'
+      static_configs:
+          - targets: [localhost]
+            labels:
+                job: nginx
+                host: ${HOSTNAME}
+                log_type: error
+                __path__: /var/log/nginx/error*.log
+      pipeline_stages:
+          # Base fields from error log prefix
+          - regex:
+                expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<pid>\d+)#(?P<tid>\d+): (?P<message>.*)'
+          - timestamp:
+                source: timestamp
+                format: '2006/01/02 15:04:05'
+          # Extract structured key/value pairs commonly appended by nginx
+          - regex:
+                expression: 'client: (?P<client>[^,]+)(?:, server: (?P<server>[^,]+))?(?:, request: "(?P<request>[^"]+)")?(?:, upstream: "(?P<upstream>[^"]+)")?(?:, host: "(?P<host>[^"]+)")?'
+          # Optionally split request into method/path/protocol when present
+          - regex:
+                source: request
+                expression: '^(?P<req_method>\S+) (?P<req_path>\S+) (?P<req_protocol>\S+)$'
+          - labels:
+                level:
+                pid:
+                tid:
+                server:
+                client:
+                host:
+                req_method:
+          - output:
+                source: message

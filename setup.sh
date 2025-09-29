@@ -327,6 +327,18 @@ print_status "✓ HTTPS (port 443) allowed"
 sudo ufw allow 8000
 print_status "✓ Application port (8000) allowed"
 
+# Allow monitoring ports
+sudo ufw allow 3000  # Grafana
+print_status "✓ Grafana port (3000) allowed"
+sudo ufw allow 9090  # Prometheus
+print_status "✓ Prometheus port (9090) allowed"
+sudo ufw allow 3100  # Loki
+print_status "✓ Loki port (3100) allowed"
+sudo ufw allow 9100  # Node Exporter
+print_status "✓ Node Exporter port (9100) allowed"
+sudo ufw allow 9113  # Nginx Exporter
+print_status "✓ Nginx Exporter port (9113) allowed"
+
 print_status "Enabling UFW firewall..."
 sudo ufw --force enable
 
@@ -423,6 +435,26 @@ sudo tee /etc/logrotate.d/grosint-backend << EOF
 }
 EOF
 
+print_status "Configuring log rotation for Nginx logs..."
+sudo tee /etc/logrotate.d/nginx << EOF
+/var/log/nginx/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 0644 www-data www-data
+    dateext
+    dateformat -%Y-%m-%d
+    postrotate
+        if [ -f /var/run/nginx.pid ]; then
+            kill -USR1 \$(cat /var/run/nginx.pid)
+        fi
+    endscript
+}
+EOF
+
 print_status "Setting up system monitoring aliases..."
 sudo tee /etc/profile.d/grosint-aliases.sh << EOF
 # Grosint Backend monitoring aliases
@@ -433,6 +465,17 @@ alias grosint-stop='sudo systemctl stop grosint-backend'
 alias grosint-start='sudo systemctl start grosint-backend'
 alias docker-logs='docker-compose -f /opt/grosint-backend/docker-compose.test.yml logs -f'
 alias nginx-logs='sudo tail -f /var/log/nginx/access.log /var/log/nginx/error.log'
+
+# Monitoring stack aliases
+alias monitoring-status='sudo systemctl status grosint-monitoring'
+alias monitoring-restart='sudo systemctl restart grosint-monitoring'
+alias monitoring-stop='sudo systemctl stop grosint-monitoring'
+alias monitoring-start='sudo systemctl start grosint-monitoring'
+alias monitoring-logs='docker-compose -f /opt/grosint-monitoring/docker-compose.logs.yml logs -f'
+alias grafana-logs='docker-compose -f /opt/grosint-monitoring/docker-compose.logs.yml logs grafana'
+alias prometheus-logs='docker-compose -f /opt/grosint-monitoring/docker-compose.logs.yml logs prometheus'
+alias loki-logs='docker-compose -f /opt/grosint-monitoring/docker-compose.logs.yml logs loki'
+alias promtail-logs='docker-compose -f /opt/grosint-monitoring/docker-compose.logs.yml logs promtail'
 EOF
 
 print_success "Monitoring and logging setup completed!"
@@ -454,12 +497,18 @@ echo -e "\nNginx Service:"
 sudo systemctl status nginx --no-pager
 echo -e "\nDocker Service:"
 sudo systemctl status docker --no-pager
+echo -e "\nMonitoring Service:"
+sudo systemctl status grosint-monitoring --no-pager
 echo -e "\nDisk Usage:"
 df -h /opt/grosint-backend
 echo -e "\nMemory Usage:"
 free -h
 echo -e "\nApplication Health Check:"
 curl -f http://localhost:8000/health 2>/dev/null && echo "✅ Healthy" || echo "❌ Unhealthy"
+echo -e "\nMonitoring Stack Health:"
+curl -f http://localhost:3000/api/health 2>/dev/null && echo "✅ Grafana Healthy" || echo "❌ Grafana Unhealthy"
+curl -f http://localhost:9090/-/healthy 2>/dev/null && echo "✅ Prometheus Healthy" || echo "❌ Prometheus Unhealthy"
+curl -f http://localhost:3100/ready 2>/dev/null && echo "✅ Loki Healthy" || echo "❌ Loki Unhealthy"
 EOF
 
 sudo chmod +x /usr/local/bin/grosint-status
@@ -474,6 +523,24 @@ sudo cp -r /opt/grosint-backend $BACKUP_DIR/
 sudo tar -czf $BACKUP_DIR.tar.gz -C /opt/backups $(basename $BACKUP_DIR)
 sudo rm -rf $BACKUP_DIR
 echo "Backup created: $BACKUP_DIR.tar.gz"
+EOF
+
+# Create log monitoring script
+sudo tee /usr/local/bin/grosint-logs-status << 'EOF'
+#!/bin/bash
+echo "=== Log Files Status ==="
+echo "Application Logs:"
+du -sh /opt/grosint-backend/logs/* 2>/dev/null || echo "No app logs found"
+echo -e "\nNginx Logs:"
+du -sh /var/log/nginx/*.log* 2>/dev/null || echo "No nginx logs found"
+echo -e "\nMonitoring Stack Logs:"
+docker-compose -f /opt/grosint-monitoring/docker-compose.logs.yml exec prometheus du -sh /prometheus 2>/dev/null || echo "Prometheus data not accessible"
+docker-compose -f /opt/grosint-monitoring/docker-compose.logs.yml exec loki du -sh /loki 2>/dev/null || echo "Loki data not accessible"
+echo -e "\nDisk Usage:"
+df -h /opt/grosint-backend /var/log/nginx 2>/dev/null
+echo -e "\nLog Rotation Status:"
+sudo logrotate -d /etc/logrotate.d/grosint-backend
+sudo logrotate -d /etc/logrotate.d/nginx
 EOF
 
 sudo chmod +x /usr/local/bin/grosint-backup
@@ -506,7 +573,16 @@ http {
                     '$status $body_bytes_sent "$http_referer" '
                     '"$http_user_agent" "$http_x_forwarded_for"';
 
-    access_log /var/log/nginx/access.log main;
+    # JSON log format for structured logging (better for log aggregation)
+    log_format json_combined escape=json
+        '{ "time": "$time_iso8601", "remote_addr": "$remote_addr", "request": "$request",'
+        ' "status": $status, "body_bytes_sent": $body_bytes_sent, "request_time": $request_time,'
+        ' "upstream_response_time": "$upstream_response_time", "request_method": "$request_method",'
+        ' "uri": "$request_uri", "http_referrer": "$http_referer", "http_user_agent": "$http_user_agent",'
+        ' "http_x_forwarded_for": "$http_x_forwarded_for", "server_name": "$server_name" }';
+
+    # Access and error logs (will be rotated daily by logrotate)
+    access_log /var/log/nginx/access.log json_combined;
     error_log /var/log/nginx/error.log;
 
     # Performance

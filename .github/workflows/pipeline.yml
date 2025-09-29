@@ -333,6 +333,10 @@ jobs:
                   cp requirements.txt dist/
                   cp run.py dist/
 
+                  # Copy monitoring stack files
+                  cp -r monitoring/ dist/
+                  cp docker-compose.logs.yml dist/
+
                   # Note: Nginx and systemd configurations are created by setup.sh
                   # No need to create them here as they already exist on the server
 
@@ -352,6 +356,53 @@ jobs:
                   echo "✅ Dependencies installed"
                   EOF
                   chmod +x dist/deploy.sh
+
+                  # Create monitoring deployment script
+                  cat > dist/deploy-monitoring.sh << 'EOF'
+                  #!/bin/bash
+                  set -e
+
+                  echo "📊 Starting monitoring stack deployment..."
+
+                  # Create monitoring directory
+                  sudo mkdir -p /opt/grosint-monitoring
+                  sudo chown $USER:$USER /opt/grosint-monitoring
+
+                  # Copy monitoring files
+                  cp -r monitoring/ /opt/grosint-monitoring/
+                  cp docker-compose.logs.yml /opt/grosint-monitoring/
+
+                  # Create systemd service for monitoring stack
+                  sudo tee /etc/systemd/system/grosint-monitoring.service << 'MONEOF'
+                  [Unit]
+                  Description=Grosint Monitoring Stack (Grafana, Loki, Prometheus)
+                  Requires=docker.service
+                  After=docker.service
+
+                  [Service]
+                  Type=oneshot
+                  RemainAfterExit=yes
+                  WorkingDirectory=/opt/grosint-monitoring
+                  ExecStart=/usr/local/bin/docker-compose -f docker-compose.logs.yml up -d
+                  ExecStop=/usr/local/bin/docker-compose -f docker-compose.logs.yml down
+                  TimeoutStartSec=0
+                  User=$USER
+
+                  [Install]
+                  WantedBy=multi-user.target
+                  MONEOF
+
+                  # Enable and start monitoring service
+                  sudo systemctl daemon-reload
+                  sudo systemctl enable grosint-monitoring
+                  sudo systemctl start grosint-monitoring
+
+                  echo "✅ Monitoring stack deployed successfully!"
+                  echo "Grafana: http://localhost:3000 (admin/admin123)"
+                  echo "Prometheus: http://localhost:9090"
+                  echo "Loki: http://localhost:3100"
+                  EOF
+                  chmod +x dist/deploy-monitoring.sh
 
                   # Environment file will be created during deployment using GitHub Secrets
 
@@ -501,6 +552,15 @@ jobs:
 
                       echo "✅ Deployment completed successfully!"
                       sudo systemctl status grosint-backend --no-pager
+
+                      # Deploy monitoring stack
+                      echo "📊 Deploying monitoring stack..."
+                      chmod +x deploy-monitoring.sh
+                      ./deploy-monitoring.sh
+
+                      echo "✅ Monitoring stack deployed!"
+                      echo "Grafana: http://${{ secrets.DOMAIN_NAME }}:3000 (admin/admin123)"
+                      echo "Prometheus: http://${{ secrets.DOMAIN_NAME }}:9090"
 
     notify:
         name: 📢 Slack Notification
