@@ -1,15 +1,20 @@
 # Grosint Backend Monitoring Stack
 
-This directory contains the monitoring stack configuration for the Grosint Backend application using Grafana, Loki, Prometheus, and Promtail.
+This directory contains a production-ready observability stack for the Grosint Backend using Grafana, Loki, Prometheus, and Promtail. It provides logs, metrics, dashboards, and alerting primitives with minimal operational overhead.
 
 ## Architecture
 
-- **Grafana**: Visualization and dashboards
-- **Loki**: Log aggregation and storage
-- **Prometheus**: Metrics collection and storage
-- **Promtail**: Log shipping agent
-- **Node Exporter**: System metrics
-- **Nginx Exporter**: Nginx metrics
+- **Grafana**: Visualization and dashboards (view both metrics and logs)
+- **Loki**: Log aggregation and storage (queried via LogQL)
+- **Prometheus**: Metrics collection and storage (queried via PromQL)
+- **Promtail**: Log shipping agent (tails files, parses, labels, ships to Loki)
+- **Node Exporter**: System metrics (CPU, memory, disk, network)
+- **Nginx Exporter**: Nginx reverse proxy metrics (connections, requests)
+
+Flow:
+
+- Backend/Nginx → logs → Promtail → Loki → Grafana (Explore)
+- Backend/Nginx/Node Exporter → metrics → Prometheus → Grafana (Dashboards)
 
 ## Services
 
@@ -18,32 +23,38 @@ This directory contains the monitoring stack configuration for the Grosint Backe
 - **URL**: <http://localhost:3000>
 - **Default Credentials**: admin/admin123
 - **Purpose**: Visualize metrics and logs from Prometheus and Loki
+- Use Dashboards for metrics, Explore for ad-hoc metrics/logs queries
 
 ### Prometheus (Port 9090)
 
 - **URL**: <http://localhost:9090>
-- **Purpose**: Collect and store metrics from various sources
+- **Purpose**: Collect and store metrics from various sources; raw query UI, target status
 
 ### Loki (Port 3100)
 
 - **URL**: <http://localhost:3100>
-- **Purpose**: Store and query logs from Promtail
+- **Purpose**: Store and query logs from Promtail; no UI (use Grafana Explore)
 
 ### Promtail
 
 - **Purpose**: Ship logs from application and Nginx to Loki
+- Reads:
+  - Application: `/opt/grosint-backend/logs/app-*.log` (text in dev, JSON in prod)
+  - Nginx access: `/var/log/nginx/access*.log` (JSON via log_format)
+  - Nginx error: `/var/log/nginx/error*.log` (parsed via regex stages)
+- Adds useful labels (`job`, `host`, `log_type`, `status`, `request_method`, etc.)
 
 ## Log Sources
 
 1. **Application Logs**: `/opt/grosint-backend/logs/app-*.log`
-   - JSON format in production
-   - Structured with timestamp, level, logger, message, client_ip, etc.
+   - Text in development; JSON in production for better parsing
+   - Contains timestamp, level, logger, message, client_ip, etc.
 
-2. **Nginx Access Logs**: `/var/log/nginx/access.log`
+2. **Nginx Access Logs**: `/var/log/nginx/access*.log`
    - JSON format with request details, status codes, response times
 
-3. **Nginx Error Logs**: `/var/log/nginx/error.log`
-   - Standard Nginx error format
+3. **Nginx Error Logs**: `/var/log/nginx/error*.log`
+   - Standard Nginx error format; Promtail extracts client/server/request/host fields
 
 ## Metrics Sources
 
@@ -121,6 +132,10 @@ docker-compose -f docker-compose.logs.yml restart grafana
 
 # Logs from specific module
 {job="grosint-app"} | json | module="auth"
+
+# Nginx error logs by host or method
+{job="nginx", log_type="error"} | host="your-domain.com"
+{job="nginx", log_type="error"} | req_method="GET"
 ```
 
 ### Prometheus Queries
@@ -137,6 +152,12 @@ rate(nginx_http_requests_total[5m])
 
 # FastAPI request duration
 histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+
+# Nginx active connections (from exporter)
+nginx_connections_active
+
+# Scrape targets up
+up
 ```
 
 ## Troubleshooting
@@ -192,3 +213,28 @@ curl http://localhost:3100/ready
 - Consider restricting access to monitoring ports
 - Use HTTPS for external access
 - Regular backup of Grafana dashboards and configurations
+
+## Retention and disk management
+
+- Application and Nginx logs rotate daily and keep 30 days (compressed) via logrotate.
+- Loki retention is set to 30 days in `loki.yml` (`limits_config.retention_period`).
+- Prometheus retention is set to 30 days via `--storage.tsdb.retention.time=30d`.
+- Use `grosint-logs-status` to inspect sizes and rotation status.
+
+## How to view everything (quick guide)
+
+- Dashboards: Grafana → Dashboards → “Grosint Backend Monitoring”.
+- Metrics ad-hoc: Grafana → Explore → Data source: Prometheus → write PromQL.
+- Logs ad-hoc: Grafana → Explore → Data source: Loki → run LogQL queries.
+- Raw Prometheus UI: <http://localhost:9090> (targets, rules, queries).
+
+## Typical workflows
+
+- Investigate spike in 5xx:
+  1) Grafana dashboard → Nginx request rate/5xx panels
+  2) Drill down to logs: Explore → Loki → `{job="nginx", log_type="access"} | json | status >= 500`
+  3) Correlate with app errors: `{job="grosint-app"} |= "ERROR"`
+
+- Check VM pressure:
+  1) Dashboard → Node exporter panels (CPU, memory, disk)
+  2) If high CPU, correlate with app latency metrics and Nginx connections
