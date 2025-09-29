@@ -13,8 +13,7 @@ class TestUser:
             "verifyByGovId": True,
         }
 
-        response = client.post("/api/users/", json=user_data)
-        print("🕵️‍♂️ 🥷🏻 : ==> test_user.py:17 : ==> response:", response.json())
+        response = client.post("/api/user/", json=user_data)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "user_id" in data

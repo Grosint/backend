@@ -597,6 +597,7 @@ jobs:
                           {
                             "color": "good",
                             "title": "🎉 Deployment Successful!",
+                            "text": "All pipeline stages completed successfully on branch `${{ github.ref_name }}`",
                             "fields": [
                               {
                                 "title": "Repository",
@@ -605,18 +606,23 @@ jobs:
                               },
                               {
                                 "title": "Branch",
-                                "value": "${{ github.ref_name }}",
+                                "value": "`${{ github.ref_name }}`",
                                 "short": true
                               },
                               {
                                 "title": "Commit",
-                                "value": "${{ github.sha }}",
+                                "value": "`${{ github.sha }}`",
                                 "short": true
                               },
                               {
                                 "title": "Author",
                                 "value": "${{ github.actor }}",
                                 "short": true
+                              },
+                              {
+                                "title": "Pipeline Stages",
+                                "value": "✅ Lint\n✅ Test\n✅ Build\n✅ Deploy",
+                                "short": false
                               }
                             ],
                             "actions": [
@@ -629,6 +635,11 @@ jobs:
                                 "type": "button",
                                 "text": "View Logs",
                                 "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                              },
+                              {
+                                "type": "button",
+                                "text": "Grafana",
+                                "url": "http://${{ secrets.DOMAIN_NAME }}:3000"
                               }
                             ]
                           }
@@ -649,6 +660,7 @@ jobs:
                           {
                             "color": "danger",
                             "title": "❌ Pipeline Failed!",
+                            "text": "Pipeline failed on branch `${{ github.ref_name }}` - check details below",
                             "fields": [
                               {
                                 "title": "Repository",
@@ -657,17 +669,27 @@ jobs:
                               },
                               {
                                 "title": "Branch",
-                                "value": "${{ github.ref_name }}",
+                                "value": "`${{ github.ref_name }}`",
                                 "short": true
                               },
                               {
-                                "title": "Failed Stage",
-                                "value": "${{ needs.lint.result == 'failure' && 'Lint' || needs.test.result == 'failure' && 'Test' || needs.build.result == 'failure' && 'Build' || 'Deploy' }}",
+                                "title": "Commit",
+                                "value": "`${{ github.sha }}`",
                                 "short": true
                               },
                               {
                                 "title": "Author",
                                 "value": "${{ github.actor }}",
+                                "short": true
+                              },
+                              {
+                                "title": "Pipeline Stages Status",
+                                "value": "${{ needs.lint.result == 'success' && '✅ Lint' || needs.lint.result == 'failure' && '❌ Lint' || needs.lint.result == 'cancelled' && '⏹️ Lint' || '⏳ Lint' }}\n${{ needs.test.result == 'success' && '✅ Test' || needs.test.result == 'failure' && '❌ Test' || needs.test.result == 'cancelled' && '⏹️ Test' || '⏳ Test' }}\n${{ needs.build.result == 'success' && '✅ Build' || needs.build.result == 'failure' && '❌ Build' || needs.build.result == 'cancelled' && '⏹️ Build' || '⏳ Build' }}\n${{ needs.deploy.result == 'success' && '✅ Deploy' || needs.deploy.result == 'failure' && '❌ Deploy' || needs.deploy.result == 'cancelled' && '⏹️ Deploy' || '⏳ Deploy' }}",
+                                "short": false
+                              },
+                              {
+                                "title": "Failed Stage",
+                                "value": "${{ needs.lint.result == 'failure' && '🔍 Lint Stage' || needs.test.result == 'failure' && '🧪 Test Stage' || needs.build.result == 'failure' && '🏗️ Build Stage' || needs.deploy.result == 'failure' && '🚀 Deploy Stage' || 'Unknown' }}",
                                 "short": true
                               }
                             ],
@@ -676,6 +698,11 @@ jobs:
                                 "type": "button",
                                 "text": "View Logs",
                                 "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                              },
+                              {
+                                "type": "button",
+                                "text": "Retry Pipeline",
+                                "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/rerun"
                               }
                             ]
                           }
@@ -696,6 +723,7 @@ jobs:
                           {
                             "color": "warning",
                             "title": "⚠️ Pipeline Passed (No Deployment)",
+                            "text": "All pipeline stages passed on branch `${{ github.ref_name }}` but deployment was skipped",
                             "fields": [
                               {
                                 "title": "Repository",
@@ -704,18 +732,28 @@ jobs:
                               },
                               {
                                 "title": "Branch",
-                                "value": "${{ github.ref_name }}",
+                                "value": "`${{ github.ref_name }}`",
                                 "short": true
                               },
                               {
-                                "title": "Reason",
-                                "value": "Not on main branch - deployment skipped",
-                                "short": false
+                                "title": "Commit",
+                                "value": "`${{ github.sha }}`",
+                                "short": true
                               },
                               {
                                 "title": "Author",
                                 "value": "${{ github.actor }}",
                                 "short": true
+                              },
+                              {
+                                "title": "Pipeline Stages Status",
+                                "value": "✅ Lint\n✅ Test\n✅ Build\n⏭️ Deploy (skipped)",
+                                "short": false
+                              },
+                              {
+                                "title": "Reason",
+                                "value": "Deployment only runs on main/production branches",
+                                "short": false
                               }
                             ],
                             "actions": [
@@ -723,6 +761,11 @@ jobs:
                                 "type": "button",
                                 "text": "View Logs",
                                 "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                              },
+                              {
+                                "type": "button",
+                                "text": "Merge to Deploy",
+                                "url": "https://github.com/${{ github.repository }}/compare/main...${{ github.ref_name }}"
                               }
                             ]
                           }
