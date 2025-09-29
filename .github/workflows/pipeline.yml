@@ -126,22 +126,25 @@ jobs:
                   fi
 
             - name: Check SonarCloud Configuration
+              env:
+                  SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+                  SONARCLOUD_ORG: ${{ secrets.SONARCLOUD_ORG }}
               run: |
-                  if [ -z "${{ secrets.SONARCLOUD_TOKEN }}" ]; then
+                  if [ -z "$SONARCLOUD_TOKEN" ]; then
                     echo "❌ SONARCLOUD_TOKEN secret is not configured"
                     echo "Skipping SonarCloud scan"
                     echo "SONARCLOUD_TOKEN=" >> $GITHUB_ENV
                     exit 0
                   else
                     echo "✅ SonarCloud token is configured"
-                    echo "SONARCLOUD_TOKEN=${{ secrets.SONARCLOUD_TOKEN }}" >> $GITHUB_ENV
+                    echo "SONARCLOUD_TOKEN=$SONARCLOUD_TOKEN" >> $GITHUB_ENV
                   fi
 
-                  if [ -z "${{ secrets.SONARCLOUD_ORG }}" ]; then
+                  if [ -z "$SONARCLOUD_ORG" ]; then
                     echo "⚠️  SONARCLOUD_ORG secret is not configured, attempting to auto-detect..."
 
                     # Try to get organization from SonarCloud API
-                    ORG_RESPONSE=$(curl -s -u "${{ secrets.SONARCLOUD_TOKEN }}:" "https://sonarcloud.io/api/organizations/search" || echo "")
+                    ORG_RESPONSE=$(curl -s -u "$SONARCLOUD_TOKEN:" "https://sonarcloud.io/api/organizations/search" || echo "")
 
                     if [ -n "$ORG_RESPONSE" ] && echo "$ORG_RESPONSE" | grep -q '"key"'; then
                       # Extract the first organization key
@@ -160,7 +163,7 @@ jobs:
                       echo "Trying alternative method..."
 
                       # Alternative: Try to get organization from project info
-                      PROJECT_RESPONSE=$(curl -s -u "${{ secrets.SONARCLOUD_TOKEN }}:" "https://sonarcloud.io/api/projects/search?projects=Grosint_backend" || echo "")
+                      PROJECT_RESPONSE=$(curl -s -u "$SONARCLOUD_TOKEN:" "https://sonarcloud.io/api/projects/search?projects=Grosint_backend" || echo "")
                       if [ -n "$PROJECT_RESPONSE" ] && echo "$PROJECT_RESPONSE" | grep -q '"organization"'; then
                         ORG_KEY=$(echo "$PROJECT_RESPONSE" | grep -o '"organization":"[^"]*"' | head -1 | cut -d'"' -f4)
                         if [ -n "$ORG_KEY" ]; then
@@ -181,41 +184,48 @@ jobs:
                     fi
                   else
                     echo "✅ SonarCloud organization is configured"
-                    echo "SONARCLOUD_ORG=${{ secrets.SONARCLOUD_ORG }}" >> $GITHUB_ENV
+                    echo "SONARCLOUD_ORG=$SONARCLOUD_ORG" >> $GITHUB_ENV
                   fi
 
             - name: Test SonarCloud Connection
               if: env.SONARCLOUD_TOKEN != ''
+              env:
+                  SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
               run: |
                   echo "Testing SonarCloud connection..."
-                  curl -s -u "${{ secrets.SONARCLOUD_TOKEN }}:" "https://sonarcloud.io/api/authentication/validate" || echo "Connection test failed"
+                  curl -s -u "$SONARCLOUD_TOKEN:" "https://sonarcloud.io/api/authentication/validate" || echo "Connection test failed"
 
-                  echo "Organization: ${{ env.SONARCLOUD_ORG }}"
+                  echo "Organization: $SONARCLOUD_ORG"
                   echo "Project Key: Grosint_backend"
 
             - name: Update SonarCloud Properties
               if: env.SONARCLOUD_TOKEN != ''
+              env:
+                  SONARCLOUD_TOKEN: ${{ env.SONARCLOUD_TOKEN }}
+                  SONARCLOUD_ORG: ${{ env.SONARCLOUD_ORG }}
               run: |
                   echo "Updating sonar-project.properties with detected organization..."
                   # Update the organization in sonar-project.properties
-                  sed -i "s/sonar.organization=.*/sonar.organization=${{ env.SONARCLOUD_ORG }}/" sonar-project.properties
+                  sed -i "s/sonar.organization=.*/sonar.organization=$SONARCLOUD_ORG/" sonar-project.properties
                   echo "Updated sonar-project.properties:"
                   cat sonar-project.properties
 
             - name: Disable Automatic Analysis
               if: env.SONARCLOUD_TOKEN != ''
+              env:
+                  SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
               run: |
                   echo "Disabling automatic analysis for CI compatibility..."
 
                   # Check current automatic analysis status
                   echo "Checking current automatic analysis status..."
-                  STATUS_RESPONSE=$(curl -s -u "${{ secrets.SONARCLOUD_TOKEN }}:" "https://sonarcloud.io/api/automatic_analysis/status?project=Grosint_backend")
+                  STATUS_RESPONSE=$(curl -s -u "$SONARCLOUD_TOKEN:" "https://sonarcloud.io/api/automatic_analysis/status?project=Grosint_backend")
                   echo "Current status: $STATUS_RESPONSE"
 
                   # Disable automatic analysis via API
                   echo "Attempting to disable automatic analysis..."
                   DISABLE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-                    -u "${{ secrets.SONARCLOUD_TOKEN }}:" \
+                    -u "$SONARCLOUD_TOKEN:" \
                     "https://sonarcloud.io/api/automatic_analysis/disable" \
                     -d "project=Grosint_backend")
 
@@ -238,6 +248,7 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+                  SONARCLOUD_ORG: ${{ env.SONARCLOUD_ORG }}
               with:
                   args: >
                       -Dsonar.organization=${{ env.SONARCLOUD_ORG }}
@@ -246,6 +257,8 @@ jobs:
 
             - name: SonarCloud Scan Fallback
               if: env.SONARCLOUD_TOKEN != '' && failure()
+              env:
+                  SONARCLOUD_TOKEN: ${{ env.SONARCLOUD_TOKEN }}
               run: |
                   echo "❌ SonarCloud scan failed due to automatic analysis conflict"
                   echo ""
@@ -261,6 +274,8 @@ jobs:
 
             - name: Check SonarCloud Scan Results
               if: env.SONARCLOUD_TOKEN != ''
+              env:
+                  SONARCLOUD_TOKEN: ${{ env.SONARCLOUD_TOKEN }}
               run: |
                   if [ -f "target/sonar/report-task.txt" ]; then
                     echo "✅ SonarCloud scan completed successfully"
@@ -276,11 +291,14 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+                  SONARCLOUD_ORG: ${{ env.SONARCLOUD_ORG }}
               with:
                   scanMetadataReportFile: target/sonar/report-task.txt
 
             - name: SonarCloud Quality Gate Skipped
               if: env.SONARCLOUD_TOKEN != '' && env.SONARCLOUD_SCAN_SUCCESS == 'false'
+              env:
+                  SONARCLOUD_TOKEN: ${{ env.SONARCLOUD_TOKEN }}
               run: |
                   echo "⏭️  Skipping SonarCloud Quality Gate - scan was not successful"
                   echo "This is expected when automatic analysis is enabled in SonarCloud"
