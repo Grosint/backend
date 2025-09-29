@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # MongoDB configuration
     MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
     MONGODB_DATABASE: str = os.getenv("MONGODB_DATABASE", "osint_backend")
-    MONGODB_COLLECTION_USERS: str = "users"
+    MONGODB_COLLECTION_USERS: str = "user"
     MONGODB_COLLECTION_SEARCHES: str = "searches"
     MONGODB_COLLECTION_RESULTS: str = "results"
 
