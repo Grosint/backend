@@ -574,8 +574,10 @@ jobs:
 
                       # Deploy monitoring stack
                       echo "📊 Deploying monitoring stack..."
-                      chmod +x deploy-monitoring.sh
-                      ./deploy-monitoring.sh
+                      # File is owned by root after earlier chown; ensure it's executable
+                      sudo chmod +x deploy-monitoring.sh
+                      # Run as root and preserve env (needs GRAFANA_ADMIN_PASSWORD)
+                      sudo -E ./deploy-monitoring.sh
 
                       echo "✅ Monitoring stack deployed!"
                       echo "Grafana: http://${{ secrets.DOMAIN_NAME }}:3000 (admin/[password from environment])"
