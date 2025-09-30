@@ -372,6 +372,16 @@ jobs:
                   cp -r monitoring/ /opt/grosint-monitoring/
                   cp docker-compose.logs.yml /opt/grosint-monitoring/
 
+                  # Ensure Grafana admin password is set
+                  if [ -z "${GRAFANA_ADMIN_PASSWORD:-}" ]; then
+                    echo "GRAFANA_ADMIN_PASSWORD is not set" >&2
+                    exit 1
+                  fi
+                  cat > /opt/grosint-monitoring/.env <<EOF_ENV
+                  GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+                  EOF_ENV
+                  chmod 600 /opt/grosint-monitoring/.env
+
                   # Create systemd service for monitoring stack
                   sudo tee /etc/systemd/system/grosint-monitoring.service << MONEOF
                   [Unit]
@@ -391,6 +401,7 @@ jobs:
                   User=${USER}
                   Restart=on-failure
                   RestartSec=10
+                  EnvironmentFile=/opt/grosint-monitoring/.env
 
                   [Install]
                   WantedBy=multi-user.target
