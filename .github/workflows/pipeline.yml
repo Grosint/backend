@@ -576,6 +576,8 @@ jobs:
                       echo "📊 Deploying monitoring stack..."
                       # File is owned by root after earlier chown; ensure it's executable
                       sudo chmod +x deploy-monitoring.sh
+                      # Export Grafana password from GitHub Secrets for first-time setup
+                      export GRAFANA_ADMIN_PASSWORD='${{ secrets.GRAFANA_ADMIN_PASSWORD }}'
                       # Run as root and preserve env (needs GRAFANA_ADMIN_PASSWORD)
                       sudo -E ./deploy-monitoring.sh
 
@@ -583,6 +585,24 @@ jobs:
                       echo "Grafana: http://${{ secrets.DOMAIN_NAME }}:3000 (admin/[password from environment])"
                       echo "Prometheus: http://${{ secrets.DOMAIN_NAME }}:9090"
                       echo "Note: Grafana password is set via GRAFANA_ADMIN_PASSWORD environment variable"
+
+                      # Post-deploy Grafana health check (fail if not reachable)
+                      echo "🔎 Checking Grafana health..."
+                      for i in {1..10}; do
+                        CODE=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/health || true)
+                        if [ "$CODE" = "200" ]; then
+                          echo "✅ Grafana health OK (HTTP $CODE)"
+                          break
+                        elif [ $i -eq 10 ]; then
+                          echo "❌ Grafana health check failed (HTTP ${CODE:-none})"
+                          echo "Recent Grafana logs:"
+                          docker logs --tail=200 grosint-grafana || true
+                          exit 1
+                        else
+                          echo "Attempt $i/10: Grafana not ready yet (HTTP ${CODE:-none}), retrying..."
+                          sleep 5
+                        fi
+                      done
 
     notify:
         name: 📢 Slack Notification
