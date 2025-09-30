@@ -21,9 +21,10 @@ Flow:
 ### Grafana (Port 3000)
 
 - **URL**: <http://localhost:3000>
-- **Default Credentials**: admin/admin123
+- **Credentials**: admin/[password from GRAFANA_ADMIN_PASSWORD environment variable]
 - **Purpose**: Visualize metrics and logs from Prometheus and Loki
 - Use Dashboards for metrics, Explore for ad-hoc metrics/logs queries
+- **Security**: Password is set via environment variable for security
 
 ### Prometheus (Port 9090)
 
@@ -209,10 +210,34 @@ curl http://localhost:3100/ready
 
 ## Security Notes
 
-- Change default Grafana password in production
+- **Grafana password is now set via environment variable** (`GRAFANA_ADMIN_PASSWORD`)
+- Use a strong, unique password for production environments
 - Consider restricting access to monitoring ports
 - Use HTTPS for external access
 - Regular backup of Grafana dashboards and configurations
+
+## Environment Setup
+
+1. **Copy the environment template**:
+   ```bash
+   cp monitoring/env.example monitoring/.env
+   ```
+
+2. **Set a secure Grafana password**:
+   ```bash
+   # Generate a secure password
+   openssl rand -base64 32
+
+   # Or using Python
+   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+
+3. **Start the monitoring stack**:
+   ```bash
+   cd monitoring
+   source .env
+   docker compose -f ../docker-compose.logs.yml up -d
+   ```
 
 ## Retention and disk management
 

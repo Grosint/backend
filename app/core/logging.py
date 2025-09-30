@@ -21,56 +21,171 @@ class UTCFormatter(logging.Formatter):
 
 
 class JSONFormatter(logging.Formatter):
-    """Custom JSON formatter for structured logging"""
+    """Custom JSON formatter for structured logging with PII protection"""
 
-    def format(self, record):
-        log_entry = {
-            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
-            "module": record.module,
-            "function": record.funcName,
-            "line": record.lineno,
+    def __init__(self):
+        super().__init__()
+        # Attributes that should never be included in logs (security risk)
+        self.excluded_attrs = {
+            "name",
+            "msg",
+            "args",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "lineno",
+            "funcName",
+            "created",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+            "getMessage",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "client_ip",
+            # Risky attributes that could contain non-serializable objects or PII
+            "request",
+            "response",
+            "session",
+            "user",
+            "auth",
+            "credentials",
+            "password",
+            "token",
+            "secret",
+            "key",
+            "cookie",
+            "header",
+            "form",
+            "data",
+            "body",
+            "query",
+            "params",
+            "kwargs",
+            "self",
+            "cls",
+            "obj",
+            "instance",
+            "context",
+            "state",
         }
 
-        # Add client IP if available
-        if hasattr(record, "client_ip"):
-            log_entry["client_ip"] = record.client_ip
+    def _safe_serialize_value(self, value):
+        """Safely serialize a value for JSON output"""
+        try:
+            # Handle None
+            if value is None:
+                return None
 
-        # Add exception info if present
-        if record.exc_info:
-            log_entry["exception"] = self.formatException(record.exc_info)
+            # Handle basic JSON-serializable types
+            if isinstance(value, (str, int, float, bool)):
+                return value
 
-        # Add extra fields from record
-        for key, value in record.__dict__.items():
-            if key not in [
-                "name",
-                "msg",
-                "args",
-                "levelname",
-                "levelno",
-                "pathname",
-                "filename",
-                "module",
-                "lineno",
-                "funcName",
-                "created",
-                "msecs",
-                "relativeCreated",
-                "thread",
-                "threadName",
-                "processName",
-                "process",
-                "getMessage",
-                "exc_info",
-                "exc_text",
-                "stack_info",
-                "client_ip",
-            ]:
-                log_entry[key] = value
+            # Handle lists and tuples
+            if isinstance(value, (list, tuple)):
+                return [self._safe_serialize_value(item) for item in value]
 
-        return json.dumps(log_entry, ensure_ascii=False)
+            # Handle dictionaries
+            if isinstance(value, dict):
+                # Apply sanitization to dictionary values
+                sanitized = sanitize_log_data(value)
+                return {k: self._safe_serialize_value(v) for k, v in sanitized.items()}
+
+            # Handle sets
+            if isinstance(value, set):
+                return [self._safe_serialize_value(item) for item in value]
+
+            # For other types, convert to string representation
+            # but avoid exposing sensitive information
+            str_repr = str(value)
+
+            # Check if it looks like it might contain sensitive data
+            sensitive_patterns = [
+                r"password\s*[:=]\s*\S+",
+                r"token\s*[:=]\s*\S+",
+                r"secret\s*[:=]\s*\S+",
+                r"key\s*[:=]\s*\S+",
+                r"bearer\s+\S+",
+                r"authorization\s*[:=]\s*\S+",
+            ]
+
+            for pattern in sensitive_patterns:
+                if re.search(pattern, str_repr, re.IGNORECASE):
+                    return "[REDACTED - contains sensitive data]"
+
+            # Limit length to prevent log bloat
+            if len(str_repr) > 1000:
+                return str_repr[:1000] + "... [TRUNCATED]"
+
+            return str_repr
+
+        except Exception:
+            # If we can't serialize it safely, return a safe placeholder
+            return f"[SERIALIZATION_ERROR: {type(value).__name__}]"
+
+    def format(self, record):
+        try:
+            log_entry = {
+                "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
+                "level": record.levelname,
+                "logger": record.name,
+                "message": record.getMessage(),
+                "module": record.module,
+                "function": record.funcName,
+                "line": record.lineno,
+            }
+
+            # Add client IP if available (already sanitized by filter)
+            if hasattr(record, "client_ip"):
+                log_entry["client_ip"] = record.client_ip
+
+            # Add exception info if present
+            if record.exc_info:
+                log_entry["exception"] = self.formatException(record.exc_info)
+
+            # Add extra fields from record (with security filtering)
+            for key, value in record.__dict__.items():
+                # Skip excluded attributes
+                if key in self.excluded_attrs:
+                    continue
+
+                # Skip attributes that start with underscore (internal)
+                if key.startswith("_"):
+                    continue
+
+                # Skip callable attributes (methods, functions)
+                if callable(value):
+                    continue
+
+                # Safely serialize the value
+                try:
+                    serialized_value = self._safe_serialize_value(value)
+                    log_entry[key] = serialized_value
+                except Exception as e:
+                    # If we can't serialize this field, skip it
+                    log_entry[f"{key}_error"] = (
+                        f"Serialization failed: {type(e).__name__}"
+                    )
+
+            return json.dumps(log_entry, ensure_ascii=False)
+
+        except Exception as e:
+            # Fallback to a safe log entry if JSON serialization fails
+            fallback_entry = {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "level": "ERROR",
+                "logger": "JSONFormatter",
+                "message": f"JSON serialization failed: {str(e)}",
+                "original_message": getattr(record, "msg", "Unknown"),
+                "original_level": getattr(record, "levelname", "UNKNOWN"),
+            }
+            return json.dumps(fallback_entry, ensure_ascii=False)
 
 
 class ClientIPFilter(logging.Filter):

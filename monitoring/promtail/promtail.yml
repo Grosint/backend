@@ -19,6 +19,11 @@ scrape_configs:
                 app: backend
                 __path__: /opt/grosint-backend/logs/app-*.log
       pipeline_stages:
+          # Handle multiline logs (stack traces, exceptions)
+          - multiline:
+                firstline: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC'
+                max_wait_time: 3s
+                max_lines: 1000
           - json:
                 expressions:
                     timestamp: timestamp
@@ -32,12 +37,28 @@ scrape_configs:
           - timestamp:
                 source: timestamp
                 format: RFC3339
+          # Only use low-cardinality labels to prevent series explosion
           - labels:
-                level:
-                logger:
-                client_ip:
-                module:
-                function:
+                level: # Only ~5 values: DEBUG, INFO, WARNING, ERROR, CRITICAL
+          # Group errors by type for better aggregation
+          - regex:
+                expression: '^(?P<error_type>\w+Error|Exception|Warning):'
+                source: message
+          - labels:
+                error_type:
+          # Keep high-cardinality data as fields (not labels) for querying
+          - template:
+                source: logger
+                template: '{{ .Value }}'
+          - template:
+                source: client_ip
+                template: '{{ .Value }}'
+          - template:
+                source: function
+                template: '{{ .Value }}'
+          - template:
+                source: module
+                template: '{{ .Value }}'
           - output:
                 source: message
 
@@ -69,17 +90,20 @@ scrape_configs:
           - timestamp:
                 source: time
                 format: RFC3339
+          # Use only low-cardinality labels for Nginx access logs
           - labels:
-                status:
-                request_method:
-                server_name:
+                status: # HTTP status codes (~20-30 values)
+                request_method: # GET, POST, PUT, DELETE, etc. (~10 values)
           - regex:
                 expression: '^(?P<method>\S+) (?P<path>\S+) (?P<protocol>\S+)'
                 source: request
-          - labels:
-                method:
-                path:
-                protocol:
+          # Don't use path as label (high cardinality) - keep as field
+          - template:
+                source: path
+                template: '{{ .Value }}'
+          - template:
+                source: protocol
+                template: '{{ .Value }}'
           - output:
                 source: request
 
@@ -106,13 +130,25 @@ scrape_configs:
           - regex:
                 source: request
                 expression: '^(?P<req_method>\S+) (?P<req_path>\S+) (?P<req_protocol>\S+)$'
+          # Use only low-cardinality labels for Nginx error logs
           - labels:
-                level:
-                pid:
-                tid:
-                server:
-                client:
-                host:
-                req_method:
+                level: # error, warn, info, debug (~5 values)
+                req_method: # GET, POST, etc. (~10 values)
+          # Keep high-cardinality data as fields
+          - template:
+                source: pid
+                template: '{{ .Value }}'
+          - template:
+                source: tid
+                template: '{{ .Value }}'
+          - template:
+                source: server
+                template: '{{ .Value }}'
+          - template:
+                source: client
+                template: '{{ .Value }}'
+          - template:
+                source: host
+                template: '{{ .Value }}'
           - output:
                 source: message

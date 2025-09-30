@@ -373,20 +373,24 @@ jobs:
                   cp docker-compose.logs.yml /opt/grosint-monitoring/
 
                   # Create systemd service for monitoring stack
-                  sudo tee /etc/systemd/system/grosint-monitoring.service << 'MONEOF'
+                  sudo tee /etc/systemd/system/grosint-monitoring.service << MONEOF
                   [Unit]
                   Description=Grosint Monitoring Stack (Grafana, Loki, Prometheus)
                   Requires=docker.service
                   After=docker.service
 
                   [Service]
-                  Type=oneshot
+                  Type=forking
                   RemainAfterExit=yes
                   WorkingDirectory=/opt/grosint-monitoring
-                  ExecStart=/usr/local/bin/docker-compose -f docker-compose.logs.yml up -d
-                  ExecStop=/usr/local/bin/docker-compose -f docker-compose.logs.yml down
+                  # Use shell to detect available compose command
+                  ExecStart=/bin/bash -c 'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then docker compose -f docker-compose.logs.yml up -d; else docker-compose -f docker-compose.logs.yml up -d; fi'
+                  ExecStop=/bin/bash -c 'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then docker compose -f docker-compose.logs.yml down; else docker-compose -f docker-compose.logs.yml down; fi'
                   TimeoutStartSec=0
-                  User=$USER
+                  # Pin an explicit, non-root user that owns /opt/grosint-monitoring
+                  User=${USER}
+                  Restart=on-failure
+                  RestartSec=10
 
                   [Install]
                   WantedBy=multi-user.target
@@ -398,9 +402,10 @@ jobs:
                   sudo systemctl start grosint-monitoring
 
                   echo "✅ Monitoring stack deployed successfully!"
-                  echo "Grafana: http://localhost:3000 (admin/admin123)"
+                  echo "Grafana: http://localhost:3000 (admin/[password from environment])"
                   echo "Prometheus: http://localhost:9090"
                   echo "Loki: http://localhost:3100"
+                  echo "Note: Grafana password is set via GRAFANA_ADMIN_PASSWORD environment variable"
                   EOF
                   chmod +x dist/deploy-monitoring.sh
 
@@ -501,6 +506,9 @@ jobs:
                       LOG_LEVEL=info
                       SECRET_KEY=${{ secrets.SECRET_KEY }}
 
+                      # Monitoring Configuration
+                      GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+
                       # Environment
                       ENVIRONMENT=production
                       EOF
@@ -559,8 +567,9 @@ jobs:
                       ./deploy-monitoring.sh
 
                       echo "✅ Monitoring stack deployed!"
-                      echo "Grafana: http://${{ secrets.DOMAIN_NAME }}:3000 (admin/admin123)"
+                      echo "Grafana: http://${{ secrets.DOMAIN_NAME }}:3000 (admin/[password from environment])"
                       echo "Prometheus: http://${{ secrets.DOMAIN_NAME }}:9090"
+                      echo "Note: Grafana password is set via GRAFANA_ADMIN_PASSWORD environment variable"
 
     notify:
         name: 📢 Slack Notification
@@ -645,6 +654,15 @@ jobs:
                           }
                         ]
                       }
+
+            - name: Debug Failure Payload
+              if: needs.lint.result == 'failure' || needs.test.result == 'failure' || needs.build.result == 'failure' || needs.deploy.result == 'failure' || needs.lint.result == 'cancelled' || needs.test.result == 'cancelled' || needs.build.result == 'cancelled' || needs.deploy.result == 'cancelled'
+              run: |
+                  echo "Branch: ${{ github.ref_name }}"
+                  echo "Lint result: ${{ needs.lint.result }}"
+                  echo "Test result: ${{ needs.test.result }}"
+                  echo "Build result: ${{ needs.build.result }}"
+                  echo "Deploy result: ${{ needs.deploy.result }}"
 
             - name: Notify Failure
               if: needs.lint.result == 'failure' || needs.test.result == 'failure' || needs.build.result == 'failure' || needs.deploy.result == 'failure' || needs.lint.result == 'cancelled' || needs.test.result == 'cancelled' || needs.build.result == 'cancelled' || needs.deploy.result == 'cancelled'
