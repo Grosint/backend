@@ -6,6 +6,7 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.router import api_router
@@ -99,6 +100,10 @@ app.add_middleware(TimingMiddleware)
 
 # Include API routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Add Prometheus metrics instrumentation
+instrumentator = Instrumentator()
+instrumentator.instrument(app).expose(app, endpoint="/metrics")
 
 
 # Health check endpoint

@@ -4,7 +4,7 @@ on:
     push:
         branches: [main, develop, production] # Currently set to main for testing
     pull_request:
-        types: [closed]
+        types: [opened, reopened, synchronize, ready_for_review]
         branches: [main, develop, production]
 
 env:
@@ -333,6 +333,10 @@ jobs:
                   cp requirements.txt dist/
                   cp run.py dist/
 
+                  # Copy monitoring stack files
+                  cp -r monitoring/ dist/
+                  cp docker-compose.logs.yml dist/
+
                   # Note: Nginx and systemd configurations are created by setup.sh
                   # No need to create them here as they already exist on the server
 
@@ -352,6 +356,69 @@ jobs:
                   echo "✅ Dependencies installed"
                   EOF
                   chmod +x dist/deploy.sh
+
+                  # Create monitoring deployment script
+                  cat > dist/deploy-monitoring.sh << 'EOF'
+                  #!/bin/bash
+                  set -e
+
+                  echo "📊 Starting monitoring stack deployment..."
+
+                  # Create monitoring directory
+                  sudo mkdir -p /opt/grosint-monitoring
+                  sudo chown $USER:$USER /opt/grosint-monitoring
+
+                  # Copy monitoring files
+                  cp -r monitoring/ /opt/grosint-monitoring/
+                  cp docker-compose.logs.yml /opt/grosint-monitoring/
+
+                  # Ensure Grafana admin password is set
+                  if [ -z "${GRAFANA_ADMIN_PASSWORD:-}" ]; then
+                    echo "GRAFANA_ADMIN_PASSWORD is not set" >&2
+                    exit 1
+                  fi
+                  cat > /opt/grosint-monitoring/.env <<EOF_ENV
+                  GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+                  EOF_ENV
+                  chmod 600 /opt/grosint-monitoring/.env
+
+                  # Create systemd service for monitoring stack
+                  sudo tee /etc/systemd/system/grosint-monitoring.service << MONEOF
+                  [Unit]
+                  Description=Grosint Monitoring Stack (Grafana, Loki, Prometheus)
+                  Requires=docker.service
+                  After=docker.service
+
+                  [Service]
+                  Type=forking
+                  RemainAfterExit=yes
+                  WorkingDirectory=/opt/grosint-monitoring
+                  # Use shell to detect available compose command
+                  ExecStart=/bin/bash -c 'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then docker compose -f docker-compose.logs.yml up -d; else docker-compose -f docker-compose.logs.yml up -d; fi'
+                  ExecStop=/bin/bash -c 'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then docker compose -f docker-compose.logs.yml down; else docker-compose -f docker-compose.logs.yml down; fi'
+                  TimeoutStartSec=0
+                  # Pin an explicit, non-root user that owns /opt/grosint-monitoring
+                  User=${USER}
+                  Restart=on-failure
+                  RestartSec=10
+                  EnvironmentFile=/opt/grosint-monitoring/.env
+
+                  [Install]
+                  WantedBy=multi-user.target
+                  MONEOF
+
+                  # Enable and start monitoring service
+                  sudo systemctl daemon-reload
+                  sudo systemctl enable grosint-monitoring
+                  sudo systemctl start grosint-monitoring
+
+                  echo "✅ Monitoring stack deployed successfully!"
+                  echo "Grafana: http://localhost:3000 (admin/[password from environment])"
+                  echo "Prometheus: http://localhost:9090"
+                  echo "Loki: http://localhost:3100"
+                  echo "Note: Grafana password is set via GRAFANA_ADMIN_PASSWORD environment variable"
+                  EOF
+                  chmod +x dist/deploy-monitoring.sh
 
                   # Environment file will be created during deployment using GitHub Secrets
 
@@ -450,6 +517,9 @@ jobs:
                       LOG_LEVEL=info
                       SECRET_KEY=${{ secrets.SECRET_KEY }}
 
+                      # Monitoring Configuration
+                      GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+
                       # Environment
                       ENVIRONMENT=production
                       EOF
@@ -502,6 +572,16 @@ jobs:
                       echo "✅ Deployment completed successfully!"
                       sudo systemctl status grosint-backend --no-pager
 
+                      # Deploy monitoring stack
+                      echo "📊 Deploying monitoring stack..."
+                      chmod +x deploy-monitoring.sh
+                      ./deploy-monitoring.sh
+
+                      echo "✅ Monitoring stack deployed!"
+                      echo "Grafana: http://${{ secrets.DOMAIN_NAME }}:3000 (admin/[password from environment])"
+                      echo "Prometheus: http://${{ secrets.DOMAIN_NAME }}:9090"
+                      echo "Note: Grafana password is set via GRAFANA_ADMIN_PASSWORD environment variable"
+
     notify:
         name: 📢 Slack Notification
         runs-on: ubuntu-latest
@@ -537,6 +617,7 @@ jobs:
                           {
                             "color": "good",
                             "title": "🎉 Deployment Successful!",
+                            "text": "All pipeline stages completed successfully on branch `${{ github.ref_name }}`",
                             "fields": [
                               {
                                 "title": "Repository",
@@ -545,18 +626,23 @@ jobs:
                               },
                               {
                                 "title": "Branch",
-                                "value": "${{ github.ref_name }}",
+                                "value": "`${{ github.ref_name }}`",
                                 "short": true
                               },
                               {
                                 "title": "Commit",
-                                "value": "${{ github.sha }}",
+                                "value": "`${{ github.sha }}`",
                                 "short": true
                               },
                               {
                                 "title": "Author",
                                 "value": "${{ github.actor }}",
                                 "short": true
+                              },
+                              {
+                                "title": "Pipeline Stages",
+                                "value": "✅ Lint\n✅ Test\n✅ Build\n✅ Deploy",
+                                "short": false
                               }
                             ],
                             "actions": [
@@ -569,11 +655,25 @@ jobs:
                                 "type": "button",
                                 "text": "View Logs",
                                 "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                              },
+                              {
+                                "type": "button",
+                                "text": "Grafana",
+                                "url": "http://${{ secrets.DOMAIN_NAME }}:3000"
                               }
                             ]
                           }
                         ]
                       }
+
+            - name: Debug Failure Payload
+              if: needs.lint.result == 'failure' || needs.test.result == 'failure' || needs.build.result == 'failure' || needs.deploy.result == 'failure' || needs.lint.result == 'cancelled' || needs.test.result == 'cancelled' || needs.build.result == 'cancelled' || needs.deploy.result == 'cancelled'
+              run: |
+                  echo "Branch: ${{ github.ref_name }}"
+                  echo "Lint result: ${{ needs.lint.result }}"
+                  echo "Test result: ${{ needs.test.result }}"
+                  echo "Build result: ${{ needs.build.result }}"
+                  echo "Deploy result: ${{ needs.deploy.result }}"
 
             - name: Notify Failure
               if: needs.lint.result == 'failure' || needs.test.result == 'failure' || needs.build.result == 'failure' || needs.deploy.result == 'failure' || needs.lint.result == 'cancelled' || needs.test.result == 'cancelled' || needs.build.result == 'cancelled' || needs.deploy.result == 'cancelled'
@@ -589,6 +689,7 @@ jobs:
                           {
                             "color": "danger",
                             "title": "❌ Pipeline Failed!",
+                            "text": "Pipeline failed on branch `${{ github.ref_name }}` - check details below",
                             "fields": [
                               {
                                 "title": "Repository",
@@ -597,17 +698,27 @@ jobs:
                               },
                               {
                                 "title": "Branch",
-                                "value": "${{ github.ref_name }}",
+                                "value": "`${{ github.ref_name }}`",
                                 "short": true
                               },
                               {
-                                "title": "Failed Stage",
-                                "value": "${{ needs.lint.result == 'failure' && 'Lint' || needs.test.result == 'failure' && 'Test' || needs.build.result == 'failure' && 'Build' || 'Deploy' }}",
+                                "title": "Commit",
+                                "value": "`${{ github.sha }}`",
                                 "short": true
                               },
                               {
                                 "title": "Author",
                                 "value": "${{ github.actor }}",
+                                "short": true
+                              },
+                              {
+                                "title": "Pipeline Stages Status",
+                                "value": "${{ needs.lint.result == 'success' && '✅ Lint' || needs.lint.result == 'failure' && '❌ Lint' || needs.lint.result == 'cancelled' && '⏹️ Lint' || '⏳ Lint' }}\n${{ needs.test.result == 'success' && '✅ Test' || needs.test.result == 'failure' && '❌ Test' || needs.test.result == 'cancelled' && '⏹️ Test' || '⏳ Test' }}\n${{ needs.build.result == 'success' && '✅ Build' || needs.build.result == 'failure' && '❌ Build' || needs.build.result == 'cancelled' && '⏹️ Build' || '⏳ Build' }}\n${{ needs.deploy.result == 'success' && '✅ Deploy' || needs.deploy.result == 'failure' && '❌ Deploy' || needs.deploy.result == 'cancelled' && '⏹️ Deploy' || '⏳ Deploy' }}",
+                                "short": false
+                              },
+                              {
+                                "title": "Failed Stage",
+                                "value": "${{ needs.lint.result == 'failure' && '🔍 Lint Stage' || needs.test.result == 'failure' && '🧪 Test Stage' || needs.build.result == 'failure' && '🏗️ Build Stage' || needs.deploy.result == 'failure' && '🚀 Deploy Stage' || 'Unknown' }}",
                                 "short": true
                               }
                             ],
@@ -616,6 +727,11 @@ jobs:
                                 "type": "button",
                                 "text": "View Logs",
                                 "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                              },
+                              {
+                                "type": "button",
+                                "text": "Retry Pipeline",
+                                "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/rerun"
                               }
                             ]
                           }
@@ -636,6 +752,7 @@ jobs:
                           {
                             "color": "warning",
                             "title": "⚠️ Pipeline Passed (No Deployment)",
+                            "text": "All pipeline stages passed on branch `${{ github.ref_name }}` but deployment was skipped",
                             "fields": [
                               {
                                 "title": "Repository",
@@ -644,18 +761,28 @@ jobs:
                               },
                               {
                                 "title": "Branch",
-                                "value": "${{ github.ref_name }}",
+                                "value": "`${{ github.ref_name }}`",
                                 "short": true
                               },
                               {
-                                "title": "Reason",
-                                "value": "Not on main branch - deployment skipped",
-                                "short": false
+                                "title": "Commit",
+                                "value": "`${{ github.sha }}`",
+                                "short": true
                               },
                               {
                                 "title": "Author",
                                 "value": "${{ github.actor }}",
                                 "short": true
+                              },
+                              {
+                                "title": "Pipeline Stages Status",
+                                "value": "✅ Lint\n✅ Test\n✅ Build\n⏭️ Deploy (skipped)",
+                                "short": false
+                              },
+                              {
+                                "title": "Reason",
+                                "value": "Deployment only runs on main/production branches",
+                                "short": false
                               }
                             ],
                             "actions": [
@@ -663,6 +790,11 @@ jobs:
                                 "type": "button",
                                 "text": "View Logs",
                                 "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                              },
+                              {
+                                "type": "button",
+                                "text": "Merge to Deploy",
+                                "url": "https://github.com/${{ github.repository }}/compare/main...${{ github.ref_name }}"
                               }
                             ]
                           }
