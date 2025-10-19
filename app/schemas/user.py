@@ -1,47 +1,31 @@
 from __future__ import annotations
 
-import re
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from app.utils.validators import validate_phone_number, validate_required_phone_number
 
 
 class UserCreateRequest(BaseModel):
     """Request schema for user creation - only required fields"""
 
     email: EmailStr
-    phone: str = Field(..., min_length=7, max_length=20)
+    phone: str = Field(..., description="Phone number in E.164 format")
     verifyByGovId: bool
     password: str = Field(..., min_length=8, max_length=100)
 
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v):
-        if v is None:
-            return v
-
-        # Remove all non-digit characters except +
-        if v.startswith("+"):
-            phone_digits = re.sub(r"\D", "", v[1:])  # Remove + and non-digits
-        else:
-            phone_digits = re.sub(r"\D", "", v)  # Remove all non-digits
-
-        # Check if it's a valid length (7-15 digits)
-        if len(phone_digits) < 7 or len(phone_digits) > 15:
-            raise ValueError("Phone number must be between 7 and 15 digits")
-
-        # Return in E.164 format if it doesn't start with +
-        if not v.startswith("+") and phone_digits:
-            return f"+{phone_digits}"
-
-        return v
+        return validate_required_phone_number(v)
 
 
 class UserUpdateRequest(BaseModel):
     """Request schema for user updates - all fields optional"""
 
     email: EmailStr | None = None
-    phone: str | None = Field(None, min_length=7, max_length=20)
+    phone: str | None = Field(None, description="Phone number in E.164 format")
     verifyByGovId: bool | None = None
     firstName: str | None = Field(None, max_length=100)
     lastName: str | None = Field(None, max_length=100)
@@ -53,24 +37,7 @@ class UserUpdateRequest(BaseModel):
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v):
-        if v is None:
-            return v
-
-        # Remove all non-digit characters except +
-        if v.startswith("+"):
-            phone_digits = re.sub(r"\D", "", v[1:])  # Remove + and non-digits
-        else:
-            phone_digits = re.sub(r"\D", "", v)  # Remove all non-digits
-
-        # Check if it's a valid length (7-15 digits)
-        if len(phone_digits) < 7 or len(phone_digits) > 15:
-            raise ValueError("Phone number must be between 7 and 15 digits")
-
-        # Return in E.164 format if it doesn't start with +
-        if not v.startswith("+") and phone_digits:
-            return f"+{phone_digits}"
-
-        return v
+        return validate_phone_number(v)
 
 
 class UserResponse(BaseModel):

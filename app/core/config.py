@@ -20,7 +20,11 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "development_secret_key")
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # 15 minutes (short-lived)
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # 7 days
+
+    # Token blocklist configuration (using MongoDB)
+    # No additional configuration needed - uses existing MongoDB connection
 
     # Rate limiting
     RATE_LIMIT_PER_MINUTE: int = 60

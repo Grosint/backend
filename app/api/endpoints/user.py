@@ -1,16 +1,15 @@
 import logging
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.core.auth_dependencies import TokenData, get_current_user_token
 from app.core.database import get_database
-from app.core.security import get_current_user
+from app.core.exceptions import NotFoundException
 from app.models.user import UserCreate, UserUpdate
-from app.schemas.auth import TokenData
+from app.schemas.response import PaginatedResponse, SuccessResponse
 from app.schemas.user import (
     UserCreateRequest,
-    UserCreateResponse,
-    UserListResponse,
     UserResponse,
     UserUpdateRequest,
 )
@@ -20,19 +19,14 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/", response_model=UserCreateResponse)
+@router.post("/", response_model=SuccessResponse[UserResponse])
 async def create_user(user_request: UserCreateRequest, db=Depends(get_database)):
     """Create a new user"""
     try:
         user_service = UserService(db)
 
-        # Create user
-        user_create = UserCreate(
-            email=user_request.email,
-            phone=user_request.phone,
-            password=user_request.password,
-            verifyByGovId=user_request.verifyByGovId,
-        )
+        # Create user - convert request to service model
+        user_create = UserCreate.model_validate(user_request.model_dump())
 
         user = await user_service.create_user(user_create)
 
@@ -54,63 +48,58 @@ async def create_user(user_request: UserCreateRequest, db=Depends(get_database))
 
         logger.info(f"User created: {user.email}")
 
-        return UserCreateResponse(
+        return SuccessResponse(
             message="User created successfully",
-            user_id=str(user.id),
-            user=user_response,
+            data=user_response,
         )
 
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-        ) from e
-    except Exception as e:
-        logger.error(f"Error creating user: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create user",
-        ) from e
+    except Exception:
+        # Let the global exception handler deal with it
+        raise
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=SuccessResponse[UserResponse])
 async def get_current_user_info(
-    current_user: TokenData = Depends(get_current_user), db=Depends(get_database)
+    current_user: TokenData = Depends(get_current_user_token), db=Depends(get_database)
 ):
     """Get current user information"""
     try:
         user_service = UserService(db)
 
-        # Get user by username (from token)
-        user = await user_service.get_user_by_username(current_user.username)
+        # Get user by ID (from token)
+        user = await user_service.get_user_by_id(current_user.user_id)
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
+            raise NotFoundException(resource="User", resource_id=current_user.user_id)
 
-        return UserResponse(
+        user_response = UserResponse(
             id=str(user.id),
             email=user.email,
-            username=user.username,
-            full_name=user.full_name,
-            is_active=user.is_active,
+            phone=user.phone,
+            verifyByGovId=user.verifyByGovId,
+            firstName=user.firstName,
+            lastName=user.lastName,
+            pinCode=user.pinCode,
+            state=user.state,
+            isActive=user.isActive,
+            isVerified=user.isVerified,
             createdAt=user.createdAt,
             updatedAt=user.updatedAt,
         )
 
-    except HTTPException:
+        return SuccessResponse(
+            message="User information retrieved successfully",
+            data=user_response,
+        )
+
+    except Exception:
+        # Let the global exception handler deal with it
         raise
-    except Exception as e:
-        logger.error(f"Error getting current user: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get user information",
-        ) from e
 
 
-@router.put("/me", response_model=UserResponse)
+@router.put("/me", response_model=SuccessResponse[UserResponse])
 async def update_current_user(
     user_update: UserUpdateRequest,
-    current_user: TokenData = Depends(get_current_user),
+    current_user: TokenData = Depends(get_current_user_token),
     db=Depends(get_database),
 ):
     """Update current user information"""
@@ -118,46 +107,47 @@ async def update_current_user(
         user_service = UserService(db)
 
         # Get current user
-        user = await user_service.get_user_by_username(current_user.username)
+        user = await user_service.get_user_by_id(current_user.user_id)
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
+            raise NotFoundException(resource="User", resource_id=current_user.user_id)
 
         # Update user
-        update_data = UserUpdate(**user_update.dict(exclude_unset=True))
+        update_data = UserUpdate(**user_update.model_dump(exclude_unset=True))
         updated_user = await user_service.update_user(str(user.id), update_data)
 
         if not updated_user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
+            raise NotFoundException(resource="User", resource_id=str(user.id))
 
-        return UserResponse(
+        user_response = UserResponse(
             id=str(updated_user.id),
             email=updated_user.email,
-            username=updated_user.username,
-            full_name=updated_user.full_name,
-            is_active=updated_user.is_active,
-            created_at=updated_user.created_at,
-            updated_at=updated_user.updated_at,
+            phone=updated_user.phone,
+            verifyByGovId=updated_user.verifyByGovId,
+            firstName=updated_user.firstName,
+            lastName=updated_user.lastName,
+            pinCode=updated_user.pinCode,
+            state=updated_user.state,
+            isActive=updated_user.isActive,
+            isVerified=updated_user.isVerified,
+            createdAt=updated_user.createdAt,
+            updatedAt=updated_user.updatedAt,
         )
 
-    except HTTPException:
+        return SuccessResponse(
+            message="User updated successfully",
+            data=user_response,
+        )
+
+    except Exception:
+        # Let the global exception handler deal with it
         raise
-    except Exception as e:
-        logger.error(f"Error updating user: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update user",
-        ) from e
 
 
-@router.get("/", response_model=UserListResponse)
+@router.get("/list", response_model=PaginatedResponse[UserResponse])
 async def list_users(
-    page: int = 1,
-    size: int = 20,
-    current_user: TokenData = Depends(get_current_user),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(20, ge=1, le=100, description="Page size"),
+    current_user: TokenData = Depends(get_current_user_token),
     db=Depends(get_database),
 ):
     """List users with pagination (admin only)"""
@@ -169,37 +159,53 @@ async def list_users(
 
         # Get users
         users = await user_service.list_users(skip=skip, limit=size)
+        total = await user_service.count_users()
 
         # Convert to response format
         user_responses = [
             UserResponse(
                 id=str(user.id),
                 email=user.email,
-                username=user.username,
-                full_name=user.full_name,
-                is_active=user.is_active,
+                phone=user.phone,
+                verifyByGovId=user.verifyByGovId,
+                firstName=user.firstName,
+                lastName=user.lastName,
+                pinCode=user.pinCode,
+                state=user.state,
+                isActive=user.isActive,
+                isVerified=user.isVerified,
                 createdAt=user.createdAt,
                 updatedAt=user.updatedAt,
             )
             for user in users
         ]
 
-        return UserListResponse(
-            users=user_responses, total=len(user_responses), page=page, size=size
+        from app.schemas.response import PaginationMeta
+
+        pagination = PaginationMeta(
+            page=page,
+            size=size,
+            total=total,
+            pages=(total + size - 1) // size,
+            has_next=page * size < total,
+            has_prev=page > 1,
         )
 
-    except Exception as e:
-        logger.error(f"Error listing users: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list users",
-        ) from e
+        return PaginatedResponse(
+            message="Users retrieved successfully",
+            data=user_responses,
+            pagination=pagination,
+        )
+
+    except Exception:
+        # Let the global exception handler deal with it
+        raise
 
 
-@router.delete("/{user_id}")
+@router.delete("/{user_id}", response_model=SuccessResponse[dict])
 async def delete_user(
     user_id: str,
-    current_user: TokenData = Depends(get_current_user),
+    current_user: TokenData = Depends(get_current_user_token),
     db=Depends(get_database),
 ):
     """Delete a user (admin only)"""
@@ -215,19 +221,16 @@ async def delete_user(
         # Delete user
         deleted = await user_service.delete_user(user_id)
         if not deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
+            raise NotFoundException(resource="User", resource_id=user_id)
 
         logger.info(f"User deleted: {user_id}")
 
-        return {"message": "User deleted successfully"}
+        return SuccessResponse(
+            message="User deleted successfully", data={"deleted_user_id": user_id}
+        )
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error deleting user: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete user",
-        ) from e
+    except Exception:
+        # Let the global exception handler deal with it
+        raise

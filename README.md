@@ -15,7 +15,7 @@ A comprehensive REST API backend built with FastAPI and MongoDB for OSINT (Open 
 
 ## Architecture
 
-```
+```text
 app/
 ├── core/           # Core functionality (config, database, security, logging)
 ├── models/         # Data models and schemas
@@ -113,25 +113,125 @@ Once the server is running, visit:
 
 ## Testing
 
-### Run all tests
+### Quick Start
 
 ```bash
-pytest
+# Run all tests with Docker (recommended)
+python run_tests.py
+
+# Run all tests without Docker (requires local MongoDB)
+python run_tests.py --no-docker
+
+# Run tests and open HTML coverage report
+python run_tests.py --open-report
 ```
 
-### Run specific test categories
+### Test Categories
 
 ```bash
-pytest -m unit          # Unit tests only
-pytest -m integration   # Integration tests only
-pytest -m e2e          # End-to-end tests only
+# Run specific test files
+python run_tests.py test_user_database.py
+python run_tests.py test_auth_endpoints.py
+
+# Run with pattern matching
+python run_tests.py -k "test_user_creation"
+
+# Run specific test classes or functions
+python run_tests.py test_user_database::TestUserTimestampBehavior
 ```
 
-### Run with coverage
+### Testing with Beanie Models
 
-```bash
-pytest --cov=app --cov-report=html
+This project uses Beanie (MongoDB ODM) for data models. **Always follow these patterns** when writing tests to avoid `CollectionWasNotInitialized` errors:
+
+#### ✅ **Service Layer Tests (Recommended Pattern)**
+
+For testing service methods that use Beanie queries like `User.find_one(User.email == user.email)`:
+
+```python
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+@pytest.mark.asyncio
+async def test_create_user_database_interaction(self, user_service):
+    """Test user creation with proper Beanie mocking."""
+    # Create a mock user instance using Mock(spec=User)
+    mock_user = Mock(spec=User)
+    mock_user.id = ObjectId()
+    mock_user.email = "test@example.com"
+    mock_user.insert = AsyncMock()
+
+    # Mock the User model at the service level
+    with patch('app.services.user_service.User') as mock_user_class:
+        # Setup mock to handle query pattern: User.email == user.email
+        mock_user_class.email = MagicMock()
+        mock_user_class.email.__eq__ = MagicMock(return_value="query")
+        mock_user_class.find_one = AsyncMock(return_value=None)
+        mock_user_class.return_value = mock_user
+
+        result = await user_service.create_user(user_create)
+
+        # Verify calls
+        mock_user_class.find_one.assert_called_once()
+        mock_user.insert.assert_called_once()
 ```
+
+#### ✅ **Unit Tests for Model Behavior**
+
+For testing model validation, timestamps, and business logic:
+
+```python
+def test_user_model_behavior(self):
+    """Test user model behavior without database operations."""
+    with patch('app.models.user.User.get_settings') as mock_get_settings:
+        mock_settings = MagicMock()
+        mock_settings.pymongo_collection = MagicMock()
+        mock_get_settings.return_value = mock_settings
+
+        # Now you can safely instantiate the User model
+        user = User(
+            email="test@example.com",
+            phone="+1234567890",
+            password="hashed_password"
+        )
+
+        # Test model behavior
+        user.set_timestamps()
+        assert user.createdAt is not None
+        assert user.updatedAt is not None
+```
+
+#### ✅ **Integration Tests**
+
+For testing actual database operations:
+
+```python
+@pytest.mark.asyncio
+async def test_user_database_operations(self, beanie_init):
+    """Test actual database operations with Beanie."""
+    # Beanie is now initialized, you can perform database operations
+    user = User(
+        email="test@example.com",
+        phone="+1234567890",
+        password="hashed_password"
+    )
+
+    # Insert into database
+    await user.insert()
+
+    # Query from database
+    found_user = await User.find_one(User.email == "test@example.com")
+    assert found_user is not None
+```
+
+### **Key Testing Rules**
+
+1. **Always use `Mock(spec=User)` for mock user instances** (same pattern as auth tests)
+2. **Mock the User class at the service level** (`app.services.user_service.User`)
+3. **Setup `mock_user_class.email` with `__eq__` method** for query patterns
+4. **Make database methods like `find_one` and `insert` AsyncMock objects**
+5. **For model unit tests, always mock `User.get_settings`** to avoid initialization errors
+
+For comprehensive testing patterns and examples, see [tests/README.md](tests/README.md#testing-with-beanie-models).
 
 ## Configuration
 

@@ -1,41 +1,17 @@
+"""Test configuration and fixtures."""
+
 import asyncio
-import os
-import subprocess
-import time
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from beanie import init_beanie
 from fastapi.testclient import TestClient
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.core.database import get_database
 from app.main import app
-
-
-# Load test environment variables
-def load_test_env():
-    """Load test environment variables from .env.test file"""
-    env_file = os.path.join(os.path.dirname(__file__), "..", ".env.test")
-    if os.path.exists(env_file):
-        with open(env_file) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, value = line.split("=", 1)
-                    # Set environment variable with high priority
-                    os.environ[key] = value
-        print(f"Loaded test environment from {env_file}")
-        print(f"MONGODB_URL: {os.environ.get('MONGODB_URL', 'NOT SET')}")
-        print(f"MONGODB_DATABASE: {os.environ.get('MONGODB_DATABASE', 'NOT SET')}")
-
-
-# Load test environment before importing other modules
-load_test_env()
-
-# Test database configuration
-# Using Docker MongoDB for tests
-TEST_DATABASE_URL = os.getenv(
-    "MONGODB_URL", "mongodb://testuser:testpass@localhost:27018"
-)
-TEST_DATABASE_NAME = os.getenv("MONGODB_DATABASE", "test_osint_backend")
+from app.models.user import User, UserInDB
 
 
 @pytest.fixture(scope="session")
@@ -46,234 +22,245 @@ def event_loop():
     loop.close()
 
 
-@pytest.fixture(scope="session")
-def docker_compose_file():
-    """Return the path to the docker-compose file for testing."""
-    return os.path.join(os.path.dirname(__file__), "..", "docker-compose.test.yml")
-
-
-@pytest.fixture(scope="session")
-def docker_services(docker_compose_file):
-    """Start Docker services for testing."""
-    # Temporarily rename .env file to prevent production config loading
-    env_file = os.path.join(os.path.dirname(__file__), "..", ".env")
-    env_backup = env_file + ".backup"
-
-    if os.path.exists(env_file):
-        os.rename(env_file, env_backup)
-
-    try:
-        # Start the services
-        subprocess.run(
-            ["docker", "compose", "-f", docker_compose_file, "up", "-d", "--build"],
-            check=True,
-        )
-
-        # Wait for MongoDB to be ready
-        max_retries = 30
-        for _ in range(max_retries):
-            try:
-                # Try to connect to MongoDB
-                result = subprocess.run(
-                    [
-                        "docker",
-                        "exec",
-                        "osint-backend-test-mongodb",
-                        "mongosh",
-                        "--eval",
-                        "db.adminCommand('ping')",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                if "ok" in result.stdout.lower():
-                    break
-            except subprocess.CalledProcessError:
-                pass
-            time.sleep(1)
-        else:
-            raise Exception("MongoDB container failed to start or become ready")
-
-        yield
-
-    finally:
-        # Clean up: stop and remove containers
-        subprocess.run(
-            ["docker", "compose", "-f", docker_compose_file, "down", "-v"], check=False
-        )
-
-        # Restore .env file
-        if os.path.exists(env_backup):
-            os.rename(env_backup, env_file)
-
-
-@pytest.fixture(scope="session")
-def test_db_session(docker_services):
-    """Create a session-scoped test database connection"""
-    from pymongo import MongoClient  # Use sync client for session scope
-
-    try:
-        # Use synchronous client for session scope to avoid event loop issues
-        client = MongoClient(TEST_DATABASE_URL)
-        db = client[TEST_DATABASE_NAME]
-
-        # Test the connection
-        client.admin.command("ping")
-
-        yield db
-
-        # Clean up
-        client.close()
-    except Exception as e:
-        print(f"MongoDB connection error: {e}")
-        pytest.skip(f"MongoDB not available: {e}")
+@pytest.fixture
+def client():
+    """Create test client."""
+    return TestClient(app)
 
 
 @pytest.fixture
-def test_db(test_db_session):
-    """Create a test database connection with cleanup"""
-
-    # Use sync client for cleanup to avoid event loop issues
-    def cleanup_before():
-        test_db_session.drop_collection("users")
-        test_db_session.drop_collection("searches")
-        test_db_session.drop_collection("results")
-
-    def cleanup_after():
-        test_db_session.drop_collection("users")
-        test_db_session.drop_collection("searches")
-        test_db_session.drop_collection("results")
-
-    # Clean up before test
-    cleanup_before()
-
-    yield test_db_session
-
-    # Clean up after test
-    cleanup_after()
+def mock_database():
+    """Mock database for testing."""
+    db = MagicMock()
+    db.users = MagicMock()
+    db.users.find_one = AsyncMock()
+    db.users.find = MagicMock()
+    db.users.insert_one = AsyncMock()
+    db.users.update_one = AsyncMock()
+    db.users.delete_one = AsyncMock()
+    db.users.count_documents = AsyncMock()
+    return db
 
 
 @pytest.fixture
-def client(test_db):
-    """Create a test client with database override"""
+def sample_user_data():
+    """Sample user data for testing."""
+    return {
+        "id": "user_id_123",
+        "email": "test@example.com",
+        "phone": "+1234567890",
+        "password": "hashed_password",
+        "verifyByGovId": True,
+        "firstName": "John",
+        "lastName": "Doe",
+        "pinCode": "12345",
+        "state": "CA",
+        "isActive": True,
+        "isVerified": False,
+        "createdAt": datetime.now(UTC),
+        "updatedAt": datetime.now(UTC),
+    }
 
-    # Create an async wrapper for the sync database
-    class AsyncDatabaseWrapper:
-        def __init__(self, sync_db):
-            self.sync_db = sync_db
 
-        def __getattr__(self, name):
-            return getattr(self.sync_db, name)
+@pytest.fixture
+def sample_user_in_db(sample_user_data):
+    """Sample UserInDB object for testing."""
+    return UserInDB(**sample_user_data)
 
-        def __getitem__(self, key):
-            # Return a collection wrapper that handles async operations
-            collection = self.sync_db[key]
-            return AsyncCollectionWrapper(collection)
 
-        async def __aenter__(self):
-            return self
+@pytest.fixture
+def sample_user_create_request():
+    """Sample user creation request data."""
+    return {
+        "email": "test@example.com",
+        "phone": "+1234567890",
+        "password": "password123",
+        "verifyByGovId": True,
+    }
 
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            pass
 
-    # Create an async wrapper for collections
-    class AsyncCollectionWrapper:
-        def __init__(self, sync_collection):
-            self.sync_collection = sync_collection
+@pytest.fixture
+def sample_user_update_request():
+    """Sample user update request data."""
+    return {
+        "firstName": "Jane",
+        "lastName": "Smith",
+        "phone": "+9876543210",
+        "pinCode": "54321",
+        "state": "NY",
+    }
 
-        def __getattr__(self, name):
-            return getattr(self.sync_collection, name)
 
-        async def insert_one(self, document):
-            # Convert async call to sync
-            import asyncio
+@pytest.fixture
+def invalid_user_requests():
+    """Invalid user request data for testing validation."""
+    return {
+        "invalid_email": {
+            "email": "invalid-email",
+            "phone": "+1234567890",
+            "password": "password123",
+            "verifyByGovId": True,
+        },
+        "empty_phone": {
+            "email": "test@example.com",
+            "phone": "",
+            "password": "password123",
+            "verifyByGovId": True,
+        },
+        "short_password": {
+            "email": "test@example.com",
+            "phone": "+1234567890",
+            "password": "short",
+            "verifyByGovId": True,
+        },
+        "invalid_verify_by_gov_id": {
+            "email": "test@example.com",
+            "phone": "+1234567890",
+            "password": "password123",
+            "verifyByGovId": "not_boolean",
+        },
+        "missing_required_fields": {
+            "email": "test@example.com",
+            # phone missing
+            "password": "password123",
+            "verifyByGovId": True,
+        },
+    }
 
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                None, self.sync_collection.insert_one, document
-            )
 
-        async def find_one(self, filter):
-            # Convert async call to sync
-            import asyncio
+@pytest.fixture
+def mock_user_service():
+    """Mock UserService for testing."""
+    service = MagicMock()
+    service.create_user = AsyncMock()
+    service.get_user_by_id = AsyncMock()
+    service.update_user = AsyncMock()
+    service.delete_user = AsyncMock()
+    service.list_users = AsyncMock()
+    service.count_users = AsyncMock()
+    return service
 
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                None, self.sync_collection.find_one, filter
-            )
 
-        async def find(self, filter):
-            # Convert async call to sync
-            import asyncio
+@pytest.fixture
+def mock_get_current_user(sample_user_in_db):
+    """Mock get_current_user dependency."""
+    return sample_user_in_db
 
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(None, self.sync_collection.find, filter)
 
-        async def update_one(self, filter, update):
-            # Convert async call to sync
-            import asyncio
-
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                None, self.sync_collection.update_one, filter, update
-            )
-
-        async def delete_one(self, filter):
-            # Convert async call to sync
-            import asyncio
-
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                None, self.sync_collection.delete_one, filter
-            )
-
-    def override_get_database():
-        return AsyncDatabaseWrapper(test_db)
-
-    app.dependency_overrides[get_database] = override_get_database
-
-    with TestClient(app) as test_client:
-        yield test_client
+@pytest.fixture(autouse=True)
+def mock_database_dependency(mock_database):
+    """Mock database dependency for all tests."""
+    app.dependency_overrides[get_database] = lambda: mock_database
+    yield
     app.dependency_overrides.clear()
 
 
 @pytest.fixture
-def test_user(test_db):
-    """Create a test user"""
-    import asyncio
-
-    from app.models.user import UserCreate
-    from app.services.user_service import UserService
-
-    async def create_user():
-        user_service = UserService(test_db)
-        user_create = UserCreate(
-            email="test@example.com",
-            phone="+1234567890",
-            password="testpassword",
-            verifyByGovId=True,
+def mock_password_hashing():
+    """Mock password hashing functions."""
+    with pytest.MonkeyPatch().context() as m:
+        m.setattr(
+            "app.services.user_service.get_password_hash", lambda x: f"hashed_{x}"
         )
-
-        user = await user_service.create_user(user_create)
-        return user
-
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    return loop.run_until_complete(create_user())
+        m.setattr(
+            "app.services.user_service.verify_password",
+            lambda x, y: x == y.replace("hashed_", ""),
+        )
+        yield
 
 
 @pytest.fixture
-def auth_headers(client, test_user):
-    """Get authentication headers for test user"""
-    response = client.post(
-        "/api/v1/auth/token",
-        data={"username": test_user.email, "password": "testpassword"},
-    )
+def mock_beanie_operations():
+    """Mock Beanie operations."""
+    with pytest.MonkeyPatch().context() as m:
+        # Mock User.find_one
+        m.setattr("app.models.user.User.find_one", AsyncMock())
+        # Mock User.insert
+        m.setattr("app.models.user.User.insert", AsyncMock())
+        # Mock User.save
+        m.setattr("app.models.user.User.save", AsyncMock())
+        # Mock User.delete
+        m.setattr("app.models.user.User.delete", AsyncMock())
+        yield
 
-    token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+
+class TestDataFactory:
+    """Factory for creating test data."""
+
+    @staticmethod
+    def create_user_data(**overrides):
+        """Create user data with optional overrides."""
+        default_data = {
+            "email": "test@example.com",
+            "phone": "+1234567890",
+            "password": "hashed_password",
+            "verifyByGovId": True,
+            "firstName": "John",
+            "lastName": "Doe",
+            "pinCode": "12345",
+            "state": "CA",
+            "isActive": True,
+            "isVerified": False,
+            "createdAt": datetime.now(UTC),
+            "updatedAt": datetime.now(UTC),
+        }
+        default_data.update(overrides)
+        return default_data
+
+    @staticmethod
+    def create_user_create_request(**overrides):
+        """Create user creation request with optional overrides."""
+        default_data = {
+            "email": "test@example.com",
+            "phone": "+1234567890",
+            "password": "password123",
+            "verifyByGovId": True,
+        }
+        default_data.update(overrides)
+        return default_data
+
+    @staticmethod
+    def create_user_update_request(**overrides):
+        """Create user update request with optional overrides."""
+        default_data = {
+            "firstName": "Jane",
+            "lastName": "Smith",
+            "phone": "+9876543210",
+        }
+        default_data.update(overrides)
+        return default_data
+
+
+@pytest.fixture
+def test_data_factory():
+    """Test data factory fixture."""
+    return TestDataFactory()
+
+
+@pytest.fixture
+async def beanie_init():
+    """Initialize Beanie for tests that need it."""
+    # Create a test database connection
+    client = AsyncIOMotorClient("mongodb://localhost:27017")
+    database = client.test_grosint
+
+    # Initialize Beanie with test database
+    await init_beanie(database=database, document_models=[User])
+
+    yield database
+
+    # Cleanup
+    await client.close()
+
+
+@pytest.fixture
+def test_db():
+    """Test database fixture for MongoDB connection tests."""
+    from motor.motor_asyncio import AsyncIOMotorClient
+
+    # Connect to test MongoDB instance without authentication first
+    # The container is configured with auth but we need to connect to admin first
+    client = AsyncIOMotorClient("mongodb://testuser:testpass@localhost:27018/admin")
+    database = client.test_osint_backend
+
+    return database

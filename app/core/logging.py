@@ -84,11 +84,11 @@ class JSONFormatter(logging.Formatter):
                 return None
 
             # Handle basic JSON-serializable types
-            if isinstance(value, (str, int, float, bool)):
+            if isinstance(value, str | int | float | bool):
                 return value
 
             # Handle lists and tuples
-            if isinstance(value, (list, tuple)):
+            if isinstance(value, list | tuple):
                 return [self._safe_serialize_value(item) for item in value]
 
             # Handle dictionaries

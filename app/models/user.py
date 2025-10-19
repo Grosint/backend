@@ -1,28 +1,16 @@
 from __future__ import annotations
 
-import re
 from datetime import UTC, datetime
 
+from beanie import Document, Indexed, Insert, Replace, before_event
 from bson import ObjectId
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-
-class PyObjectId(ObjectId):
-    @classmethod
-    def __get_pydantic_core_schema__(cls, source_type, handler):
-        from pydantic_core import core_schema
-
-        return core_schema.no_info_plain_validator_function(cls.validate)
-
-    @classmethod
-    def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid objectid")
-        return ObjectId(v)
-
-    @classmethod
-    def __get_pydantic_json_schema__(cls, field_schema):
-        field_schema.update(type="string")
+from app.utils.validators import (
+    PyObjectId,
+    validate_phone_number,
+    validate_required_phone_number,
+)
 
 
 class UserBase(BaseModel):
@@ -42,24 +30,7 @@ class UserBase(BaseModel):
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v):
-        if v is None:
-            return v
-
-        # Remove all non-digit characters except +
-        if v.startswith("+"):
-            phone_digits = re.sub(r"\D", "", v[1:])  # Remove + and non-digits
-        else:
-            phone_digits = re.sub(r"\D", "", v)  # Remove all non-digits
-
-        # Check if it's a valid length (7-15 digits)
-        if len(phone_digits) < 7 or len(phone_digits) > 15:
-            raise ValueError("Phone number must be between 7 and 15 digits")
-
-        # Return in E.164 format if it doesn't start with +
-        if not v.startswith("+") and phone_digits:
-            return f"+{phone_digits}"
-
-        return v
+        return validate_required_phone_number(v)
 
 
 class UserCreate(BaseModel):
@@ -73,24 +44,7 @@ class UserCreate(BaseModel):
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v):
-        if v is None:
-            return v
-
-        # Remove all non-digit characters except +
-        if v.startswith("+"):
-            phone_digits = re.sub(r"\D", "", v[1:])  # Remove + and non-digits
-        else:
-            phone_digits = re.sub(r"\D", "", v)  # Remove all non-digits
-
-        # Check if it's a valid length (7-15 digits)
-        if len(phone_digits) < 7 or len(phone_digits) > 15:
-            raise ValueError("Phone number must be between 7 and 15 digits")
-
-        # Return in E.164 format if it doesn't start with +
-        if not v.startswith("+") and phone_digits:
-            return f"+{phone_digits}"
-
-        return v
+        return validate_required_phone_number(v)
 
 
 class UserUpdate(BaseModel):
@@ -109,24 +63,7 @@ class UserUpdate(BaseModel):
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v):
-        if v is None:
-            return v
-
-        # Remove all non-digit characters except +
-        if v.startswith("+"):
-            phone_digits = re.sub(r"\D", "", v[1:])  # Remove + and non-digits
-        else:
-            phone_digits = re.sub(r"\D", "", v)  # Remove all non-digits
-
-        # Check if it's a valid length (7-15 digits)
-        if len(phone_digits) < 7 or len(phone_digits) > 15:
-            raise ValueError("Phone number must be between 7 and 15 digits")
-
-        # Return in E.164 format if it doesn't start with +
-        if not v.startswith("+") and phone_digits:
-            return f"+{phone_digits}"
-
-        return v
+        return validate_phone_number(v)
 
 
 class UserInDB(UserBase):
@@ -139,10 +76,31 @@ class UserInDB(UserBase):
         json_encoders = {ObjectId: str}
 
 
-class User(UserBase):
-    id: PyObjectId = None
+class User(Document):
+    email: Indexed(EmailStr, unique=True)
+    phone: str
+    password: str
+    firstName: str | None = None
+    lastName: str | None = None
+    pinCode: str | None = None
+    state: str | None = None
+    isActive: bool = True
+    verifyByGovId: bool = False
+    isVerified: bool = False
+    createdAt: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updatedAt: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-    class Config:
-        populate_by_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v):
+        return validate_phone_number(v)
+
+    @before_event([Insert, Replace])
+    def set_timestamps(self):
+        now = datetime.now(UTC)
+        if self.createdAt is None:
+            self.createdAt = now
+        self.updatedAt = now
+
+    class Settings:
+        name = "users"

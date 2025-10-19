@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 from urllib.parse import urlparse
 
-from pymongo import AsyncMongoClient
+from beanie import init_beanie
+from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import ConnectionFailure
 
 from app.core.config import settings
@@ -29,8 +30,8 @@ def extract_database_name_from_url(mongodb_url: str) -> str:
 
 
 class Database:
-    client: AsyncMongoClient | None = None
-    database: AsyncMongoClient | None = None
+    client: AsyncIOMotorClient | None = None
+    database = None
 
 
 db = Database()
@@ -44,7 +45,7 @@ async def get_database():
 async def connect_to_mongo():
     """Create database connection"""
     try:
-        db.client = AsyncMongoClient(settings.MONGODB_URL)
+        db.client = AsyncIOMotorClient(settings.MONGODB_URL)
 
         # Extract database name from URL or use default
         database_name = extract_database_name_from_url(settings.MONGODB_URL)
@@ -66,8 +67,13 @@ async def connect_to_mongo():
 
         logger.info(f"Connected to MongoDB at {masked_url}")
 
-        # Create indexes
-        await create_indexes()
+        # Initialize Beanie with document models
+        # from app.models.result import Result
+        # from app.models.search import Search
+        from app.models.user import User  # local import to avoid circulars
+
+        await init_beanie(database=db.database, document_models=[User])
+        logger.info("Initialized Beanie")
 
     except ConnectionFailure as e:
         logger.error(f"Failed to connect to MongoDB: {e}")
@@ -85,26 +91,7 @@ async def close_mongo_connection():
 
 
 async def create_indexes():
-    """Create database indexes for better performance"""
-    try:
-        # Users collection indexes
-        users_collection = db.database[settings.MONGODB_COLLECTION_USERS]
-        await users_collection.create_index("email", unique=True)
-
-        # Searches collection indexes
-        searches_collection = db.database[settings.MONGODB_COLLECTION_SEARCHES]
-        await searches_collection.create_index("user_id")
-        await searches_collection.create_index("search_type")
-        await searches_collection.create_index("created_at")
-
-        # Results collection indexes
-        results_collection = db.database[settings.MONGODB_COLLECTION_RESULTS]
-        await results_collection.create_index("search_id")
-        await results_collection.create_index("source")
-        await results_collection.create_index("created_at")
-
-        logger.info("Database indexes created successfully")
-
-    except Exception as e:
-        logger.error(f"Error creating database indexes: {e}")
-        raise
+    """Deprecated: Indexes are now defined on Beanie models."""
+    logger.info(
+        "create_indexes is deprecated; Beanie manages indexes from model definitions"
+    )

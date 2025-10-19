@@ -5,15 +5,16 @@ import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+import jwt
 from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from jwt import PyJWTError
 from passlib.context import CryptContext
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.status import HTTP_429_TOO_MANY_REQUESTS
 
+from app.core.auth_dependencies import TokenData
 from app.core.config import settings
-from app.schemas.auth import TokenData
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -75,10 +76,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
             raise credentials_exception
 
         # Create token data
-        token_data = TokenData(username=username)
+        token_data = TokenData(
+            user_id=username,
+            email=payload.get("email", ""),
+            token_type=payload.get("type", "access"),
+            expires_at=datetime.fromtimestamp(payload.get("exp", 0)),
+        )
         return token_data
 
-    except JWTError as e:
+    except PyJWTError as e:
         logger.warning("JWT validation failed")
         raise credentials_exception from e
 

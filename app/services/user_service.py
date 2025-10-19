@@ -6,8 +6,9 @@ from datetime import UTC, datetime
 from bson import ObjectId
 
 from app.core.config import settings
-from app.core.security import get_password_hash, verify_password
-from app.models.user import UserCreate, UserInDB, UserUpdate
+from app.core.exceptions import ConflictException
+from app.models.user import User, UserCreate, UserInDB, UserUpdate
+from app.utils.password import hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -21,36 +22,47 @@ class UserService:
         """Create a new user"""
         try:
             # Check if user already exists
-            existing_user = await self.get_user_by_email(user.email)
+            existing_user = await User.find_one(User.email == user.email)
             if existing_user:
-                raise ValueError("User with this email already exists")
+                raise ConflictException(
+                    message="User with this email already exists",
+                    details={"email": user.email},
+                )
 
-            # Hash password
-            hashed_password = get_password_hash(user.password)
-
-            # Create user document
-            current_time = datetime.now(UTC)
-            user_doc = {
-                "email": user.email,
-                "password": hashed_password,
-                "phone": user.phone,
-                "verifyByGovId": user.verifyByGovId,
-                "firstName": None,
-                "lastName": None,
-                "pinCode": None,
-                "state": None,
-                "isActive": True,
-                "isVerified": False,
-                "createdAt": current_time,
-                "updatedAt": current_time,
-            }
-
-            result = await self.collection.insert_one(user_doc)
-            user_doc["_id"] = result.inserted_id
+            # Create new user document
+            new_user = User(
+                email=user.email,
+                phone=user.phone,
+                password=hash_password(user.password),
+                verifyByGovId=user.verifyByGovId,
+                firstName=None,
+                lastName=None,
+                pinCode=None,
+                state=None,
+                isActive=True,
+                isVerified=False,
+            )
+            await new_user.insert()
 
             logger.info(f"User created: {user.email}")
-            return UserInDB(**user_doc)
+            return UserInDB(
+                id=new_user.id,
+                email=new_user.email,
+                phone=new_user.phone,
+                password=new_user.password,
+                verifyByGovId=new_user.verifyByGovId,
+                firstName=new_user.firstName,
+                lastName=new_user.lastName,
+                pinCode=new_user.pinCode,
+                state=new_user.state,
+                isActive=new_user.isActive,
+                isVerified=new_user.isVerified,
+                createdAt=new_user.createdAt,
+                updatedAt=new_user.updatedAt,
+            )
 
+        except ConflictException:
+            raise
         except Exception as e:
             logger.error(f"Error creating user: {e}")
             raise
@@ -58,9 +70,23 @@ class UserService:
     async def get_user_by_id(self, user_id: str) -> UserInDB | None:
         """Get user by ID"""
         try:
-            user_doc = await self.collection.find_one({"_id": ObjectId(user_id)})
-            if user_doc:
-                return UserInDB(**user_doc)
+            user = await User.find_one(User.id == ObjectId(user_id))
+            if user:
+                return UserInDB(
+                    id=user.id,
+                    email=user.email,
+                    phone=user.phone,
+                    password=user.password,
+                    verifyByGovId=user.verifyByGovId,
+                    firstName=user.firstName,
+                    lastName=user.lastName,
+                    pinCode=user.pinCode,
+                    state=user.state,
+                    isActive=user.isActive,
+                    isVerified=user.isVerified,
+                    createdAt=user.createdAt,
+                    updatedAt=user.updatedAt,
+                )
             return None
         except Exception as e:
             logger.error(f"Error getting user by ID: {e}")
@@ -69,21 +95,33 @@ class UserService:
     async def get_user_by_email(self, email: str) -> UserInDB | None:
         """Get user by email"""
         try:
-            user_doc = await self.collection.find_one({"email": email})
-            if user_doc:
-                return UserInDB(**user_doc)
+            user = await User.find_one(User.email == email)
+            if user:
+                return UserInDB(
+                    id=user.id,
+                    email=user.email,
+                    phone=user.phone,
+                    password=user.password,
+                    verifyByGovId=user.verifyByGovId,
+                    firstName=user.firstName,
+                    lastName=user.lastName,
+                    pinCode=user.pinCode,
+                    state=user.state,
+                    isActive=user.isActive,
+                    isVerified=user.isVerified,
+                    createdAt=user.createdAt,
+                    updatedAt=user.updatedAt,
+                )
             return None
         except Exception as e:
             logger.error(f"Error getting user by email: {e}")
             raise
 
     async def get_user_by_username(self, username: str) -> UserInDB | None:
-        """Get user by username"""
+        """Get user by username (alias for email)"""
         try:
-            user_doc = await self.collection.find_one({"username": username})
-            if user_doc:
-                return UserInDB(**user_doc)
-            return None
+            # For now, treat username as email since we don't have a separate username field
+            return await self.get_user_by_email(username)
         except Exception as e:
             logger.error(f"Error getting user by username: {e}")
             raise
@@ -95,10 +133,10 @@ class UserService:
             if not user:
                 return None
 
-            if not verify_password(password, user.hashed_password):
+            if not verify_password(password, user.password):
                 return None
 
-            if not user.is_active:
+            if not user.isActive:
                 return None
 
             return user
@@ -111,19 +149,23 @@ class UserService:
     ) -> UserInDB | None:
         """Update user"""
         try:
+            user = await User.find_one(User.id == ObjectId(user_id))
+            if not user:
+                return None
+
             update_data = user_update.dict(exclude_unset=True)
             if not update_data:
                 return await self.get_user_by_id(user_id)
 
-            update_data["updatedAt"] = datetime.now(UTC)
+            # Update user fields
+            for field, value in update_data.items():
+                if hasattr(user, field):
+                    setattr(user, field, value)
 
-            result = await self.collection.update_one(
-                {"_id": ObjectId(user_id)}, {"$set": update_data}
-            )
+            user.updatedAt = datetime.now(UTC)
+            await user.save()
 
-            if result.modified_count:
-                return await self.get_user_by_id(user_id)
-            return None
+            return await self.get_user_by_id(user_id)
         except Exception as e:
             logger.error(f"Error updating user: {e}")
             raise
@@ -131,8 +173,11 @@ class UserService:
     async def delete_user(self, user_id: str) -> bool:
         """Delete user"""
         try:
-            result = await self.collection.delete_one({"_id": ObjectId(user_id)})
-            return result.deleted_count > 0
+            user = await User.find_one(User.id == ObjectId(user_id))
+            if user:
+                await user.delete()
+                return True
+            return False
         except Exception as e:
             logger.error(f"Error deleting user: {e}")
             raise
@@ -140,11 +185,36 @@ class UserService:
     async def list_users(self, skip: int = 0, limit: int = 100) -> list[UserInDB]:
         """List users with pagination"""
         try:
-            cursor = self.collection.find().skip(skip).limit(limit)
-            users = []
-            async for user_doc in cursor:
-                users.append(UserInDB(**user_doc))
+            cursor = User.find()
+            users_docs = await cursor.skip(skip).limit(limit).to_list()
+            users: list[UserInDB] = []
+            for u in users_docs:
+                users.append(
+                    UserInDB(
+                        id=u.id,
+                        email=u.email,
+                        phone=u.phone,
+                        password=u.password,
+                        verifyByGovId=u.verifyByGovId,
+                        firstName=u.firstName,
+                        lastName=u.lastName,
+                        pinCode=u.pinCode,
+                        state=u.state,
+                        isActive=u.isActive,
+                        isVerified=u.isVerified,
+                        createdAt=u.createdAt,
+                        updatedAt=u.updatedAt,
+                    )
+                )
             return users
         except Exception as e:
             logger.error(f"Error listing users: {e}")
+            raise
+
+    async def count_users(self) -> int:
+        """Count total number of users"""
+        try:
+            return await User.count()
+        except Exception as e:
+            logger.error(f"Error counting users: {e}")
             raise
