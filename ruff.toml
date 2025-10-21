@@ -1,6 +1,8 @@
 # Ruff configuration
 target-version = "py312"
 line-length = 88
+
+[lint]
 select = [
     "E",    # pycodestyle errors
     "W",    # pycodestyle warnings
@@ -17,8 +19,8 @@ ignore = [
     "B008", # do not perform function calls in argument defaults
 ]
 
-[per-file-ignores]
+[lint.per-file-ignores]
 "tests/*" = ["S101"]  # Allow assert statements in tests
 
-[isort]
+[lint.isort]
 known-first-party = ["app"]

@@ -14,8 +14,9 @@ repos:
           - id: ruff
             args: [--fix, --exit-non-zero-on-fix]
             exclude: __pycache__
-          - id: ruff-format
-            exclude: __pycache__
+          # Disabled ruff-format to avoid conflicts with Black
+          # - id: ruff-format
+          #   exclude: __pycache__
 
     # MyPy - Type checking (disabled for now, enable when ready for strict typing)
     # - repo: https://github.com/pre-commit/mirrors-mypy
@@ -25,9 +26,21 @@ repos:
     #         args: [--ignore-missing-imports]
     #         exclude: __pycache__
 
-    # Security checks - Commented out due to dependency issues in pre-commit
-    # Run manually with: bandit -r . -f json -o bandit-report.json
+    # Security checks
+    - repo: https://github.com/PyCQA/bandit
+      rev: 1.7.5
+      hooks:
+          - id: bandit
+            exclude: '^tests/|^run_tests\.py$'
+            additional_dependencies: ['pbr>=5.11.0']
+
+    # Safety - Check for known security vulnerabilities (disabled due to mixed dependency management)
     # Run manually with: safety check
+    # - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
+    #   rev: v1.3.2
+    #   hooks:
+    #       - id: python-safety-dependencies-check
+    #         args: ['--requirements', 'requirements.txt']
 
     # General hooks
     - repo: https://github.com/pre-commit/pre-commit-hooks

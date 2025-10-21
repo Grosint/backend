@@ -104,7 +104,7 @@ class AuthService:
         return LoginResponse(
             access_token=access_token,
             refresh_token=refresh_token,
-            token_type="bearer",
+            token_type="bearer",  # nosec B106 - This is the standard OAuth 2.0 token type, not a password
             expires_in=expires_in,
             user_id=str(user.id),
             email=user.email,
@@ -146,7 +146,9 @@ class AuthService:
             expires_in = 15 * 60  # 15 minutes in seconds
 
             return RefreshTokenResponse(
-                access_token=access_token, token_type="bearer", expires_in=expires_in
+                access_token=access_token,
+                token_type="bearer",
+                expires_in=expires_in,  # nosec B106 - Standard OAuth 2.0 token type
             )
 
         except Exception as e:
@@ -182,7 +184,7 @@ class AuthService:
             await add_token_to_blocklist(
                 jti=access_jti,
                 user_id=user_id,
-                token_type="access",
+                token_type="access",  # nosec B106 - Token type identifier, not a password
                 expires_at=access_expiry,
                 reason="logout",
                 database=self.database,
@@ -197,12 +199,14 @@ class AuthService:
                     await add_token_to_blocklist(
                         jti=refresh_jti,
                         user_id=user_id,
-                        token_type="refresh",
+                        token_type="refresh",  # nosec B106 - Token type identifier, not a password
                         expires_at=refresh_expiry,
                         reason="logout",
                         database=self.database,
                     )
-                except Exception:
+                except (
+                    Exception
+                ):  # nosec B110 - Intentionally broad exception handling for token cleanup
                     # If refresh token is invalid, continue with access token logout
                     pass
 

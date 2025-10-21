@@ -14,8 +14,8 @@ class JWTManager:
     """JWT token manager with security best practices."""
 
     # Token types for different purposes
-    ACCESS_TOKEN_TYPE = "access"
-    REFRESH_TOKEN_TYPE = "refresh"
+    ACCESS_TOKEN_TYPE = "access"  # nosec B105 - Token type identifier, not a password
+    REFRESH_TOKEN_TYPE = "refresh"  # nosec B105 - Token type identifier, not a password
 
     # Token expiration times (following OAuth 2.0 best practices)
     ACCESS_TOKEN_EXPIRE_MINUTES = 15  # Short-lived access tokens
