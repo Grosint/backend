@@ -5,9 +5,6 @@ from typing import Any
 
 from app.adapters.base import OSINTAdapter
 from app.core.resilience import ResilientHttpClient
-from app.external_apis.social_media.social_media_orchestrator import (
-    SocialMediaOrchestrator,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +16,6 @@ class SocialMediaAdapter(OSINTAdapter):
         super().__init__()
         self.name = "SocialMediaAdapter"
         self.client = ResilientHttpClient()
-        self.orchestrator = SocialMediaOrchestrator()
 
     async def search_email(self, email: str) -> dict[str, Any]:
         """Search email across social media platforms"""
@@ -159,8 +155,11 @@ class SocialMediaAdapter(OSINTAdapter):
 
             combined_data = {
                 "domain": domain,
-                "social_presence": {},
-                "influence_metrics": {
+                "platforms": {},
+                "summary": {
+                    "total_platforms": len(tasks),
+                    "found_platforms": 0,
+                    "confidence_score": 0.0,
                     "total_followers": 0,
                     "total_engagement": 0,
                     "influence_score": 0.0,
@@ -171,18 +170,30 @@ class SocialMediaAdapter(OSINTAdapter):
             for i, result in enumerate(results):
                 platform = platform_names[i]
                 if isinstance(result, Exception):
-                    combined_data["social_presence"][platform] = {"error": str(result)}
+                    combined_data["platforms"][platform] = {"error": str(result)}
                 else:
-                    combined_data["social_presence"][platform] = result
+                    combined_data["platforms"][platform] = result
                     if result.get("found", False):
-                        combined_data["influence_metrics"][
-                            "total_followers"
-                        ] += result.get("followers", 0)
+                        combined_data["summary"]["found_platforms"] += 1
+                        # Handle different follower field names (followers vs likes)
+                        followers = result.get("followers")
+                        if followers is None:
+                            followers = result.get("likes", 0)
+                        combined_data["summary"]["total_followers"] += followers
+                        combined_data["summary"]["total_engagement"] += result.get(
+                            "engagement_rate", 0
+                        )
 
-            # Calculate influence score
-            if combined_data["influence_metrics"]["total_followers"] > 0:
-                combined_data["influence_metrics"]["influence_score"] = min(
-                    combined_data["influence_metrics"]["total_followers"] / 100000, 1.0
+            # Calculate confidence score (based on found platforms)
+            combined_data["summary"]["confidence_score"] = (
+                combined_data["summary"]["found_platforms"]
+                / combined_data["summary"]["total_platforms"]
+            )
+
+            # Calculate influence score (based on total followers)
+            if combined_data["summary"]["total_followers"] > 0:
+                combined_data["summary"]["influence_score"] = min(
+                    combined_data["summary"]["total_followers"] / 100000, 1.0
                 )
 
             return self.normalize_success_response(combined_data)

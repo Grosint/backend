@@ -201,10 +201,13 @@ class ResilientHttpClient:
     ) -> httpx.Response:
         key = circuit_key or self._extract_host(url)
 
+        # Sanitize URL for logging to prevent PII leakage
+        sanitized_url = sanitize_log_data({"url": url}).get("url", url)
+
         if not await self._circuit.allow_request(key):
             logger.warning(
                 "Circuit open - short-circuiting request",
-                extra={"cb_key": key, "url": url},
+                extra={"cb_key": key, "url": sanitized_url},
             )
             raise httpx.RequestError(f"Circuit open for {key}")
 
@@ -232,7 +235,7 @@ class ResilientHttpClient:
                         logger.info(
                             "HTTP request success",
                             extra={
-                                "url": url,
+                                "url": sanitized_url,
                                 "method": method,
                                 "status": response.status_code,
                                 "latency_ms": latency_ms,
@@ -249,7 +252,7 @@ class ResilientHttpClient:
                         logger.warning(
                             "HTTP retry on status",
                             extra={
-                                "url": url,
+                                "url": sanitized_url,
                                 "method": method,
                                 "status": response.status_code,
                                 "attempt": attempt,
@@ -264,7 +267,7 @@ class ResilientHttpClient:
                     logger.error(
                         "HTTP request failed",
                         extra={
-                            "url": url,
+                            "url": sanitized_url,
                             "method": method,
                             "status": response.status_code,
                             "response": sanitize_log_data(
@@ -283,7 +286,7 @@ class ResilientHttpClient:
                         logger.warning(
                             "HTTP retry on exception",
                             extra={
-                                "url": url,
+                                "url": sanitized_url,
                                 "method": method,
                                 "attempt": attempt,
                                 "exception": type(exc).__name__,
@@ -295,7 +298,21 @@ class ResilientHttpClient:
                     logger.error(
                         "HTTP request error - giving up",
                         extra={
-                            "url": url,
+                            "url": sanitized_url,
+                            "method": method,
+                            "exception": type(exc).__name__,
+                        },
+                    )
+                    raise
+                except httpx.HTTPError as exc:
+                    # Catch-all for any httpx errors not in retry_on_exceptions
+                    # This ensures circuit breaker records failures for all HTTP errors
+                    last_exc = exc
+                    await self._circuit.on_failure(key)
+                    logger.error(
+                        "HTTP request error - non-retryable exception",
+                        extra={
+                            "url": sanitized_url,
                             "method": method,
                             "exception": type(exc).__name__,
                         },

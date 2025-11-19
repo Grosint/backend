@@ -13,7 +13,7 @@ passlib>=1.7.4,<1.8.0
 # Testing dependencies are in requirements-dev.txt
 
 # Additional utilities
-phone-iso3166>=1.0.0
+phone-iso3166>=0.4.1
 
 # Monitoring and metrics
 prometheus-fastapi-instrumentator>=7.0.0,<8.0.0

@@ -3,17 +3,32 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.adapters.social_media_adapter import SocialMediaAdapter
-
 logger = logging.getLogger(__name__)
 
 
 class SocialMediaOrchestrator:
     """Orchestrator for social media external APIs"""
 
-    def __init__(self):
+    def __init__(self, adapter=None):
+        """
+        Initialize the orchestrator.
+
+        Args:
+            adapter: Optional SocialMediaAdapter instance. If not provided,
+                    one will be created lazily to avoid circular imports.
+        """
         self.name = "SocialMediaOrchestrator"
-        self.adapter = SocialMediaAdapter()
+        self._adapter = adapter
+
+    @property
+    def adapter(self):
+        """Lazy-load adapter to avoid circular import issues"""
+        if self._adapter is None:
+            # Local import to break circular dependency
+            from app.adapters.social_media_adapter import SocialMediaAdapter
+
+            self._adapter = SocialMediaAdapter()
+        return self._adapter
 
     async def search_email(self, email: str) -> dict[str, Any]:
         """Search email across social media platforms"""

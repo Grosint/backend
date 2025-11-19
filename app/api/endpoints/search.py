@@ -166,7 +166,9 @@ async def get_user_searches(
             )
         else:
             # Get recent searches regardless of user
-            searches = await search_service.get_searches_by_status("COMPLETED", limit)
+            searches = await search_service.get_searches_by_status(
+                SearchStatus.COMPLETED, limit
+            )
 
         formatted_searches = []
         for search in searches:

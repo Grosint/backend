@@ -5,7 +5,6 @@ from typing import Any
 
 from app.adapters.base import OSINTAdapter
 from app.core.resilience import ResilientHttpClient
-from app.external_apis.security.security_orchestrator import SecurityOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +16,11 @@ class SecurityAdapter(OSINTAdapter):
         super().__init__()
         self.name = "SecurityAdapter"
         self.client = ResilientHttpClient()
-        self.orchestrator = SecurityOrchestrator()
 
     async def search_email(self, email: str) -> dict[str, Any]:
         """Search email in security/threat databases"""
         try:
-            logger.info(f"Security: Searching email {email}")
+            logger.info("Security: Searching email")
 
             # Call multiple security APIs in parallel
             tasks = [
@@ -53,15 +51,18 @@ class SecurityAdapter(OSINTAdapter):
                 "recommendations": [],
             }
 
-            api_names = ["malware", "phishing", "breaches", "reputation"]
+            key_map = [
+                "malware_detection",
+                "phishing_attempts",
+                "data_breaches",
+                "reputation_score",
+            ]
             for i, result in enumerate(results):
-                api_name = api_names[i]
+                key = key_map[i]
                 if isinstance(result, Exception):
-                    combined_data["threat_analysis"][f"{api_name}_detection"] = {
-                        "error": str(result)
-                    }
+                    combined_data["threat_analysis"][key] = {"error": str(result)}
                 else:
-                    combined_data["threat_analysis"][f"{api_name}_detection"] = result
+                    combined_data["threat_analysis"][key] = result
 
             # Calculate overall risk
             risk_factors = []
@@ -98,7 +99,10 @@ class SecurityAdapter(OSINTAdapter):
             return self.normalize_success_response(combined_data)
 
         except Exception as e:
-            logger.error(f"Security search failed: {e}")
+            logger.error(
+                "Security search failed",
+                extra={"exception": type(e).__name__, "identifier_type": "email"},
+            )
             return self.normalize_error_response(e)
 
     async def _check_malware_databases(self, email: str) -> dict[str, Any]:
@@ -194,7 +198,7 @@ class SecurityAdapter(OSINTAdapter):
     async def search_domain(self, domain: str) -> dict[str, Any]:
         """Search domain in security databases"""
         try:
-            logger.info(f"Security: Searching domain {domain}")
+            logger.info("Security: Searching domain")
 
             tasks = [
                 self._check_domain_malware(domain),
@@ -219,15 +223,18 @@ class SecurityAdapter(OSINTAdapter):
                 "security_score": 0.0,
             }
 
-            api_names = ["malware", "phishing", "reputation", "ssl"]
+            key_map = [
+                "malware_detection",
+                "phishing_risk",
+                "reputation",
+                "ssl_certificate",
+            ]
             for i, result in enumerate(results):
-                api_name = api_names[i]
+                key = key_map[i]
                 if isinstance(result, Exception):
-                    combined_data["security_analysis"][f"{api_name}_detection"] = {
-                        "error": str(result)
-                    }
+                    combined_data["security_analysis"][key] = {"error": str(result)}
                 else:
-                    combined_data["security_analysis"][f"{api_name}_detection"] = result
+                    combined_data["security_analysis"][key] = result
 
             # Calculate security score
             security_factors = []
@@ -252,7 +259,10 @@ class SecurityAdapter(OSINTAdapter):
             return self.normalize_success_response(combined_data)
 
         except Exception as e:
-            logger.error(f"Security domain search failed: {e}")
+            logger.error(
+                "Security domain search failed",
+                extra={"exception": type(e).__name__, "identifier_type": "domain"},
+            )
             return self.normalize_error_response(e)
 
     async def _check_domain_malware(self, domain: str) -> dict[str, Any]:
