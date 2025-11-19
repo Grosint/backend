@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import os
@@ -328,3 +329,24 @@ def sanitize_log_data(data):
                 sanitized[key] = token_pattern.sub("Bearer ********", value)
 
     return sanitized
+
+
+def hash_identifier(identifier: str) -> str:
+    """
+    Create a non-reversible hash of an identifier for logging purposes.
+
+    Uses SHA256 to create a deterministic hash, then returns the first 8
+    characters as a short identifier. This allows tracking the same identifier
+    across logs without exposing PII.
+
+    Args:
+        identifier: The identifier to hash (email, domain, phone, etc.)
+
+    Returns:
+        str: Short hash prefix (8 characters) for logging
+    """
+    if not identifier:
+        return "empty"
+    # Create SHA256 hash and take first 8 characters
+    hash_obj = hashlib.sha256(identifier.encode("utf-8"))
+    return hash_obj.hexdigest()[:8]
