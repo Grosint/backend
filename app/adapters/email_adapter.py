@@ -64,11 +64,11 @@ class EmailAdapter(OSINTAdapter):
                     combined_result["summary"]["successful_sources"] += 1
 
             logger.info(f"Email search completed for: {email}")
-            return combined_result
+            return self.normalize_success_response(combined_result)
 
         except Exception as e:
             logger.error(f"Error in email search: {e}")
-            return self.format_error(e)
+            return self.normalize_error_response(e)
 
     async def _check_haveibeenpwned(self, email: str) -> dict[str, Any]:
         """Check if email has been compromised using HaveIBeenPwned API"""

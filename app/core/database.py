@@ -68,11 +68,14 @@ async def connect_to_mongo():
         logger.info(f"Connected to MongoDB at {masked_url}")
 
         # Initialize Beanie with document models
-        # from app.models.result import Result
-        # from app.models.search import Search
+        from app.models.history import History
+        from app.models.result import Result
+        from app.models.search import Search
         from app.models.user import User  # local import to avoid circulars
 
-        await init_beanie(database=db.database, document_models=[User])
+        await init_beanie(
+            database=db.database, document_models=[User, History, Search, Result]
+        )
         logger.info("Initialized Beanie")
 
     except ConnectionFailure as e:

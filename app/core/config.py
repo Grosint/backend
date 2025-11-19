@@ -50,6 +50,21 @@ class Settings(BaseSettings):
     EXTERNAL_API_TIMEOUT: int = 30
     MAX_CONCURRENT_REQUESTS: int = 10
 
+    # Resilience configuration
+    CB_FAILURE_THRESHOLD: int = int(os.getenv("CB_FAILURE_THRESHOLD", 3))
+    CB_RECOVERY_TIMEOUT_SECONDS: int = int(os.getenv("CB_RECOVERY_TIMEOUT_SECONDS", 60))
+    CB_HALF_OPEN_PROBE_ATTEMPTS: int = int(os.getenv("CB_HALF_OPEN_PROBE_ATTEMPTS", 1))
+
+    RETRY_MAX_ATTEMPTS: int = int(os.getenv("RETRY_MAX_ATTEMPTS", 3))
+    RETRY_INITIAL_BACKOFF_SECONDS: float = float(
+        os.getenv("RETRY_INITIAL_BACKOFF_SECONDS", 0.2)
+    )
+    RETRY_BACKOFF_MULTIPLIER: float = float(os.getenv("RETRY_BACKOFF_MULTIPLIER", 2.0))
+    RETRY_JITTER_RATIO: float = float(os.getenv("RETRY_JITTER_RATIO", 0.2))
+
+    # RAPIDAPI KEYS
+    RAPIDAPI_KEY: str = os.getenv("RAPIDAPI_KEY", "")
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: str | list[str]) -> list[str]:

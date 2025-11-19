@@ -65,11 +65,12 @@ class DomainAdapter(OSINTAdapter):
                     combined_result["summary"]["successful_sources"] += 1
 
             logger.info(f"Domain search completed for: {domain}")
-            return combined_result
+            # Normalize combined result to standard output
+            return self.normalize_success_response(combined_result)
 
         except Exception as e:
             logger.error(f"Error in domain search: {e}")
-            return self.format_error(e)
+            return self.normalize_error_response(e)
 
     async def _check_whois(self, domain: str) -> dict[str, Any]:
         """Get WHOIS information for domain"""
