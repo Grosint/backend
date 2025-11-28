@@ -371,7 +371,14 @@ class CashfreeService:
                 logger.warning(
                     "Webhook secret not configured, skipping signature verification"
                 )
-                return True  # Allow if secret not configured (for development)
+                # Only allow bypass in development/testing with explicit flag
+                if settings.WEBHOOK_SIGNATURE_BYPASS:
+                    logger.warning(
+                        "Webhook signature bypass enabled (development mode only)",
+                        extra={"environment": settings.ENVIRONMENT},
+                    )
+                    return True
+                return False  # Treat missing secret as invalid
 
             # Calculate expected signature
             expected_signature = hmac.new(

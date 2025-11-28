@@ -112,6 +112,13 @@ class Settings(BaseSettings):
     # Payment configuration
     GST_RATE: float = float(os.getenv("GST_RATE", "0.18"))  # 18% GST
 
+    # Webhook security configuration
+    # WARNING: Only enable in development/testing. Never enable in production.
+    WEBHOOK_SIGNATURE_BYPASS: bool = (
+        os.getenv("WEBHOOK_SIGNATURE_BYPASS", "false").lower() in ("true", "1", "yes")
+        and os.getenv("ENVIRONMENT", "development").lower() != "production"
+    )
+
     # Credit scheduler configuration
     CREDIT_EXPIRY_SCHEDULER_ENABLED: bool = os.getenv(
         "CREDIT_EXPIRY_SCHEDULER_ENABLED", "true"

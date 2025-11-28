@@ -64,6 +64,7 @@ class AITANService:
             import asyncio
 
             tasks = []
+            executed_function_names = []  # Track function names in same order as tasks
             for func_name in functions_to_call:
                 if hasattr(self, f"_{func_name}"):
                     if func_name in [
@@ -73,6 +74,7 @@ class AITANService:
                         "mobile_to_vpa_advance",
                     ]:
                         tasks.append(getattr(self, f"_{func_name}")(phone))
+                        executed_function_names.append(func_name)
                     else:
                         # For other functions, we'll need different parameters
                         # For now, skip if not phone-based
@@ -96,8 +98,9 @@ class AITANService:
             found_any = False
             raw_responses = {}
 
-            for i, result in enumerate(results):
-                func_name = functions_to_call[i]
+            for result, func_name in zip(
+                results, executed_function_names, strict=False
+            ):
                 if isinstance(result, Exception):
                     logger.error(f"AITAN {func_name} failed: {result}")
                     raw_responses[func_name] = {"error": str(result)}

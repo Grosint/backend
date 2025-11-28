@@ -10,6 +10,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette import status
 
+from app.core.config import settings
 from app.services.integrations.payment.cashfree_service import CashfreeService
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,14 @@ def verify_webhook_signature(
     """
     if not signature:
         logger.warning("Webhook signature not provided")
-        return True  # Allow if signature not provided (for development/testing)
+        # Only allow bypass in development/testing with explicit flag
+        if settings.WEBHOOK_SIGNATURE_BYPASS:
+            logger.warning(
+                "Webhook signature bypass enabled (development mode only)",
+                extra={"environment": settings.ENVIRONMENT},
+            )
+            return True
+        return False  # Treat missing signature as invalid
 
     return cashfree_service.verify_webhook_signature(raw_body, signature)
 

@@ -149,6 +149,7 @@ class BefiscService:
             import asyncio
 
             tasks = []
+            executed_function_names = []  # Track function names in same order as tasks
             for func_name in functions_to_call:
                 if hasattr(self, f"_{func_name}"):
                     # Determine parameters based on function
@@ -165,10 +166,13 @@ class BefiscService:
                                     phone, is_format_for_osint=True
                                 )
                             )
+                            executed_function_names.append(func_name)
                         elif func_name == "mobile_advance_profile_basic":
                             tasks.append(getattr(self, f"_{func_name}")(phone, name))
+                            executed_function_names.append(func_name)
                         else:
                             tasks.append(getattr(self, f"_{func_name}")(phone))
+                            executed_function_names.append(func_name)
                     else:
                         logger.warning(
                             f"Befisc: Function {func_name} not applicable for phone search"
@@ -190,8 +194,9 @@ class BefiscService:
             found_any = False
             raw_responses = {}
 
-            for i, result in enumerate(results):
-                func_name = functions_to_call[i]
+            for result, func_name in zip(
+                results, executed_function_names, strict=False
+            ):
                 if isinstance(result, Exception):
                     logger.error(f"Befisc {func_name} failed: {result}")
                     raw_responses[func_name] = {"error": str(result)}

@@ -5,12 +5,14 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from bson import ObjectId
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 
 from app.core.auth_dependencies import TokenData, get_current_user_token
 from app.core.database import get_database
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import AuthorizationException, NotFoundException
+from app.models.subscription import Subscription
 from app.schemas.response import SuccessResponse
 from app.schemas.subscription import (
     SubscriptionCreate,
@@ -135,6 +137,30 @@ async def cancel_subscription(
 ):
     """Cancel a subscription."""
     try:
+        # Load subscription to verify ownership
+        subscription = await Subscription.find_one(
+            Subscription.id == ObjectId(subscription_id)
+        )
+        if not subscription:
+            raise NotFoundException(
+                resource="Subscription", resource_id=subscription_id
+            )
+
+        # Verify ownership - check if subscription belongs to current user
+        if str(subscription.userId) != current_user.user_id:
+            logger.warning(
+                "Unauthorized subscription cancellation attempt",
+                extra={
+                    "user_id": current_user.user_id,
+                    "subscription_id": subscription_id,
+                    "subscription_owner_id": str(subscription.userId),
+                },
+            )
+            raise AuthorizationException(
+                message="You do not have permission to cancel this subscription"
+            )
+
+        # Ownership verified - proceed with cancellation
         subscription_service = SubscriptionService(db)
         result = await subscription_service.cancel_subscription(subscription_id)
 
@@ -148,7 +174,7 @@ async def cancel_subscription(
             data=result,
         )
 
-    except NotFoundException:
+    except (NotFoundException, AuthorizationException):
         raise
     except Exception as e:
         logger.error(
