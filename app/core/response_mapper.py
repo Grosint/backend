@@ -148,6 +148,7 @@ def domain_success_mapper(raw_response: dict) -> dict:
 def api_error_mapper(error: Exception) -> dict:
     """Enhanced error mapper with more context"""
     error_type = error.__class__.__name__
+    error_str = str(error).lower()
 
     # Map common HTTP errors to user-friendly messages
     if "Timeout" in error_type:
@@ -159,6 +160,9 @@ def api_error_mapper(error: Exception) -> dict:
     elif "HTTP" in error_type:
         message = "External API returned an error"
         error_code = "HTTP_ERROR"
+    elif "credential" in error_str or "cookie" in error_str or "auth" in error_str:
+        message = "Authentication error: Credentials are missing or expired"
+        error_code = "CREDENTIALS_ERROR"
     else:
         message = f"External API error: {str(error)}"
         error_code = "API_ERROR"
@@ -173,6 +177,42 @@ def api_error_mapper(error: Exception) -> dict:
             "retry_recommended": error_type in ["Timeout", "Connection"],
         },
     }
+
+
+def ghunt_error_mapper(error: Exception) -> dict:
+    """Custom error mapper for GHunt-specific errors"""
+    error_type = error.__class__.__name__
+    error_str = str(error).lower()
+
+    # Check for credential-related errors
+    if "credential" in error_str or "cookie" in error_str or "auth" in error_str:
+        return {
+            "success": False,
+            "message": "GHunt credentials are missing or expired. Please run 'ghunt login' to authenticate.",
+            "error_code": "GHUNT_CREDENTIALS_ERROR",
+            "data": None,
+            "metadata": {
+                "error_type": error_type,
+                "retry_recommended": False,
+                "action_required": "Run 'ghunt login' to authenticate",
+            },
+        }
+
+    # Check for rate limiting
+    if "rate limit" in error_str or "429" in error_str:
+        return {
+            "success": False,
+            "message": "GHunt API rate limit exceeded. Please try again later.",
+            "error_code": "GHUNT_RATE_LIMIT_ERROR",
+            "data": None,
+            "metadata": {
+                "error_type": error_type,
+                "retry_recommended": True,
+            },
+        }
+
+    # Default to general API error mapper
+    return api_error_mapper(error)
 
 
 def phone_lookup_success_mapper(raw_response: dict) -> dict:
@@ -200,15 +240,38 @@ def phone_lookup_success_mapper(raw_response: dict) -> dict:
     }
 
 
+def email_lookup_success_mapper(raw_response: dict) -> dict:
+    """Mapper for email lookup API responses"""
+    return {
+        "success": True,
+        "message": "Email lookup completed successfully",
+        "data": {
+            "email": raw_response.get("email", "unknown"),
+            "lookup_results": raw_response.get("lookup_results", {}),
+            "summary": raw_response.get("summary", {}),
+            "confidence_score": raw_response.get("summary", {}).get(
+                "successful_sources", 0
+            )
+            / max(raw_response.get("summary", {}).get("total_sources", 1), 1),
+        },
+        "metadata": {
+            "source_type": "email_lookup",
+            "data_completeness": (
+                "high"
+                if raw_response.get("summary", {}).get("found_data", False)
+                else "low"
+            ),
+        },
+    }
+
+
 # Register default mappers
 response_mapper.register_success_mapper(
     "SocialMediaAdapter", social_media_success_mapper
 )
 response_mapper.register_success_mapper("SecurityAdapter", security_success_mapper)
 response_mapper.register_success_mapper("DomainAdapter", domain_success_mapper)
-response_mapper.register_success_mapper(
-    "EmailAdapter", domain_success_mapper
-)  # Reuse domain mapper
+response_mapper.register_success_mapper("EmailAdapter", email_lookup_success_mapper)
 response_mapper.register_success_mapper(
     "PhoneLookupAdapter", phone_lookup_success_mapper
 )
@@ -219,3 +282,5 @@ response_mapper.register_error_mapper("SecurityAdapter", api_error_mapper)
 response_mapper.register_error_mapper("DomainAdapter", api_error_mapper)
 response_mapper.register_error_mapper("EmailAdapter", api_error_mapper)
 response_mapper.register_error_mapper("PhoneLookupAdapter", api_error_mapper)
+# Note: GHuntService errors are handled within the service itself
+# and returned as part of the response dict, not as exceptions

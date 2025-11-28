@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from app.adapters.base import OSINTAdapter
-from app.external_apis.phone_lookup.phone_lookup_orchestrator import (
+from app.services.orchestrators.phone_lookup_orchestrator import (
     PhoneLookupOrchestrator,
 )
 

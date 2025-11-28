@@ -2,15 +2,18 @@ import logging
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.credit_scheduler import credit_scheduler
 from app.core.database import close_mongo_connection, connect_to_mongo
 from app.core.error_handlers import (
     base_api_exception_handler,
@@ -29,9 +32,14 @@ async def lifespan(app: FastAPI):
     # Startup
     await connect_to_mongo()
     logger = logging.getLogger(__name__)
+
+    # Start credit scheduler
+    credit_scheduler.start()
+
     logger.info("OSINT Backend API started")
     yield
     # Shutdown
+    credit_scheduler.shutdown()
     await close_mongo_connection()
     logger.info("OSINT Backend API shutting down")
 
@@ -107,6 +115,12 @@ app.add_middleware(TimingMiddleware)
 
 # Include API routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Mount static files
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    logger.info(f"Static files mounted at /static from {static_dir}")
 
 # Add Prometheus metrics instrumentation
 instrumentator = Instrumentator()

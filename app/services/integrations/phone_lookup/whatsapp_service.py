@@ -37,7 +37,7 @@ class WhatsAppService:
             data = response.json()
             raw_response = data  # Store raw response before processing
 
-            if "error" in data:
+            if "error" in data or "data" not in data:
                 return {
                     "found": False,
                     "source": "whatsapp",

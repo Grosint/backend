@@ -27,89 +27,19 @@ from typing import Any
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.core.auth_dependencies import TokenData, get_current_user_token
 from app.core.database import get_database
 from app.models.search import SearchCreate, SearchStatus, SearchType
 from app.schemas.response import SuccessResponse
-from app.schemas.search import PhoneLookupRequest, SearchCreateRequest
-from app.services.search_orchestrator import SearchOrchestrator
+from app.schemas.search import (
+    EmailLookupRequest,
+    PhoneLookupRequest,
+)
+from app.services.orchestrators.search_orchestrator import SearchOrchestrator
 from app.services.search_service import SearchService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-@router.post("/", response_model=SuccessResponse[dict[str, Any]])
-async def create_and_execute_search(
-    request: SearchCreateRequest,
-    db=Depends(get_database),
-):
-    """
-    Production-ready search endpoint that creates a search record and executes it.
-
-    This endpoint:
-    - Creates a search record in the database
-    - Executes the search using SearchOrchestrator
-    - Returns comprehensive results with search metadata
-    - Tracks search history and status
-    """
-    try:
-        logger.info(
-            f"Production search started: {request.search_type} for {request.query}"
-        )
-
-        # Create search service and orchestrator
-        search_service = SearchService(db)
-        search_orchestrator = SearchOrchestrator(db)
-
-        # Create search record
-        search_create = SearchCreate(
-            user_id=request.user_id,
-            search_type=request.search_type,
-            query=request.query,
-            status=SearchStatus.PENDING,
-        )
-
-        search = await search_service.create_search(search_create)
-        logger.info(f"Search record created: {search.id}")
-
-        # Execute the search
-        result = await search_orchestrator.execute_search(str(search.id))
-
-        logger.info(
-            f"Production search completed: {search.id} - Status: {result['status']}"
-        )
-
-        return SuccessResponse[dict[str, Any]](
-            data={
-                "search_id": str(search.id),
-                "search_type": request.search_type.value,
-                "query": request.query,
-                "status": result["status"],
-                "results_count": result["results_count"],
-                "failed_count": result["failed_count"],
-                "error_message": result.get("error_message"),
-                "results": result["results"],
-                "history": result["history"],
-                "created_at": search.created_at.isoformat(),
-                "updated_at": search.updated_at.isoformat(),
-            },
-            success=True,
-            message=f"Search executed successfully with {result['results_count']} successful results",
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            "Production search failed",
-            extra={
-                "exception": type(e).__name__,
-                "query": request.query,
-                "search_type": request.search_type.value,
-                "user_id": str(request.user_id) if request.user_id else None,
-            },
-        )
-        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/search/{search_id}", response_model=SuccessResponse[dict[str, Any]])
@@ -233,6 +163,7 @@ async def get_search_statistics(
 @router.post("/phone-lookup", response_model=SuccessResponse[dict[str, Any]])
 async def create_phone_lookup_search(
     request: PhoneLookupRequest,
+    current_user: TokenData = Depends(get_current_user_token),
     db=Depends(get_database),
 ):
     try:
@@ -245,8 +176,12 @@ async def create_phone_lookup_search(
         search_orchestrator = SearchOrchestrator(db)
 
         # Create search record for phone lookup
+        # Extract user_id from authenticated token
+        user_id = (
+            PydanticObjectId(current_user.user_id) if current_user.user_id else None
+        )
         search_create = SearchCreate(
-            user_id=request.user_id,
+            user_id=user_id,
             search_type=SearchType.PHONE,
             query=f"{request.country_code}{request.phone}",
         )
@@ -286,7 +221,70 @@ async def create_phone_lookup_search(
                 "exception": type(e).__name__,
                 "phone": request.phone,
                 "country_code": request.country_code,
-                "user_id": str(request.user_id) if request.user_id else None,
+                "user_id": current_user.user_id,
+            },
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/email-lookup", response_model=SuccessResponse[dict[str, Any]])
+async def create_email_lookup_search(
+    request: EmailLookupRequest,
+    current_user: TokenData = Depends(get_current_user_token),
+    db=Depends(get_database),
+):
+    try:
+        logger.info(f"Email lookup search started: {request.email}")
+
+        # Create search service and orchestrator
+        search_service = SearchService(db)
+        search_orchestrator = SearchOrchestrator(db)
+
+        # Create search record for email lookup
+        # Extract user_id from authenticated token
+        user_id = (
+            PydanticObjectId(current_user.user_id) if current_user.user_id else None
+        )
+        search_create = SearchCreate(
+            user_id=user_id,
+            search_type=SearchType.EMAIL,
+            query=request.email,
+        )
+
+        search = await search_service.create_search(search_create)
+        logger.info(f"Email search record created: {search.id}")
+
+        # Execute the email lookup search
+        result = await search_orchestrator.execute_search(str(search.id))
+
+        logger.info(f"Email lookup completed: {search.id} - Status: {result['status']}")
+
+        return SuccessResponse[dict[str, Any]](
+            data={
+                "search_id": str(search.id),
+                "email": request.email,
+                "status": result["status"],
+                "results_count": result["results_count"],
+                "failed_count": result["failed_count"],
+                "error_message": result.get("error_message"),
+                "results": result["results"],
+                "history": result["history"],
+                "created_at": search.created_at.isoformat(),
+                "updated_at": search.updated_at.isoformat(),
+            },
+            success=True,
+            message=f"Email lookup executed successfully with {result['results_count']} successful results",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Email lookup failed",
+            extra={
+                "exception": type(e).__name__,
+                "email": request.email,
+                "user_id": current_user.user_id,
             },
         )
         raise HTTPException(status_code=500, detail=str(e)) from e
