@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Redirecting to Payment Status</title>
+		<style>
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+
+			body {
+				font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+				background-color: #f8f9fa;
+				color: #042a4a;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				min-height: 100vh;
+				padding: 20px;
+			}
+
+			.container {
+				background: white;
+				border-radius: 16px;
+				box-shadow: 0 20px 40px rgba(4, 42, 74, 0.1);
+				padding: 3rem;
+				text-align: center;
+				max-width: 500px;
+				width: 100%;
+				position: relative;
+				overflow: hidden;
+			}
+
+			.container::before {
+				content: '';
+				position: absolute;
+				top: 0;
+				left: 0;
+				right: 0;
+				height: 4px;
+				background: linear-gradient(90deg, #042a4a 0%, #ff4081 100%);
+			}
+
+			.success-icon {
+				width: 80px;
+				height: 80px;
+				background: #042a4a;
+				border-radius: 50%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				margin: 0 auto 2rem;
+				position: relative;
+			}
+
+			.success-icon::after {
+				content: '✓';
+				color: white;
+				font-size: 2.5rem;
+				font-weight: bold;
+			}
+
+			.spinner {
+				width: 60px;
+				height: 60px;
+				border: 3px solid #e9ecef;
+				border-top: 3px solid #ff4081;
+				border-radius: 50%;
+				animation: spin 1s linear infinite;
+				margin: 0 auto 2rem;
+			}
+
+			@keyframes spin {
+				0% {
+					transform: rotate(0deg);
+				}
+				100% {
+					transform: rotate(360deg);
+				}
+			}
+
+			.message h2 {
+				color: #042a4a;
+				font-size: 1.8rem;
+				font-weight: 600;
+				margin-bottom: 1rem;
+				letter-spacing: -0.5px;
+			}
+
+			.message p {
+				color: #6c757d;
+				font-size: 1.1rem;
+				line-height: 1.6;
+				margin-bottom: 2rem;
+			}
+
+			.redirect-link {
+				display: inline-block;
+				background: #ff4081;
+				color: white;
+				text-decoration: none;
+				padding: 12px 24px;
+				border-radius: 8px;
+				font-weight: 500;
+				font-size: 1rem;
+				transition: all 0.3s ease;
+				border: 2px solid #ff4081;
+			}
+
+			.redirect-link:hover {
+				background: white;
+				color: #ff4081;
+				transform: translateY(-2px);
+				box-shadow: 0 8px 20px rgba(255, 64, 129, 0.3);
+			}
+
+			.countdown {
+				color: #6c757d;
+				font-size: 0.9rem;
+				margin-top: 1rem;
+			}
+
+			.brand-name {
+				position: absolute;
+				bottom: 1rem;
+				left: 50%;
+				transform: translateX(-50%);
+				color: #042a4a;
+				font-weight: 600;
+				font-size: 0.9rem;
+				opacity: 0.7;
+			}
+
+			@media (max-width: 480px) {
+				.container {
+					padding: 2rem;
+					margin: 10px;
+				}
+
+				.message h2 {
+					font-size: 1.5rem;
+				}
+
+				.message p {
+					font-size: 1rem;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<div class="success-icon"></div>
+			<div class="spinner"></div>
+			<div class="message">
+				<h2>Payment Successful!</h2>
+				<p>Your subscription has been processed successfully. Redirecting you to the payment status page...</p>
+			</div>
+			<a href="#" id="manualRedirect" class="redirect-link">Continue to Dashboard</a>
+			<div class="countdown" id="countdown">Redirecting in <span id="timer">2</span> seconds...</div>
+			<div class="brand-name">GROSINT | Accelerate Your Intelligence</div>
+		</div>
+
+		<script>
+			// Function to get URL parameters
+			function getUrlParameter(name) {
+				name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+				var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+				var results = regex.exec(location.search);
+				return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+			}
+
+			// Function to redirect to Angular app
+			function redirectToAngularApp() {
+				// Get subscription_id from the current URL path
+				var pathParts = window.location.pathname.split('/');
+				var subscriptionId = pathParts[pathParts.length - 1];
+
+				// Determine the frontend URL based on the current environment
+				var frontendUrl;
+				var currentHost = window.location.hostname;
+
+				if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+					// Local development environment
+					frontendUrl = 'http://localhost:4200';
+				} else if (currentHost === 'grosint.org' || currentHost.includes('grosint.org')) {
+					// Staging environment - backend on grosint.org, frontend on grosint.in
+					frontendUrl = 'https://www.grosint.in';
+				} else if (currentHost === 'grosint.net' || currentHost.includes('grosint.net')) {
+					// Prod environment - backend on grosint.net, frontend on grosint.com
+					frontendUrl = 'https://www.grosint.com';
+				} else {
+					// Fallback - use the same origin
+					frontendUrl = window.location.origin;
+				}
+
+				// Construct the Angular app URL
+				var angularUrl = frontendUrl + '/payment-status/subscription/' + subscriptionId;
+				// Redirect to Angular application
+				window.location.href = angularUrl;
+			}
+
+			// Countdown timer
+			let timeLeft = 2;
+			const timerElement = document.getElementById('timer');
+			const countdownElement = document.getElementById('countdown');
+
+			const countdownInterval = setInterval(function () {
+				timeLeft--;
+				timerElement.textContent = timeLeft;
+
+				if (timeLeft <= 0) {
+					clearInterval(countdownInterval);
+					countdownElement.style.display = 'none';
+				}
+			}, 1000);
+
+			// Set up manual redirect link
+			document.getElementById('manualRedirect').addEventListener('click', function (e) {
+				e.preventDefault();
+				clearInterval(countdownInterval);
+				countdownElement.style.display = 'none';
+				redirectToAngularApp();
+			});
+
+			// Auto redirect after 2 seconds
+			setTimeout(function () {
+				redirectToAngularApp();
+			}, 2000);
+		</script>
+	</body>
+</html>

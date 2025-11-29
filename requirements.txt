@@ -1,14 +1,18 @@
 aiohttp>=3.12.15,<4.0.0
+apscheduler>=3.10.0,<4.0.0
 bcrypt>=4.0.0,<5.0.0
 beanie>=1.26.0
 docker>=7.0.0,<8.0.0
 email-validator>=2.0
 fastapi>=0.115.0,<0.116.0
+ghunt>=2.3.3
 
 # HTTP Client
-httpx>=0.28.1,<0.29.0
+httpx>=0.27.2,<0.28.0
+ignorant>=1.2
 motor>=3.4.0
 passlib>=1.7.4,<1.8.0
+philINT>=0.1a0
 
 # Testing dependencies are in requirements-dev.txt
 
@@ -26,4 +30,6 @@ pymongo[async]>=4.6.0
 python-dateutil>=2.8.2,<3.0.0
 python-dotenv>=0.21.0,<0.22.0
 python-multipart>=0.0.6,<0.1.0
+skpy>=0.10.0,<1.0.0
+telethon>=1.36.0,<2.0.0
 uvicorn>=0.35.0,<0.36.0

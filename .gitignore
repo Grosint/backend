@@ -20,6 +20,15 @@ pythonenv*
 .env.*
 !.env.example
 
+# GHunt credentials
+.ghunt/
+
+# Session files
+*.session
+
+# Temporary directories
+to_be_deleted/
+
 # Build and packaging
 build/
 develop-eggs/

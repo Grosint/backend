@@ -1,40 +1,15 @@
 """
-Admin Debug Endpoints for Testing Individual APIs
+Admin Debug Endpoints for Email Lookup Services
 
 This module provides admin-only endpoints for debugging and testing
-individual external API services without going through the full
+individual email lookup API services without going through the full
 orchestration, database persistence, or billing logic.
 
 Endpoints:
-- POST /admin/debug/phone-lookup/{service} - Test individual phone lookup service
-- POST /admin/debug/phone-lookup/all - Test all phone lookup services
-- GET /admin/debug/services - List all available services
-- GET /admin/debug/phone-lookup/{service}/health - Quick health check for a service
-
-All endpoints bypass normal business logic. Authorization removed for debugging purposes.
-
-IMPORTANT FOR NEW API SERVICES:
-================================
-When adding a new API service for debugging, ensure the service's search_phone() method
-includes the raw API response in the return dictionary with the key "_raw_response".
-
-Example:
-    data = response.json()
-    raw_response = data  # Store raw response BEFORE any processing/formatting
-
-    # ... process and format data ...
-
-    return {
-        "found": True,
-        "source": "service_name",
-        "data": formatted_data,
-        "confidence": 0.9,
-        "_raw_response": raw_response  # <-- REQUIRED for admin debug endpoints
-    }
-
-This allows the admin debug endpoints to return the unformatted API response when
-include_raw_response=True is set in the request, which is essential for debugging
-API integration issues.
+- POST /admin/debug/email-lookup/{service} - Test individual email lookup service
+- POST /admin/debug/email-lookup/all - Test all email lookup services
+- POST /admin/debug/skype/search - Test Skype search by email
+- GET /admin/debug/email-lookup/{service}/health - Quick health check for a service
 """
 
 from __future__ import annotations
@@ -45,82 +20,107 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
 
-# Authorization removed for debugging purposes
-# from app.core.auth_dependencies import require_admin_role, TokenData
-from app.external_apis.phone_lookup.callapp_service import CallAppService
-from app.external_apis.phone_lookup.eyecon_service import EyeconService
-from app.external_apis.phone_lookup.truecaller_service import TrueCallerService
-from app.external_apis.phone_lookup.viewcaller_service import ViewCallerService
-from app.external_apis.phone_lookup.whatsapp_service import WhatsAppService
+from app.schemas.admin import (
+    EmailLookupDebugRequest,
+    ServiceTestResponse,
+    SkypeSearchRequest,
+)
 from app.schemas.response import SuccessResponse
+from app.services.integrations.email_lookup.ghunt import GHuntService
+from app.services.integrations.email_lookup.philint import PhilINTService
+from app.services.integrations.phone_lookup.leakcheck_service import LeakCheckService
+from app.services.integrations.phone_lookup.skype_service import SkypeService
+from app.services.orchestrators.email_lookup_orchestrator import (
+    EmailLookupOrchestrator,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Service registry for easy access
-PHONE_LOOKUP_SERVICES = {
-    "truecaller": TrueCallerService,
-    "eyecon": EyeconService,
-    "callapp": CallAppService,
-    "viewcaller": ViewCallerService,
-    "whatsapp": WhatsAppService,
+# Email lookup service registry
+EMAIL_LOOKUP_SERVICES = {
+    "skype": SkypeService,
+    "leakcheck": LeakCheckService,
+    "ghunt": GHuntService,
+    "philint": PhilINTService,
+    "email_lookup": EmailLookupOrchestrator,  # Full orchestrator
 }
 
 
-class PhoneLookupDebugRequest(BaseModel):
-    """Request model for phone lookup debug endpoint"""
-
-    country_code: str = Field(..., description="Country code (e.g., '+1', '+91')")
-    phone: str = Field(..., description="Phone number without country code")
-    include_raw_response: bool = Field(False, description="Include raw API response")
-
-
-class ServiceTestResponse(BaseModel):
-    """Response model for individual service test"""
-
-    service_name: str
-    success: bool
-    execution_time_ms: float
-    found: bool | None = None
-    data: dict[str, Any] | None = None
-    error: str | None = None
-    raw_response: dict[str, Any] | None = None
-
-
-@router.get("/services", response_model=SuccessResponse[dict[str, Any]])
-async def list_available_services():
+@router.post("/skype/search", response_model=SuccessResponse[ServiceTestResponse])
+async def test_skype_search(request: SkypeSearchRequest):
     """
-    List all available services for debugging.
-    Returns a catalog of all testable services grouped by type.
-    """
-    services = {
-        "phone_lookup": {
-            "services": list(PHONE_LOOKUP_SERVICES.keys()),
-            "description": "Phone number lookup services",
-        },
-        # Add other service types as they're implemented
-        # "domain": {...},
-        # "email": {...},
-    }
+    Test Skype search by email address.
 
-    return SuccessResponse[dict[str, Any]](
-        data=services,
-        success=True,
-        message="Available debug services retrieved successfully",
-    )
+    Note: Skype searches by email/username, not phone number.
+    This endpoint allows direct testing of Skype search functionality.
+
+    Args:
+        request: SkypeSearchRequest with email address
+
+    Returns:
+        ServiceTestResponse with Skype search results
+    """
+    try:
+        logger.info(f"Admin debug: Testing Skype search for {request.email}")
+
+        # Initialize Skype service
+        service = SkypeService()
+
+        # Measure execution time
+        start_time = time.time()
+
+        # Call service directly (search_email method)
+        result = await service.search_email(request.email)
+        execution_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+
+        # Build response
+        is_success = (
+            not isinstance(result, Exception)
+            and isinstance(result, dict)
+            and not result.get("error")
+        )
+
+        # Extract raw response from service result
+        raw_response = None
+        if request.include_raw_response and isinstance(result, dict):
+            raw_response = result.get("_raw_response")
+
+        response_data = ServiceTestResponse(
+            service_name="skype",
+            success=is_success,
+            execution_time_ms=round(execution_time, 2),
+            found=result.get("found") if isinstance(result, dict) else None,
+            data=result if isinstance(result, dict) else None,
+            error=str(result) if isinstance(result, Exception) else result.get("error"),
+            raw_response=raw_response,
+        )
+
+        logger.info(f"Admin debug: Skype search completed in {execution_time:.2f}ms")
+
+        return SuccessResponse[ServiceTestResponse](
+            data=response_data,
+            success=True,
+            message=f"Skype search for '{request.email}' completed",
+        )
+
+    except Exception as e:
+        logger.error("Admin debug: Skype search failed", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Skype search failed: {str(e)}"
+        ) from e
 
 
 @router.post(
-    "/phone-lookup/{service_name}", response_model=SuccessResponse[ServiceTestResponse]
+    "/email-lookup/{service_name}", response_model=SuccessResponse[ServiceTestResponse]
 )
-async def test_phone_lookup_service(
+async def test_email_lookup_service(
     service_name: str,
-    request: PhoneLookupDebugRequest,
+    request: EmailLookupDebugRequest,
 ):
     """
-    Test a single phone lookup service directly.
+    Test a single email lookup service directly.
 
     This endpoint:
     - Bypasses orchestration and database
@@ -128,30 +128,28 @@ async def test_phone_lookup_service(
     - Returns detailed debugging information
     - Does NOT create search records or deduct credits
 
-    Available services: truecaller, eyecon, callapp, viewcaller, whatsapp
+    Available services: skype, leakcheck, ghunt, philint, email_lookup (full orchestrator)
     """
     service_name_lower = service_name.lower()
 
-    if service_name_lower not in PHONE_LOOKUP_SERVICES:
+    if service_name_lower not in EMAIL_LOOKUP_SERVICES:
         raise HTTPException(
             status_code=404,
-            detail=f"Service '{service_name}' not found. Available: {', '.join(PHONE_LOOKUP_SERVICES.keys())}",
+            detail=f"Service '{service_name}' not found. Available: {', '.join(EMAIL_LOOKUP_SERVICES.keys())}",
         )
 
     try:
-        logger.info(
-            f"Admin debug: Testing {service_name_lower} for {request.country_code}{request.phone}"
-        )
+        logger.info(f"Admin debug: Testing {service_name_lower} for {request.email}")
 
         # Initialize service
-        service_class = PHONE_LOOKUP_SERVICES[service_name_lower]
+        service_class = EMAIL_LOOKUP_SERVICES[service_name_lower]
         service = service_class()
 
         # Measure execution time
         start_time = time.time()
 
         # Call service directly
-        result = await service.search_phone(request.country_code, request.phone)
+        result = await service.search_email(request.email)
         execution_time = (time.time() - start_time) * 1000  # Convert to milliseconds
 
         # Build response
@@ -193,12 +191,12 @@ async def test_phone_lookup_service(
         ) from e
 
 
-@router.post("/phone-lookup/all", response_model=SuccessResponse[dict[str, Any]])
-async def test_all_phone_lookup_services(
-    request: PhoneLookupDebugRequest,
+@router.post("/email-lookup/all", response_model=SuccessResponse[dict[str, Any]])
+async def test_all_email_lookup_services(
+    request: EmailLookupDebugRequest,
 ):
     """
-    Test all phone lookup services in parallel.
+    Test all email lookup services in parallel.
 
     Useful for:
     - Comparing service performance
@@ -209,18 +207,18 @@ async def test_all_phone_lookup_services(
     """
     try:
         logger.info(
-            f"Admin debug: Testing all phone lookup services for {request.country_code}{request.phone}"
+            f"Admin debug: Testing all email lookup services for {request.email}"
         )
 
         # Initialize all services
         services = {
             name: service_class()
-            for name, service_class in PHONE_LOOKUP_SERVICES.items()
+            for name, service_class in EMAIL_LOOKUP_SERVICES.items()
         }
 
         # Create tasks for parallel execution
         tasks = {
-            name: service.search_phone(request.country_code, request.phone)
+            name: service.search_email(request.email)
             for name, service in services.items()
         }
 
@@ -264,7 +262,7 @@ async def test_all_phone_lookup_services(
         total = len(service_results)
 
         response_data = {
-            "phone": f"{request.country_code}{request.phone}",
+            "email": request.email,
             "total_execution_time_ms": round(total_execution_time, 2),
             "summary": {
                 "total_services": total,
@@ -292,32 +290,30 @@ async def test_all_phone_lookup_services(
 
 
 @router.get(
-    "/phone-lookup/{service_name}/health",
+    "/email-lookup/{service_name}/health",
     response_model=SuccessResponse[dict[str, Any]],
 )
-async def check_service_health(
+async def check_email_service_health(
     service_name: str,
-    test_phone: str = Query(
-        "234567890", description="Test phone number (without country code)"
-    ),
+    test_email: str = Query("test@example.com", description="Test email address"),
 ):
     """
-    Quick health check for a service using a test phone number.
+    Quick health check for an email lookup service using a test email.
     Returns basic connectivity and response time information.
     """
     service_name_lower = service_name.lower()
 
-    if service_name_lower not in PHONE_LOOKUP_SERVICES:
+    if service_name_lower not in EMAIL_LOOKUP_SERVICES:
         raise HTTPException(
             status_code=404, detail=f"Service '{service_name}' not found"
         )
 
     try:
-        service_class = PHONE_LOOKUP_SERVICES[service_name_lower]
+        service_class = EMAIL_LOOKUP_SERVICES[service_name_lower]
         service = service_class()
 
         start_time = time.time()
-        result = await service.search_phone("+1", test_phone)  # Use test number
+        result = await service.search_email(test_email)
         execution_time = (time.time() - start_time) * 1000
 
         is_healthy = (

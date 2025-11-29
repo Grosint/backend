@@ -68,13 +68,29 @@ async def connect_to_mongo():
         logger.info(f"Connected to MongoDB at {masked_url}")
 
         # Initialize Beanie with document models
+        from app.models.credit import Credit
+        from app.models.credit_transaction import CreditTransaction
         from app.models.history import History
+        from app.models.payment import Payment
+        from app.models.plan import Plan
         from app.models.result import Result
         from app.models.search import Search
+        from app.models.subscription import Subscription
         from app.models.user import User  # local import to avoid circulars
 
         await init_beanie(
-            database=db.database, document_models=[User, History, Search, Result]
+            database=db.database,
+            document_models=[
+                User,
+                History,
+                Search,
+                Result,
+                Plan,
+                Payment,
+                Subscription,
+                Credit,
+                CreditTransaction,
+            ],
         )
         logger.info("Initialized Beanie")
 

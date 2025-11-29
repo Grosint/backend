@@ -65,6 +65,71 @@ class Settings(BaseSettings):
     # RAPIDAPI KEYS
     RAPIDAPI_KEY: str = os.getenv("RAPIDAPI_KEY", "")
 
+    # LeakCheck API configuration
+    LEAK_CHECK_API_KEY: str = os.getenv("LEAK_CHECK_API_KEY", "")
+
+    # HLR API configuration
+    HLR_API_KEY: str = os.getenv("HLR_API_KEY", "")
+
+    # AITAN Labs API configuration
+    AITAN_API_KEY: str = os.getenv("AITAN_API_KEY", "")
+
+    # Befisc API configuration (used by AITAN service)
+    BEFISC_API_KEY: str = os.getenv("BEFISC_API_KEY", "")
+
+    # Telegram configuration (supports multiple accounts)
+    # Format: TELEGRAM_API_ID_1, TELEGRAM_API_HASH_1, TELEGRAM_AUTH_MOBILE_1, etc.
+    TELEGRAM_API_ID_1: str = os.getenv("TELEGRAM_API_ID_1", "")
+    TELEGRAM_API_HASH_1: str = os.getenv("TELEGRAM_API_HASH_1", "")
+    TELEGRAM_AUTH_MOBILE_1: str = os.getenv("TELEGRAM_AUTH_MOBILE_1", "")
+    TELEGRAM_API_ID_2: str = os.getenv("TELEGRAM_API_ID_2", "")
+    TELEGRAM_API_HASH_2: str = os.getenv("TELEGRAM_API_HASH_2", "")
+    TELEGRAM_AUTH_MOBILE_2: str = os.getenv("TELEGRAM_AUTH_MOBILE_2", "")
+    TELEGRAM_API_ID_3: str = os.getenv("TELEGRAM_API_ID_3", "")
+    TELEGRAM_API_HASH_3: str = os.getenv("TELEGRAM_API_HASH_3", "")
+    TELEGRAM_AUTH_MOBILE_3: str = os.getenv("TELEGRAM_AUTH_MOBILE_3", "")
+    TELEGRAM_MAX_ACCOUNTS: int = int(os.getenv("TELEGRAM_MAX_ACCOUNTS", "3"))
+
+    # Skype configuration (supports multiple accounts)
+    # Format: SKYPE_USER_1, SKYPE_PASSWORD_1, etc.
+    SKYPE_USER_1: str = os.getenv("SKYPE_USER_1", "")
+    SKYPE_PASSWORD_1: str = os.getenv("SKYPE_PASSWORD_1", "")
+    SKYPE_USER_2: str = os.getenv("SKYPE_USER_2", "")
+    SKYPE_PASSWORD_2: str = os.getenv("SKYPE_PASSWORD_2", "")
+    SKYPE_USER_3: str = os.getenv("SKYPE_USER_3", "")
+    SKYPE_PASSWORD_3: str = os.getenv("SKYPE_PASSWORD_3", "")
+    SKYPE_MAX_ACCOUNTS: int = int(os.getenv("SKYPE_MAX_ACCOUNTS", "3"))
+
+    # Cashfree Payment Gateway configuration
+    CASHFREE_APP_ID: str = os.getenv("CASHFREE_APP_ID", "")
+    CASHFREE_SECRET_KEY: str = os.getenv("CASHFREE_SECRET_KEY", "")
+    CASHFREE_BASE_URL: str = os.getenv(
+        "CASHFREE_BASE_URL", "https://api.cashfree.com/pg"
+    )
+    CASHFREE_WEBHOOK_SECRET: str = os.getenv("CASHFREE_WEBHOOK_SECRET", "")
+    CASHFREE_API_VERSION: str = os.getenv("CASHFREE_API_VERSION", "2023-08-01")
+
+    # Payment configuration
+    GST_RATE: float = float(os.getenv("GST_RATE", "0.18"))  # 18% GST
+
+    # Webhook security configuration
+    # WARNING: Only enable in development/testing. Never enable in production.
+    WEBHOOK_SIGNATURE_BYPASS: bool = (
+        os.getenv("WEBHOOK_SIGNATURE_BYPASS", "false").lower() in ("true", "1", "yes")
+        and os.getenv("ENVIRONMENT", "development").lower() != "production"
+    )
+
+    # Credit scheduler configuration
+    CREDIT_EXPIRY_SCHEDULER_ENABLED: bool = os.getenv(
+        "CREDIT_EXPIRY_SCHEDULER_ENABLED", "true"
+    ).lower() in ("true", "1", "yes")
+    CREDIT_EXPIRY_SCHEDULE_HOUR: int = int(
+        os.getenv("CREDIT_EXPIRY_SCHEDULE_HOUR", "2")
+    )
+    CREDIT_EXPIRY_SCHEDULE_MINUTE: int = int(
+        os.getenv("CREDIT_EXPIRY_SCHEDULE_MINUTE", "0")
+    )
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: str | list[str]) -> list[str]:

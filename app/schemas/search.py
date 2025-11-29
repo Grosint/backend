@@ -21,4 +21,9 @@ class PhoneLookupRequest(BaseModel):
 
     phone: str = Field(..., description="Phone number to search (without country code)")
     country_code: str = Field("+1", description="Country code (e.g., +1, +91)")
-    user_id: PydanticObjectId | None = Field(None, description="User ID (optional)")
+
+
+class EmailLookupRequest(BaseModel):
+    """Request schema for creating and executing an email lookup search"""
+
+    email: str = Field(..., description="Email address to search")

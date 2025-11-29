@@ -97,7 +97,8 @@ Once the server is running, visit:
 
 ### High-Level Architecture
 
-```
+```text
+
 ┌─────────────────────────────────────────────────────────────┐
 │                      API Endpoints Layer                     │
 │  (auth.py, user.py, search.py, history.py, admin.py)        │
@@ -145,14 +146,15 @@ Once the server is running, visit:
 
 ### Key Components
 
-#### 1. **GenericOrchestrator** (`app/services/generic_orchestrator.py`)
+#### 1. **GenericOrchestrator** (`app/core/generic_orchestrator.py`)
 
+- Infrastructure utility for parallel execution
 - Manages parallel execution of multiple adapters
 - Tracks history of all API calls
 - Handles errors and exceptions gracefully
 - Records latency and success/failure status
 
-#### 2. **SearchOrchestrator** (`app/services/search_orchestrator.py`)
+#### 2. **SearchOrchestrator** (`app/services/orchestrators/search_orchestrator.py`)
 
 - High-level orchestration for different search types
 - Maps search types to appropriate adapters
@@ -166,18 +168,19 @@ Once the server is running, visit:
 - Handle category-specific logic
 - Use category orchestrators for actual API calls
 
-#### 4. **Category Orchestrators** (`app/external_apis/{category}/`)
+#### 4. **Category Orchestrators** (`app/services/integrations/{category}/`)
 
 - Manage multiple APIs within a category
 - Execute APIs in parallel
 - Combine results from multiple sources
 - Handle category-specific response formatting
 
-#### 5. **Individual Services** (`app/external_apis/{category}/`)
+#### 5. **Integration Services** (`app/services/integrations/{category}/`)
 
 - Handle individual external API integration
 - Format API-specific responses
 - Implement resilience patterns per API
+- Located in `services/integrations/` to clearly separate from business services
 
 ---
 
@@ -185,7 +188,7 @@ Once the server is running, visit:
 
 ### Complete Folder Structure
 
-```
+```text
 app/
 ├── core/                           # Core infrastructure
 │   ├── __init__.py
@@ -194,6 +197,7 @@ app/
 │   ├── database.py                # MongoDB connection and Beanie setup
 │   ├── error_handlers.py          # Global error handlers
 │   ├── exceptions.py              # Custom exceptions
+│   ├── generic_orchestrator.py    # Generic multi-adapter orchestration (infrastructure utility)
 │   ├── logging.py                 # Logging configuration
 │   ├── resilience.py              # Circuit breaker, retry, timeout
 │   ├── response_mapper.py         # Response normalization
@@ -204,22 +208,57 @@ app/
 │   ├── user.py                    # User model
 │   ├── search.py                  # Search model
 │   ├── result.py                  # Result model
-│   └── history.py                 # History model
+│   ├── history.py                 # History model
+│   ├── credit.py                  # Credit model
+│   ├── payment.py                 # Payment model
+│   ├── plan.py                    # Plan model
+│   └── subscription.py            # Subscription model
 │
 ├── schemas/                        # Pydantic schemas for API
 │   ├── user.py                    # User request/response schemas
 │   ├── search.py                  # Search request/response schemas
 │   ├── result.py                  # Result schemas
-│   └── history.py                 # History schemas
+│   ├── history.py                 # History schemas
+│   ├── credit.py                  # Credit schemas
+│   ├── payment.py                 # Payment schemas
+│   ├── plan.py                    # Plan schemas
+│   └── subscription.py            # Subscription schemas
 │
-├── services/                       # Business logic services
+├── services/                       # Business logic and integration services
 │   ├── auth_service.py            # Authentication business logic
 │   ├── user_service.py            # User management business logic
 │   ├── history_service.py         # History business logic
 │   ├── search_service.py          # Search business logic
 │   ├── result_service.py          # Result business logic
-│   ├── search_orchestrator.py     # High-level search orchestration
-│   └── generic_orchestrator.py    # Generic multi-adapter orchestration
+│   ├── payment_service.py         # Payment business logic
+│   ├── credit_service.py          # Credit management business logic
+│   ├── credit_transaction_service.py  # Credit transaction tracking
+│   ├── plan_service.py            # Plan management business logic
+│   ├── subscription_service.py    # Subscription management business logic
+│   ├── orchestrators/             # Business orchestrators
+│   │   ├── __init__.py
+│   │   └── search_orchestrator.py # High-level search orchestration
+│   └── integrations/               # External API integrations (by category)
+│       ├── phone_lookup/          # Phone lookup APIs
+│       │   ├── __init__.py
+│       │   ├── viewcaller_service.py
+│       │   ├── truecaller_service.py
+│       │   ├── eyecon_service.py
+│       │   ├── callapp_service.py
+│       │   ├── whatsapp_service.py
+│       │   └── phone_lookup_orchestrator.py
+│       ├── payment/               # Payment gateway integrations
+│       │   ├── __init__.py
+│       │   └── cashfree_service.py
+│       ├── social_media/          # Social media APIs
+│       │   ├── __init__.py
+│       │   └── social_media_orchestrator.py
+│       ├── security/              # Security/threat APIs
+│       │   ├── __init__.py
+│       │   └── security_orchestrator.py
+│       └── domain/                # Domain analysis APIs
+│           ├── __init__.py
+│           └── domain_orchestrator.py
 │
 ├── adapters/                       # High-level adapters
 │   ├── base.py                    # Base adapter class (OSINTAdapter)
@@ -229,26 +268,6 @@ app/
 │   ├── social_media_adapter.py    # Social media adapter
 │   └── security_adapter.py        # Security/threat adapter
 │
-├── external_apis/                  # External API integrations (by category)
-│   ├── __init__.py
-│   ├── phone_lookup/              # Phone lookup APIs
-│   │   ├── __init__.py
-│   │   ├── viewcaller_service.py
-│   │   ├── truecaller_service.py
-│   │   ├── eyecon_service.py
-│   │   ├── callapp_service.py
-│   │   ├── whatsapp_service.py
-│   │   └── phone_lookup_orchestrator.py
-│   ├── social_media/              # Social media APIs
-│   │   ├── __init__.py
-│   │   └── social_media_orchestrator.py
-│   ├── security/                  # Security/threat APIs
-│   │   ├── __init__.py
-│   │   └── security_orchestrator.py
-│   └── domain/                    # Domain analysis APIs
-│       ├── __init__.py
-│       └── domain_orchestrator.py
-│
 ├── api/                            # API endpoints
 │   ├── router.py                  # Main API router
 │   └── endpoints/
@@ -256,37 +275,92 @@ app/
 │       ├── user.py                # User management endpoints
 │       ├── search.py              # Search endpoints
 │       ├── history.py             # History endpoints
+│       ├── payment.py             # Payment endpoints
+│       ├── credit.py              # Credit endpoints
+│       ├── plan.py                # Plan endpoints
+│       ├── subscription.py        # Subscription endpoints
 │       └── admin.py               # Admin endpoints
 │
 ├── utils/                          # Utility functions
-│   └── ...
+│   ├── jwt.py                     # JWT utilities
+│   ├── password.py                # Password hashing utilities
+│   ├── validators.py              # Validation utilities
+│   └── webhook_utils.py           # Webhook handling utilities
 │
 └── main.py                         # Application entry point
 ```
+
+### Architecture Layers
+
+The application follows a layered architecture with clear separation of concerns:
+
+#### Layer 1: Integration Services
+
+- **Location**: `app/services/integrations/{domain}/*_service.py`
+- **Purpose**: Individual external API integrations
+- **Responsibility**: Handle API-specific communication, formatting, and error handling
+- **Examples**: `cashfree_service.py`, `viewcaller_service.py`, `truecaller_service.py`
+
+#### Layer 2: Domain Orchestrators
+
+- **Location**: `app/services/integrations/{domain}/*_orchestrator.py`
+- **Purpose**: Coordinate multiple APIs within a domain
+- **Responsibility**: Execute multiple services in parallel, combine results, handle domain-specific logic
+- **Examples**: `phone_lookup_orchestrator.py`, `domain_orchestrator.py`, `security_orchestrator.py`
+
+#### Layer 3: Adapters
+
+- **Location**: `app/adapters/`
+- **Purpose**: High-level interfaces that normalize responses
+- **Responsibility**: Use domain orchestrators, provide standardized interface to services layer
+
+#### Layer 4: Business Orchestrators
+
+- **Location**: `app/services/orchestrators/`
+- **Purpose**: Coordinate multiple adapters for business operations
+- **Responsibility**: Manage business workflows, coordinate adapters, handle business logic
+
+#### Layer 5: Business Services
+
+- **Location**: `app/services/` (root level)
+- **Purpose**: Domain-specific business logic
+- **Responsibility**: Handle database operations, business rules, data validation
+- **Examples**: `payment_service.py`, `credit_service.py`, `user_service.py`
+
+#### Layer 6: Infrastructure
+
+- **Location**: `app/core/`
+- **Purpose**: Core utilities and infrastructure
+- **Responsibility**: Generic orchestrator, configuration, database, security, resilience patterns
 
 ### Structure Benefits
 
 #### 1. **Clear Separation of Concerns**
 
-- **`services/`**: Business logic (auth, user, history, search orchestration)
-- **`external_apis/`**: External API integrations organized by category
+- **`services/`**: Business logic services (auth, user, history, payment, credit)
+- **`services/integrations/`**: External API integrations organized by category
+- **`services/orchestrators/`**: Business-level orchestrators
 - **`adapters/`**: High-level orchestration and normalization
 - **`api/`**: REST endpoints
 - **`core/`**: Infrastructure components
 
 #### 2. **Scalable by Category**
 
-- **Phone Lookup**: All phone-related APIs in `external_apis/phone_lookup/`
-- **Social Media**: All social media APIs in `external_apis/social_media/`
-- **Security**: All security APIs in `external_apis/security/`
-- **Domain**: All domain analysis APIs in `external_apis/domain/`
+- **Phone Lookup**: All phone-related APIs in `services/integrations/phone_lookup/`
+- **Payment**: Payment gateway integrations in `services/integrations/payment/`
+- **Social Media**: All social media APIs in `services/integrations/social_media/`
+- **Security**: All security APIs in `services/integrations/security/`
+- **Domain**: All domain analysis APIs in `services/integrations/domain/`
 
 #### 3. **Easy Navigation**
 
-- Find phone APIs: `external_apis/phone_lookup/`
-- Find social media APIs: `external_apis/social_media/`
-- Find business logic: `services/`
-- Find orchestration: `adapters/`
+- Find phone APIs: `services/integrations/phone_lookup/`
+- Find payment integrations: `services/integrations/payment/`
+- Find social media APIs: `services/integrations/social_media/`
+- Find business logic: `services/` (root level)
+- Find business orchestrators: `services/orchestrators/`
+- Find integration orchestrators: `services/integrations/{domain}/`
+- Find high-level adapters: `adapters/`
 
 #### 4. **Independent Development**
 
@@ -294,13 +368,53 @@ app/
 - Easy to add new APIs to existing categories
 - Easy to add new categories of APIs
 
+### Why `services/integrations/` Structure?
+
+The `services/integrations/` structure provides:
+
+1. **Clear Separation**: Business services (domain logic, database) vs Integration services (external APIs)
+2. **Better Organization**: All services are under `services/`, but integrations are clearly grouped
+3. **Easier Testing**: Integration services can be easily mocked and tested separately
+4. **Maintainability**: Easy to identify what's external vs internal business logic
+5. **Scalability**: New integration domains can be added as subfolders
+
+### Key Structural Decisions
+
+1. **Created `app/services/orchestrators/` folder**
+   - Moved `search_orchestrator.py` here
+   - This is where business-level orchestrators belong
+
+2. **Moved `generic_orchestrator.py` to `app/core/`**
+   - It's an infrastructure utility, not a business service
+   - Used by business orchestrators for parallel execution
+
+3. **Integration services in `app/services/integrations/`**
+   - External API integrations are organized by domain
+   - Domain orchestrators are co-located with their integration services
+   - Clear separation from business services while keeping everything under `services/`
+
+### Import Paths
+
+Updated import paths reflect the new structure:
+
+- `app.services.search_orchestrator` → `app.services.orchestrators.search_orchestrator`
+- `app.services.generic_orchestrator` → `app.core.generic_orchestrator`
+- `app.external_apis.*` → `app.services.integrations.*`
+
+### Future Considerations
+
+- If more business orchestrators are added (e.g., `payment_orchestrator.py`, `subscription_orchestrator.py`), they should go in `app/services/orchestrators/`
+- Domain-specific orchestrators should continue to live in `app/services/integrations/{domain}/`
+- New integration services should be added to the appropriate domain folder in `app/services/integrations/`
+- Infrastructure utilities should go in `app/core/`
+
 ---
 
 ## Implementation Details
 
 ### Phone Lookup Implementation
 
-#### Architecture
+#### Phone Lookup Architecture
 
 The phone lookup system demonstrates the complete architecture pattern:
 
@@ -309,12 +423,12 @@ The phone lookup system demonstrates the complete architecture pattern:
    - Uses `PhoneLookupOrchestrator` for actual API calls
    - Normalizes responses to standard format
 
-2. **PhoneLookupOrchestrator** (`app/external_apis/phone_lookup/phone_lookup_orchestrator.py`)
+2. **PhoneLookupOrchestrator** (`app/services/orchestrators/phone_lookup_orchestrator.py`)
    - Orchestrates 5 phone lookup services
    - Executes all APIs in parallel
    - Combines results from all sources
 
-3. **Individual Services** (`app/external_apis/phone_lookup/`)
+3. **Integration Services** (`app/services/integrations/phone_lookup/`)
    - **ViewCallerService**: Name lookup service
    - **TrueCallerService**: Comprehensive phone data (name, email, address)
    - **EyeconService**: Social media integration (Facebook)
@@ -436,7 +550,7 @@ The phone lookup implementation was refactored from a single large adapter (543 
 **After:**
 
 - `PhoneLookupAdapter`: 65 lines (88% reduction)
-- 5 individual service files in `external_apis/phone_lookup/`
+- 5 individual service files in `services/integrations/phone_lookup/`
 - `PhoneLookupOrchestrator` for coordination
 
 **Benefits:**
@@ -643,7 +757,7 @@ curl -X POST "http://localhost:8000/api/v1/searches/" \
 
 ### Adding New Phone Lookup API
 
-1. **Create service in `external_apis/phone_lookup/new_service.py`:**
+1. **Create service in `services/integrations/phone_lookup/new_service.py`:**
 
    ```python
    from app.core.resilience import ResilientHttpClient
@@ -677,7 +791,7 @@ curl -X POST "http://localhost:8000/api/v1/searches/" \
 2. **Add to `PhoneLookupOrchestrator`:**
 
    ```python
-   from app.external_apis.phone_lookup.new_service import NewPhoneService
+   from app.services.integrations.phone_lookup.new_service import NewPhoneService
 
    class PhoneLookupOrchestrator:
        def __init__(self):
@@ -703,13 +817,13 @@ curl -X POST "http://localhost:8000/api/v1/searches/" \
 1. **Create folder structure:**
 
    ```bash
-   mkdir -p app/external_apis/new_category
+   mkdir -p app/services/integrations/new_category
    ```
 
 2. **Create orchestrator:**
 
    ```python
-   # app/external_apis/new_category/new_category_orchestrator.py
+   # app/services/integrations/new_category/new_category_orchestrator.py
    class NewCategoryOrchestrator:
        def __init__(self):
            self.service1 = Service1()
@@ -725,7 +839,7 @@ curl -X POST "http://localhost:8000/api/v1/searches/" \
    ```python
    # app/adapters/new_category_adapter.py
    from app.adapters.base import OSINTAdapter
-   from app.external_apis.new_category.new_category_orchestrator import NewCategoryOrchestrator
+   from app.services.integrations.new_category.new_category_orchestrator import NewCategoryOrchestrator
 
    class NewCategoryAdapter(OSINTAdapter):
        def __init__(self):
