@@ -2,12 +2,13 @@
 
 from datetime import UTC, datetime
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.database import get_database
-from app.core.exceptions import UnauthorizedException
+from app.core.exceptions import AuthorizationException, UnauthorizedException
 from app.core.token_blocklist import is_token_blocked
+from app.models.user import User, UserType
 from app.schemas.auth import AuthStatus, TokenInfo
 from app.utils.jwt import get_token_jti, verify_access_token
 
@@ -251,30 +252,139 @@ def get_current_user_optional(
     return token_data
 
 
-# Admin role check (example of role-based access)
-def require_admin_role(
+async def get_current_user(
     token_data: TokenData = Depends(get_current_user_token),
-) -> TokenData:
+    database=Depends(get_database),
+) -> User:
     """
-    Require admin role for access.
+    Get current user document from database.
 
     Args:
         token_data: Token data from get_current_user_token
+        database: Database instance
 
     Returns:
-        TokenData object if user is admin
+        User document
 
     Raises:
-        HTTPException: If user is not admin
+        UnauthorizedException: If user not found
     """
-    # This is a simplified example - in production you would check actual roles
-    # from the database or token claims
+    try:
+        from bson import ObjectId
 
-    # For now, we'll just check if the user exists
-    # In a real implementation, you would check user roles/permissions
-    if not token_data:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
+        user = await User.find_one(User.id == ObjectId(token_data.user_id))
+        if not user:
+            raise UnauthorizedException("User not found")
+
+        return user
+
+    except Exception as e:
+        raise UnauthorizedException(f"Failed to get user: {str(e)}") from e
+
+
+async def require_user_type(
+    *allowed_types: UserType,
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Require specific user type(s) for access.
+
+    Args:
+        *allowed_types: Allowed user types
+        current_user: Current user document
+
+    Returns:
+        User document if user type is allowed
+
+    Raises:
+        AuthorizationException: If user type is not allowed
+    """
+    if not allowed_types:
+        # If no types specified, allow all authenticated users
+        return current_user
+
+    if current_user.userType not in allowed_types:
+        raise AuthorizationException(
+            f"Access denied. Required user type(s): {', '.join(t.value for t in allowed_types)}"
         )
 
-    return token_data
+    return current_user
+
+
+async def require_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Require admin user type for access.
+
+    Args:
+        current_user: Current user document
+
+    Returns:
+        User document if user is admin
+
+    Raises:
+        AuthorizationException: If user is not admin
+    """
+    if current_user.userType != UserType.ADMIN:
+        raise AuthorizationException("Admin access required")
+
+    return current_user
+
+
+async def require_org_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Require org_admin user type for access.
+
+    Args:
+        current_user: Current user document
+
+    Returns:
+        User document if user is org_admin
+
+    Raises:
+        AuthorizationException: If user is not org_admin
+    """
+    if current_user.userType != UserType.ORG_ADMIN:
+        raise AuthorizationException("Organization admin access required")
+
+    return current_user
+
+
+async def require_feature(
+    feature: str | None = None,
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Require specific feature access.
+
+    Args:
+        feature: Feature name to check (e.g., "feature_a", "mobile360")
+                 If None, allows all authenticated users
+        current_user: Current user document
+
+    Returns:
+        User document if user has feature access
+
+    Raises:
+        AuthorizationException: If user doesn't have required feature access
+    """
+    # Admin users have all features
+    if current_user.userType == UserType.ADMIN:
+        return current_user
+
+    # Org admin users have all features
+    if current_user.userType == UserType.ORG_ADMIN:
+        return current_user
+
+    # If no feature specified, allow all authenticated users
+    if feature is None:
+        return current_user
+
+    # Check if user has the required feature
+    if feature not in current_user.features:
+        raise AuthorizationException(f"Access denied. Required feature: {feature}")
+
+    return current_user

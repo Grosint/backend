@@ -14,6 +14,7 @@ from app.schemas.user import (
     UserUpdateRequest,
 )
 from app.services.user_service import UserService
+from app.utils.email_otp import generate_otp, send_otp_email, store_otp
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -21,35 +22,50 @@ logger = logging.getLogger(__name__)
 
 @router.post("/", response_model=SuccessResponse[UserResponse])
 async def create_user(user_request: UserCreateRequest, db=Depends(get_database)):
-    """Create a new user"""
+    """Create a new user and send OTP for verification"""
     try:
         user_service = UserService(db)
 
+        # Convert organizationId from string to ObjectId if provided
+        user_data = user_request.model_dump()
+        if user_data.get("organizationId"):
+            user_data["organizationId"] = ObjectId(user_data["organizationId"])
+
         # Create user - convert request to service model
-        user_create = UserCreate.model_validate(user_request.model_dump())
+        user_create = UserCreate.model_validate(user_data)
 
         user = await user_service.create_user(user_create)
+
+        # Generate and send OTP
+        otp = generate_otp()
+        await store_otp(db, user.email, otp)
+        await send_otp_email(user.email, otp)
+
+        logger.info(f"User created: {user.email}, OTP sent")
 
         # Convert to response format
         user_response = UserResponse(
             id=str(user.id),
             email=user.email,
             phone=user.phone,
+            userType=user.userType,
+            features=user.features,
             firstName=user.firstName,
             lastName=user.lastName,
+            address=user.address,
+            city=user.city,
             pinCode=user.pinCode,
             state=user.state,
+            organizationId=str(user.organizationId) if user.organizationId else None,
+            orgName=user.orgName,
             isActive=user.isActive,
             isVerified=user.isVerified,
-            verifyByGovId=user.verifyByGovId,
             createdAt=user.createdAt,
             updatedAt=user.updatedAt,
         )
 
-        logger.info(f"User created: {user.email}")
-
         return SuccessResponse(
-            message="User created successfully",
+            message="User created successfully. Please verify your email with the OTP sent.",
             data=user_response,
         )
 
@@ -75,11 +91,16 @@ async def get_current_user_info(
             id=str(user.id),
             email=user.email,
             phone=user.phone,
-            verifyByGovId=user.verifyByGovId,
+            userType=user.userType,
+            features=user.features,
             firstName=user.firstName,
             lastName=user.lastName,
+            address=user.address,
+            city=user.city,
             pinCode=user.pinCode,
             state=user.state,
+            organizationId=str(user.organizationId) if user.organizationId else None,
+            orgName=user.orgName,
             isActive=user.isActive,
             isVerified=user.isVerified,
             createdAt=user.createdAt,
@@ -111,8 +132,12 @@ async def update_current_user(
         if not user:
             raise NotFoundException(resource="User", resource_id=current_user.user_id)
 
-        # Update user
-        update_data = UserUpdate(**user_update.model_dump(exclude_unset=True))
+        # Update user - convert organizationId from string to ObjectId if provided
+        update_dict = user_update.model_dump(exclude_unset=True)
+        if update_dict.get("organizationId"):
+            update_dict["organizationId"] = ObjectId(update_dict["organizationId"])
+
+        update_data = UserUpdate(**update_dict)
         updated_user = await user_service.update_user(str(user.id), update_data)
 
         if not updated_user:
@@ -122,11 +147,20 @@ async def update_current_user(
             id=str(updated_user.id),
             email=updated_user.email,
             phone=updated_user.phone,
-            verifyByGovId=updated_user.verifyByGovId,
+            userType=updated_user.userType,
+            features=updated_user.features,
             firstName=updated_user.firstName,
             lastName=updated_user.lastName,
+            address=updated_user.address,
+            city=updated_user.city,
             pinCode=updated_user.pinCode,
             state=updated_user.state,
+            organizationId=(
+                str(updated_user.organizationId)
+                if updated_user.organizationId
+                else None
+            ),
+            orgName=updated_user.orgName,
             isActive=updated_user.isActive,
             isVerified=updated_user.isVerified,
             createdAt=updated_user.createdAt,
@@ -167,7 +201,6 @@ async def list_users(
                 id=str(user.id),
                 email=user.email,
                 phone=user.phone,
-                verifyByGovId=user.verifyByGovId,
                 firstName=user.firstName,
                 lastName=user.lastName,
                 pinCode=user.pinCode,

@@ -71,6 +71,7 @@ async def connect_to_mongo():
         from app.models.credit import Credit
         from app.models.credit_transaction import CreditTransaction
         from app.models.history import History
+        from app.models.organization import Organization
         from app.models.payment import Payment
         from app.models.plan import Plan
         from app.models.result import Result
@@ -82,6 +83,7 @@ async def connect_to_mongo():
             database=db.database,
             document_models=[
                 User,
+                Organization,
                 History,
                 Search,
                 Result,

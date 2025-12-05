@@ -4,7 +4,11 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from app.utils.validators import validate_phone_number, validate_required_phone_number
+from app.models.user import UserType
+from app.utils.validators import (
+    validate_phone_number,
+    validate_required_phone_number,
+)
 
 
 class UserCreateRequest(BaseModel):
@@ -12,8 +16,18 @@ class UserCreateRequest(BaseModel):
 
     email: EmailStr
     phone: str = Field(..., description="Phone number in E.164 format")
-    verifyByGovId: bool
     password: str = Field(..., min_length=8, max_length=100)
+    userType: UserType = UserType.USER
+    firstName: str | None = Field(None, max_length=100)
+    lastName: str | None = Field(None, max_length=100)
+    address: str | None = Field(None, max_length=200)
+    city: str | None = Field(None, max_length=100)
+    pinCode: str | None = Field(None, max_length=10)
+    state: str | None = Field(None, max_length=100)
+    organizationId: str | None = Field(None, description="Organization ID for org_user")
+    orgName: str | None = Field(
+        None, max_length=200, description="Organization name for org_admin"
+    )
 
     @field_validator("phone")
     @classmethod
@@ -26,11 +40,20 @@ class UserUpdateRequest(BaseModel):
 
     email: EmailStr | None = None
     phone: str | None = Field(None, description="Phone number in E.164 format")
-    verifyByGovId: bool | None = None
+    userType: UserType | None = None
+    features: list[str] | None = Field(
+        None, description="List of feature access permissions"
+    )
     firstName: str | None = Field(None, max_length=100)
     lastName: str | None = Field(None, max_length=100)
+    address: str | None = Field(None, max_length=200)
+    city: str | None = Field(None, max_length=100)
     pinCode: str | None = Field(None, max_length=10)
     state: str | None = Field(None, max_length=100)
+    organizationId: str | None = Field(None, description="Organization ID for org_user")
+    orgName: str | None = Field(
+        None, max_length=200, description="Organization name for org_admin"
+    )
     isActive: bool | None = None
     isVerified: bool | None = None
 
@@ -46,11 +69,16 @@ class UserResponse(BaseModel):
     id: str
     email: str
     phone: str
-    verifyByGovId: bool
+    userType: UserType
+    features: list[str] = Field(default_factory=list)
     firstName: str | None = None
     lastName: str | None = None
+    address: str | None = None
+    city: str | None = None
     pinCode: str | None = None
     state: str | None = None
+    organizationId: str | None = None
+    orgName: str | None = None
     isActive: bool
     isVerified: bool
     createdAt: datetime = Field(default_factory=lambda: datetime.now(UTC))

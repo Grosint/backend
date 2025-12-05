@@ -1,5 +1,6 @@
 """Authentication API endpoints."""
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -21,12 +22,25 @@ from app.schemas.auth import (
     LogoutResponse,
     RefreshTokenRequest,
     RefreshTokenResponse,
+    SendOtpRequest,
+    SendOtpResponse,
     TokenInfo,
+    VerifyOtpRequest,
+    VerifyOtpResponse,
 )
 from app.schemas.response import SuccessResponse
 from app.services.auth_service import AuthService
+from app.utils.email_otp import (
+    delete_otp,
+    generate_otp,
+    send_otp_email,
+    store_otp,
+    verify_otp,
+)
+from app.utils.validators import is_gov_email
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/login", response_model=SuccessResponse[LoginResponse])
@@ -277,4 +291,183 @@ async def validate_token(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Token validation failed",
+        ) from e
+
+
+@router.post("/send-otp", response_model=SuccessResponse[SendOtpResponse])
+async def send_otp(otp_request: SendOtpRequest, db=Depends(get_database)):
+    """
+    Send OTP to user email for verification.
+
+    Args:
+        otp_request: OTP request with email
+        db: Database dependency
+
+    Returns:
+        OTP sent confirmation
+    """
+    try:
+        from app.models.user import User
+
+        # Check if user exists
+        user = await User.find_one(User.email == otp_request.email)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        # Generate and store OTP
+        otp = generate_otp()
+        await store_otp(db, otp_request.email, otp)
+        await send_otp_email(otp_request.email, otp)
+
+        return SuccessResponse(
+            message="OTP sent successfully to your email",
+            data=SendOtpResponse(
+                message="OTP sent successfully",
+                expires_in=600,  # 10 minutes
+            ),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send OTP",
+        ) from e
+
+
+@router.post("/verify-otp", response_model=SuccessResponse[VerifyOtpResponse])
+async def verify_otp_endpoint(
+    verify_request: VerifyOtpRequest, db=Depends(get_database)
+):
+    """
+    Verify OTP and activate user account.
+
+    Args:
+        verify_request: OTP verification request
+        db: Database dependency
+
+    Returns:
+        OTP verification confirmation
+    """
+    try:
+        from app.models.user import User
+
+        # Normalize email to lowercase for consistent comparison
+        email = verify_request.email.lower().strip()
+        otp = verify_request.otp.strip()
+
+        # Verify OTP
+        is_valid = await verify_otp(db, email, otp)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired OTP",
+            )
+
+        # Get user (use normalized email)
+        user = await User.find_one(User.email == email)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        # Update user verification status
+        # If email is a gov email, set isVerified to True
+        # If email is not a gov email, keep isVerified as False (admin must verify)
+        if is_gov_email(user.email):
+            user.isVerified = True
+            await user.save()
+
+            # Delete OTP after successful verification
+            await delete_otp(db, email)
+
+            # Send account verified email
+            try:
+                from app.services.email_service import email_service
+
+                await email_service.send_account_verified_email(
+                    email=user.email,
+                    first_name=user.firstName,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send account verified email: {e}")
+
+            return SuccessResponse(
+                message="OTP verified successfully. Your account is now active.",
+                data=VerifyOtpResponse(
+                    message="OTP verified successfully",
+                    verified_at=datetime.now(),
+                    is_verified=True,
+                ),
+            )
+        else:
+            # For non-gov ID users, OTP verification doesn't activate account
+            # Admin must verify manually
+            await delete_otp(db, email)
+
+            return SuccessResponse(
+                message="OTP verified successfully. Your account will be activated by admin.",
+                data=VerifyOtpResponse(
+                    message="OTP verified. Waiting for admin approval.",
+                    verified_at=datetime.now(),
+                    is_verified=False,
+                ),
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="OTP verification failed",
+        ) from e
+
+
+@router.post("/resend-otp", response_model=SuccessResponse[SendOtpResponse])
+async def resend_otp(otp_request: SendOtpRequest, db=Depends(get_database)):
+    """
+    Resend OTP to user email.
+
+    Args:
+        otp_request: OTP request with email
+        db: Database dependency
+
+    Returns:
+        OTP sent confirmation
+    """
+    try:
+        from app.models.user import User
+
+        # Check if user exists
+        user = await User.find_one(User.email == otp_request.email)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        # Generate and store new OTP
+        otp = generate_otp()
+        await store_otp(db, otp_request.email, otp)
+        await send_otp_email(otp_request.email, otp)
+
+        return SuccessResponse(
+            message="OTP resent successfully to your email",
+            data=SendOtpResponse(
+                message="OTP resent successfully",
+                expires_in=600,  # 10 minutes
+            ),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to resend OTP",
         ) from e

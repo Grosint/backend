@@ -12,16 +12,34 @@ class TokenBlocklist:
         """Initialize blocklist with MongoDB connection."""
         self.database = database
         self.collection = database.blocked_tokens
+        self._indexes_created = False
 
-        # Create TTL index for automatic cleanup
-        self.collection.create_index(
-            [("expires_at", ASCENDING)],
-            expireAfterSeconds=0,  # Documents expire when expires_at is reached
-            background=True,
-        )
+    async def _ensure_indexes(self):
+        """Ensure indexes are created (lazy initialization)."""
+        if self._indexes_created:
+            return
 
-        # Create index on jti for fast lookups
-        self.collection.create_index([("jti", ASCENDING)], unique=True, background=True)
+        try:
+            # Create TTL index for automatic cleanup
+            await self.collection.create_index(
+                [("expires_at", ASCENDING)],
+                expireAfterSeconds=0,  # Documents expire when expires_at is reached
+                background=True,
+            )
+
+            # Create index on jti for fast lookups
+            await self.collection.create_index(
+                [("jti", ASCENDING)], unique=True, background=True
+            )
+
+            self._indexes_created = True
+
+        except Exception as e:
+            # Log error but don't fail - indexes might already exist
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error creating blocklist indexes: {e}")
 
     async def add_token_to_blocklist(
         self,
@@ -45,6 +63,7 @@ class TokenBlocklist:
             True if successfully added to blocklist
         """
         try:
+            await self._ensure_indexes()
             # Use token expiry or default to 30 days
             if not expires_at:
                 expires_at = datetime.now(UTC) + timedelta(days=30)
@@ -78,6 +97,7 @@ class TokenBlocklist:
             True if token is blocked
         """
         try:
+            await self._ensure_indexes()
             result = await self.collection.find_one({"jti": jti})
             return result is not None
         except Exception:
