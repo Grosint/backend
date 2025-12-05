@@ -1,25 +1,28 @@
 """Test cases for authentication dependencies."""
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
-from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app.core.auth_dependencies import (
     TokenData,
     get_auth_status,
     get_authorization_header,
+    get_current_user,
     get_current_user_email,
     get_current_user_id,
     get_current_user_optional,
     get_current_user_token,
     get_token_info,
-    require_admin_role,
+    require_admin,
+    require_org_admin,
+    require_user_type,
     verify_token_not_blocked,
 )
-from app.core.exceptions import UnauthorizedException
+from app.core.exceptions import AuthorizationException, UnauthorizedException
+from app.models.user import UserType
 
 
 class TestTokenData:
@@ -389,26 +392,151 @@ class TestGetCurrentUserOptional:
         assert result is None
 
 
-class TestRequireAdminRole:
-    """Test cases for require_admin_role function."""
+class TestGetCurrentUser:
+    """Test cases for get_current_user function."""
 
-    def test_require_admin_role_success(self):
-        """Test require_admin_role with valid token data."""
+    @pytest.mark.asyncio
+    @patch("app.core.auth_dependencies.User")
+    async def test_get_current_user_success(self, mock_user_class):
+        """Test get_current_user with valid token data."""
+        from bson import ObjectId
+
+        user_id_obj = ObjectId()
+        user_id = str(user_id_obj)
         token_data = TokenData(
-            user_id="507f1f77bcf86cd799439011",
-            email="admin@example.com",
+            user_id=user_id,
+            email="test@example.com",
             token_type="access",
             expires_at=datetime.now(UTC),
         )
 
-        result = require_admin_role(token_data)
+        mock_user = Mock()
+        mock_user.id = user_id_obj
 
-        assert result == token_data
+        # Setup mock to handle query pattern: User.id == ObjectId(user_id)
+        mock_user_class.id = MagicMock()
+        mock_user_class.id.__eq__ = MagicMock(return_value="query")
+        mock_user_class.find_one = AsyncMock(return_value=mock_user)
 
-    def test_require_admin_role_with_none_token(self):
-        """Test require_admin_role with None token data."""
-        with pytest.raises(HTTPException) as exc_info:
-            require_admin_role(None)
+        result = await get_current_user(token_data, Mock())
 
-        assert exc_info.value.status_code == 403
-        assert "Admin access required" in str(exc_info.value.detail)
+        assert result == mock_user
+        mock_user_class.find_one.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch("app.core.auth_dependencies.User")
+    async def test_get_current_user_not_found(self, mock_user_class):
+        """Test get_current_user when user is not found."""
+        from bson import ObjectId
+
+        user_id_obj = ObjectId()
+        user_id = str(user_id_obj)
+        token_data = TokenData(
+            user_id=user_id,
+            email="test@example.com",
+            token_type="access",
+            expires_at=datetime.now(UTC),
+        )
+
+        # Setup mock to handle query pattern: User.id == ObjectId(user_id)
+        mock_user_class.id = MagicMock()
+        mock_user_class.id.__eq__ = MagicMock(return_value="query")
+        mock_user_class.find_one = AsyncMock(return_value=None)
+
+        with pytest.raises(UnauthorizedException, match="User not found"):
+            await get_current_user(token_data, Mock())
+
+
+class TestRequireAdmin:
+    """Test cases for require_admin function."""
+
+    @pytest.mark.asyncio
+    async def test_require_admin_success(self):
+        """Test require_admin with admin user."""
+        mock_user = Mock()
+        mock_user.userType = UserType.ADMIN
+
+        result = await require_admin(mock_user)
+
+        assert result == mock_user
+
+    @pytest.mark.asyncio
+    async def test_require_admin_with_non_admin(self):
+        """Test require_admin with non-admin user."""
+        mock_user = Mock()
+        mock_user.userType = UserType.USER
+
+        with pytest.raises(AuthorizationException, match="Admin access required"):
+            await require_admin(mock_user)
+
+
+class TestRequireOrgAdmin:
+    """Test cases for require_org_admin function."""
+
+    @pytest.mark.asyncio
+    async def test_require_org_admin_success(self):
+        """Test require_org_admin with org_admin user."""
+        mock_user = Mock()
+        mock_user.userType = UserType.ORG_ADMIN
+
+        result = await require_org_admin(mock_user)
+
+        assert result == mock_user
+
+    @pytest.mark.asyncio
+    async def test_require_org_admin_with_non_org_admin(self):
+        """Test require_org_admin with non-org_admin user."""
+        mock_user = Mock()
+        mock_user.userType = UserType.USER
+
+        with pytest.raises(
+            AuthorizationException, match="Organization admin access required"
+        ):
+            await require_org_admin(mock_user)
+
+
+class TestRequireUserType:
+    """Test cases for require_user_type function."""
+
+    @pytest.mark.asyncio
+    async def test_require_user_type_success(self):
+        """Test require_user_type with allowed user type."""
+        mock_user = Mock()
+        mock_user.userType = UserType.ADMIN
+
+        check_fn = require_user_type(UserType.ADMIN)
+        result = await check_fn(current_user=mock_user)
+
+        assert result == mock_user
+
+    @pytest.mark.asyncio
+    async def test_require_user_type_multiple_allowed(self):
+        """Test require_user_type with multiple allowed types."""
+        mock_user = Mock()
+        mock_user.userType = UserType.ORG_ADMIN
+
+        check_fn = require_user_type(UserType.ADMIN, UserType.ORG_ADMIN)
+        result = await check_fn(current_user=mock_user)
+
+        assert result == mock_user
+
+    @pytest.mark.asyncio
+    async def test_require_user_type_not_allowed(self):
+        """Test require_user_type with not allowed user type."""
+        mock_user = Mock()
+        mock_user.userType = UserType.USER
+
+        check_fn = require_user_type(UserType.ADMIN)
+        with pytest.raises(AuthorizationException):
+            await check_fn(current_user=mock_user)
+
+    @pytest.mark.asyncio
+    async def test_require_user_type_no_types_specified(self):
+        """Test require_user_type with no types specified (allows all)."""
+        mock_user = Mock()
+        mock_user.userType = UserType.USER
+
+        check_fn = require_user_type()
+        result = await check_fn(current_user=mock_user)
+
+        assert result == mock_user

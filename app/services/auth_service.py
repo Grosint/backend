@@ -93,6 +93,10 @@ class AuthService:
         if not user.isActive:
             raise UnauthorizedException("Account is deactivated")
 
+        # Check if user is verified
+        if not user.isVerified:
+            raise UnauthorizedException("Account not verified. Please contact admin.")
+
         # Create tokens
         access_token = create_access_token(user_id=str(user.id), email=user.email)
 

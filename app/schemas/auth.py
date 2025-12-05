@@ -162,3 +162,39 @@ class AuthStatus(BaseModel):
     expires_at: datetime | None = Field(
         None, description="Token expiration if authenticated"
     )
+
+
+class SendOtpRequest(BaseModel):
+    """Send OTP request schema."""
+
+    email: EmailStr = Field(..., description="User email address")
+
+
+class SendOtpResponse(BaseModel):
+    """Send OTP response schema."""
+
+    message: str = Field(..., description="OTP sent confirmation message")
+    expires_in: int = Field(..., description="OTP expiration time in seconds")
+
+
+class VerifyOtpRequest(BaseModel):
+    """Verify OTP request schema."""
+
+    email: EmailStr = Field(..., description="User email address")
+    otp: str = Field(..., min_length=6, max_length=6, description="OTP code")
+
+    @field_validator("otp")
+    @classmethod
+    def validate_otp(cls, v: str) -> str:
+        """Validate OTP is numeric."""
+        if not v.isdigit():
+            raise ValueError("OTP must contain only digits")
+        return v.strip()
+
+
+class VerifyOtpResponse(BaseModel):
+    """Verify OTP response schema."""
+
+    message: str = Field(..., description="OTP verification confirmation message")
+    verified_at: datetime = Field(..., description="OTP verification timestamp")
+    is_verified: bool = Field(..., description="Whether user account is verified")

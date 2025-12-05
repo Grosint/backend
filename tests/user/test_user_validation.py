@@ -84,13 +84,12 @@ class TestUserCreateRequestValidation:
             email="test@example.com",
             phone="+1234567890",
             password="password123",
-            verifyByGovId=True,
         )
 
         assert request.email == "test@example.com"
         assert request.phone == "+1234567890"
         assert request.password == "password123"
-        assert request.verifyByGovId is True
+        # verifyByGovId field no longer exists
 
     def test_invalid_email_format(self):
         """Test invalid email format."""
@@ -99,7 +98,6 @@ class TestUserCreateRequestValidation:
                 email="invalid-email",
                 phone="+1234567890",
                 password="password123",
-                verifyByGovId=True,
             )
 
         errors = exc_info.value.errors()
@@ -112,7 +110,6 @@ class TestUserCreateRequestValidation:
                 email="test@example.com",
                 phone="",
                 password="password123",
-                verifyByGovId=True,
             )
 
         errors = exc_info.value.errors()
@@ -124,52 +121,41 @@ class TestUserCreateRequestValidation:
         """Test missing required fields."""
         # Missing phone
         with pytest.raises(ValidationError) as exc_info:
-            UserCreateRequest(
-                email="test@example.com", password="password123", verifyByGovId=True
-            )
+            UserCreateRequest(email="test@example.com", password="password123")
 
         errors = exc_info.value.errors()
         assert any(error["loc"] == ("phone",) for error in errors)
 
         # Missing email
         with pytest.raises(ValidationError) as exc_info:
-            UserCreateRequest(
-                phone="+1234567890", password="password123", verifyByGovId=True
-            )
+            UserCreateRequest(phone="+1234567890", password="password123")
 
         errors = exc_info.value.errors()
         assert any(error["loc"] == ("email",) for error in errors)
 
         # Missing password
         with pytest.raises(ValidationError) as exc_info:
-            UserCreateRequest(
-                email="test@example.com", phone="+1234567890", verifyByGovId=True
-            )
+            UserCreateRequest(email="test@example.com", phone="+1234567890")
 
         errors = exc_info.value.errors()
         assert any(error["loc"] == ("password",) for error in errors)
 
-        # Missing verifyByGovId
-        with pytest.raises(ValidationError) as exc_info:
-            UserCreateRequest(
-                email="test@example.com", phone="+1234567890", password="password123"
-            )
-
-        errors = exc_info.value.errors()
-        assert any(error["loc"] == ("verifyByGovId",) for error in errors)
+        # verifyByGovId field no longer exists, so this test is no longer applicable
 
     def test_invalid_verify_by_gov_id_type(self):
         """Test invalid verifyByGovId type."""
-        with pytest.raises(ValidationError) as exc_info:
-            UserCreateRequest(
-                email="test@example.com",
-                phone="+1234567890",
-                password="password123",
-                verifyByGovId="invalid",  # Cannot be coerced to boolean
-            )
+        # verifyByGovId field no longer exists, so this test is no longer applicable
+        # Instead, test userType validation
+        from app.models.user import UserType
 
-        errors = exc_info.value.errors()
-        assert any(error["loc"] == ("verifyByGovId",) for error in errors)
+        # Valid userType
+        request = UserCreateRequest(
+            email="test@example.com",
+            phone="+1234567890",
+            password="password123",
+            userType=UserType.USER,
+        )
+        assert request.userType == UserType.USER
 
     def test_password_length_validation(self):
         """Test password length validation."""
@@ -179,7 +165,6 @@ class TestUserCreateRequestValidation:
                 email="test@example.com",
                 phone="+1234567890",
                 password="short",
-                verifyByGovId=True,
             )
 
         errors = exc_info.value.errors()
@@ -191,7 +176,6 @@ class TestUserCreateRequestValidation:
                 email="test@example.com",
                 phone="+1234567890",
                 password="a" * 101,  # Too long
-                verifyByGovId=True,
             )
 
         errors = exc_info.value.errors()
@@ -206,14 +190,13 @@ class TestUserUpdateRequestValidation:
         request = UserUpdateRequest(
             email="new@example.com",
             phone="+9876543210",
-            verifyByGovId=False,
             firstName="John",
             lastName="Doe",
         )
 
         assert request.email == "new@example.com"
         assert request.phone == "+9876543210"
-        assert request.verifyByGovId is False
+        # verifyByGovId field no longer exists
         assert request.firstName == "John"
         assert request.lastName == "Doe"
 
@@ -224,7 +207,7 @@ class TestUserUpdateRequestValidation:
         assert request.firstName == "Jane"
         assert request.email is None
         assert request.phone is None
-        assert request.verifyByGovId is None
+        # verifyByGovId field no longer exists
 
     def test_empty_phone_in_update(self):
         """Test empty phone in update request."""
@@ -295,13 +278,12 @@ class TestUserModelValidation:
         user_create = UserCreate(
             email="test@example.com",
             phone="+1234567890",
-            verifyByGovId=True,
             password="password123",
         )
 
         assert user_create.email == "test@example.com"
         assert user_create.phone == "+1234567890"
-        assert user_create.verifyByGovId is True
+        # verifyByGovId field no longer exists
         assert user_create.password == "password123"
 
     def test_user_update_validation(self):

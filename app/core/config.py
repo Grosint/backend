@@ -130,6 +130,14 @@ class Settings(BaseSettings):
         os.getenv("CREDIT_EXPIRY_SCHEDULE_MINUTE", "0")
     )
 
+    # Azure Communication Services Email configuration
+    AZURE_EMAIL_ENDPOINT: str = os.getenv("AZURE_EMAIL_ENDPOINT", "")
+    AZURE_EMAIL_ACCESS_KEY: str = os.getenv("AZURE_EMAIL_ACCESS_KEY", "")
+    AZURE_EMAIL_SENDER_ADDRESS: str = os.getenv("AZURE_EMAIL_SENDER_ADDRESS", "")
+
+    # Frontend URL for email links (password reset, etc.)
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://your-app.com")
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: str | list[str]) -> list[str]:

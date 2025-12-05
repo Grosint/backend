@@ -100,3 +100,33 @@ def validate_required_phone_number(value: Any) -> str:
 
     # Always return in E.164 format
     return f"+{phone_digits}"
+
+
+def is_gov_email(email: str) -> bool:
+    """
+    Detect if email is a government email based on domain patterns.
+
+    Args:
+        email: Email address to check
+
+    Returns:
+        True if email appears to be a government email
+    """
+    if not email:
+        return False
+
+    # Common government email domain patterns
+    gov_patterns = [
+        r"\.gov\.",  # .gov.
+        r"\.gov\.in",  # .gov.in
+        r"\.nic\.in",  # .nic.in
+        r"@gov\.",  # @gov.
+        r"@nic\.",  # @nic.
+        r"@.*\.gov\.",  # @*.gov.
+        r"@.*\.gov\.in",  # @*.gov.in
+        r"@.*\.nic\.in",  # @*.nic.in
+    ]
+
+    email_lower = email.lower()
+
+    return any(re.search(pattern, email_lower) for pattern in gov_patterns)

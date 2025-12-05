@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .email-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 50px 20px;
+            text-align: center;
+            color: #ffffff;
+        }
+        .email-header h1 {
+            font-size: 36px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        .welcome-icon {
+            font-size: 72px;
+            margin-bottom: 20px;
+        }
+        .email-body {
+            padding: 40px 30px;
+            color: #333333;
+        }
+        .email-body p {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            color: #555555;
+        }
+        .features-list {
+            background-color: #f8f9fa;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+        .features-list h3 {
+            color: #333333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .features-list ul {
+            list-style: none;
+            padding: 0;
+        }
+        .features-list li {
+            padding: 10px 0;
+            padding-left: 30px;
+            position: relative;
+            color: #555555;
+        }
+        .features-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 14px 32px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+            font-size: 16px;
+        }
+        .email-footer {
+            background-color: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            color: #666666;
+            font-size: 14px;
+        }
+        .email-footer p {
+            margin: 5px 0;
+        }
+        .divider {
+            height: 1px;
+            background-color: #e0e0e0;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <div class="welcome-icon">👋</div>
+            <h1>Welcome, {{first_name}}!</h1>
+            <p style="margin: 0; font-size: 18px; opacity: 0.9;">We're thrilled to have you here</p>
+        </div>
+
+        <div class="email-body">
+            <p>Hello {{first_name}},</p>
+            <p>Welcome to {{app_name}}! We're excited to have you as part of our community.</p>
+
+            <p>You now have access to all our features and services. Here's what you can do:</p>
+
+            <div class="features-list">
+                <h3>🚀 Get Started</h3>
+                <ul>
+                    <li>Explore all available features</li>
+                    <li>Complete your profile setup</li>
+                    <li>Start using our services</li>
+                    <li>Get support whenever you need it</li>
+                </ul>
+            </div>
+
+            <p>If you have any questions or need help getting started, don't hesitate to reach out to our support team.</p>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="#" class="cta-button">Explore Dashboard</a>
+            </div>
+
+            <div class="divider"></div>
+
+            <p style="font-size: 14px; color: #888888;">
+                Thank you for joining {{app_name}}. We're here to help you succeed!
+            </p>
+        </div>
+
+        <div class="email-footer">
+            <p><strong>{{app_name}}</strong></p>
+            <p>© 2025 All rights reserved</p>
+        </div>
+    </div>
+</body>
+</html>

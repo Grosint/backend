@@ -50,7 +50,8 @@ def sample_user_data():
         "email": "test@example.com",
         "phone": "+1234567890",
         "password": "hashed_password",
-        "verifyByGovId": True,
+        "userType": "user",
+        "features": [],
         "firstName": "John",
         "lastName": "Doe",
         "pinCode": "12345",
@@ -75,7 +76,6 @@ def sample_user_create_request():
         "email": "test@example.com",
         "phone": "+1234567890",
         "password": "password123",
-        "verifyByGovId": True,
     }
 
 
@@ -99,31 +99,21 @@ def invalid_user_requests():
             "email": "invalid-email",
             "phone": "+1234567890",
             "password": "password123",
-            "verifyByGovId": True,
         },
         "empty_phone": {
             "email": "test@example.com",
             "phone": "",
             "password": "password123",
-            "verifyByGovId": True,
         },
         "short_password": {
             "email": "test@example.com",
             "phone": "+1234567890",
             "password": "short",
-            "verifyByGovId": True,
-        },
-        "invalid_verify_by_gov_id": {
-            "email": "test@example.com",
-            "phone": "+1234567890",
-            "password": "password123",
-            "verifyByGovId": "not_boolean",
         },
         "missing_required_fields": {
             "email": "test@example.com",
             # phone missing
             "password": "password123",
-            "verifyByGovId": True,
         },
     }
 
@@ -194,7 +184,8 @@ class TestDataFactory:
             "email": "test@example.com",
             "phone": "+1234567890",
             "password": "hashed_password",
-            "verifyByGovId": True,
+            "userType": "user",
+            "features": [],
             "firstName": "John",
             "lastName": "Doe",
             "pinCode": "12345",
@@ -214,7 +205,6 @@ class TestDataFactory:
             "email": "test@example.com",
             "phone": "+1234567890",
             "password": "password123",
-            "verifyByGovId": True,
         }
         default_data.update(overrides)
         return default_data

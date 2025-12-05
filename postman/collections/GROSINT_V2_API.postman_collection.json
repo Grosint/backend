@@ -1,0 +1,1515 @@
+{
+	"info": {
+		"_postman_id": "fd991e9e-0a60-4e82-b42a-46eb3dbf3d7b",
+		"name": "GROSINT V2 API Collection",
+		"description": "Complete API collection for GROSINT V2 Backend - Authentication, User Management, Search, and Admin Operations",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "1173637"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.access_token) {",
+									"        pm.environment.set('access_token', jsonData.data.access_token);",
+									"        pm.environment.set('refresh_token', jsonData.data.refresh_token);",
+									"        pm.environment.set('user_id', jsonData.data.user_id);",
+									"        console.log('✅ Tokens saved to environment');",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Authenticate user and return JWT tokens. Tokens are automatically saved to environment variables."
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.access_token) {",
+									"        pm.environment.set('access_token', jsonData.data.access_token);",
+									"        console.log('✅ Access token refreshed');",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/refresh",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "refresh"]
+						},
+						"description": "Refresh access token using refresh token. New access token is automatically saved."
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/logout",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "logout"]
+						},
+						"description": "Logout user and invalidate tokens. Both access and refresh tokens are blacklisted."
+					},
+					"response": []
+				},
+				{
+					"name": "Change Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"current_password\": \"password123\",\n  \"new_password\": \"NewPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/change-password",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "change-password"]
+						},
+						"description": "Change user password. New password must be at least 8 characters and meet strength requirements."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Auth Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/me",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "me"]
+						},
+						"description": "Get current authentication status and token information."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Token Info",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/token-info",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "token-info"]
+						},
+						"description": "Get detailed token information including issued_at, expires_at, and user details."
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/validate",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "validate"]
+						},
+						"description": "Validate token and return user information. Returns user_id, email, is_active, and is_verified."
+					},
+					"response": []
+				},
+				{
+					"name": "Send OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/send-otp",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "send-otp"]
+						},
+						"description": "Send OTP to user email for verification. OTP expires in 10 minutes."
+					},
+					"response": []
+				},
+				{
+					"name": "Verify OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"otp\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/verify-otp",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "verify-otp"]
+						},
+						"description": "Verify OTP and activate user account. For users with verifyByGovId=true, account is immediately activated. For others, admin approval is required."
+					},
+					"response": []
+				},
+				{
+					"name": "Resend OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/resend-otp",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "resend-otp"]
+						},
+						"description": "Resend OTP to user email. Generates a new OTP and sends it via email."
+					},
+					"response": []
+				}
+			],
+			"description": "Authentication endpoints for login, logout, token management, and OTP verification"
+		},
+		{
+			"name": "User Management",
+			"item": [
+				{
+					"name": "Create User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"newuser@example.com\",\n  \"phone\": \"+1234567890\",\n  \"verifyByGovId\": false,\n  \"password\": \"Password123!\",\n  \"userType\": \"USER\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"address\": \"123 Main St\",\n  \"city\": \"New York\",\n  \"pinCode\": \"10001\",\n  \"state\": \"NY\",\n  \"organizationId\": null,\n  \"orgName\": null\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/user/",
+							"host": ["{{base_url}}"],
+							"path": ["user", ""]
+						},
+						"description": "Create a new user account. OTP is automatically sent to the user's email for verification. Required fields: email, phone, verifyByGovId, password."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current User Info",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/me",
+							"host": ["{{base_url}}"],
+							"path": ["user", "me"]
+						},
+						"description": "Get current authenticated user information including profile details, organization info, and verification status."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Current User",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"address\": \"123 Main St\",\n  \"city\": \"New York\",\n  \"pinCode\": \"10001\",\n  \"state\": \"NY\",\n  \"phone\": \"+1234567890\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/user/me",
+							"host": ["{{base_url}}"],
+							"path": ["user", "me"]
+						},
+						"description": "Update current user information. All fields are optional - only provided fields will be updated."
+					},
+					"response": []
+				},
+				{
+					"name": "List Users",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/list?page=1&size=20",
+							"host": ["{{base_url}}"],
+							"path": ["user", "list"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number (starts from 1)"
+								},
+								{
+									"key": "size",
+									"value": "20",
+									"description": "Page size (1-100)"
+								}
+							]
+						},
+						"description": "List users with pagination (admin only). Returns paginated list of users with metadata."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete User",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["user", "{{user_id}}"]
+						},
+						"description": "Delete a user by ID (admin only). Requires valid user_id as path parameter."
+					},
+					"response": []
+				}
+			],
+			"description": "User management endpoints for CRUD operations"
+		},
+		{
+			"name": "Search",
+			"item": [
+				{
+					"name": "Phone Lookup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phone\": \"9997260627\",\n  \"country_code\": \"+91\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/search/phone-lookup",
+							"host": ["{{base_url}}"],
+							"path": ["search", "phone-lookup"]
+						},
+						"description": "Create and execute a phone lookup search. Returns search_id, results, and status. Phone number should be without country code."
+					},
+					"response": []
+				},
+				{
+					"name": "Email Lookup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/search/email-lookup",
+							"host": ["{{base_url}}"],
+							"path": ["search", "email-lookup"]
+						},
+						"description": "Create and execute an email lookup search. Returns search_id, results from multiple services, and status."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Search Results",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/search/search/{{search_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["search", "search", "{{search_id}}"]
+						},
+						"description": "Get search results by search ID. Returns complete search information including results and status."
+					},
+					"response": []
+				},
+				{
+					"name": "List Searches",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/search/searches?limit=20&skip=0",
+							"host": ["{{base_url}}"],
+							"path": ["search", "searches"],
+							"query": [
+								{
+									"key": "user_id",
+									"value": "",
+									"description": "Optional user ID to filter searches",
+									"disabled": true
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Number of searches to return (1-100)"
+								},
+								{
+									"key": "skip",
+									"value": "0",
+									"description": "Number of searches to skip"
+								}
+							]
+						},
+						"description": "Get searches with pagination. If user_id is provided, returns searches for that user. Otherwise returns system searches."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Search Statistics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/search/search-stats",
+							"host": ["{{base_url}}"],
+							"path": ["search", "search-stats"]
+						},
+						"description": "Get search statistics including counts by type and status."
+					},
+					"response": []
+				}
+			],
+			"description": "Search endpoints for phone and email lookups"
+		},
+		{
+			"name": "Admin",
+			"item": [
+				{
+					"name": "🔐 Authentication",
+					"item": [
+						{
+							"name": "Create User (if needed)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"admin@example.com\",\n  \"phone\": \"+1234567890\",\n  \"password\": \"YourSecurePassword123!\",\n  \"verifyByGovId\": false,\n  \"userType\": \"ADMIN\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/user/",
+									"host": ["{{base_url}}"],
+									"path": ["user", ""]
+								},
+								"description": "Create a new admin user account. Use this if you don't have an account yet."
+							},
+							"response": []
+						},
+						{
+							"name": "Login (Get Admin Token)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {",
+											"    var jsonData = pm.response.json();",
+											"    if (jsonData.data && jsonData.data.access_token) {",
+											"        pm.environment.set('admin_token', jsonData.data.access_token);",
+											"        pm.environment.set('access_token', jsonData.data.access_token);",
+											"        console.log('✅ Admin token saved to environment');",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/auth/login",
+									"host": ["{{base_url}}"],
+									"path": ["auth", "login"]
+								},
+								"description": "Login to get access token. The token will be automatically saved to the 'admin_token' and 'access_token' environment variables."
+							},
+							"response": []
+						}
+					],
+					"description": "Authentication endpoints to get admin token"
+				},
+				{
+					"name": "Test Phone Lookup Service",
+					"item": [
+						{
+							"name": "Test TrueCaller",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9876543210\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/truecaller",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "truecaller"]
+								},
+								"description": "Test TrueCaller service directly. Bypasses orchestration and database."
+							},
+							"response": []
+						},
+						{
+							"name": "Test Eyecon",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9997260627\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/eyecon",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "eyecon"]
+								},
+								"description": "Test Eyecon service directly. Bypasses orchestration and database."
+							},
+							"response": []
+						},
+						{
+							"name": "Test CallApp",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9997260627\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/callapp",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "callapp"]
+								},
+								"description": "Test CallApp service directly. Bypasses orchestration and database."
+							},
+							"response": []
+						},
+						{
+							"name": "Test ViewCaller",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9876543210\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/viewcaller",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "viewcaller"]
+								},
+								"description": "Test ViewCaller service directly. Bypasses orchestration and database."
+							},
+							"response": []
+						},
+						{
+							"name": "Test WhatsApp",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9997260627\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/whatsapp",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "whatsapp"]
+								},
+								"description": "Test WhatsApp service directly. Bypasses orchestration and database."
+							},
+							"response": []
+						},
+						{
+							"name": "Test Telegram",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9997260627\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/telegram",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "telegram"]
+								},
+								"description": "Test Telegram service directly. Bypasses orchestration and database."
+							},
+							"response": []
+						},
+						{
+							"name": "Test Skype",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9997260627\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/skype",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "skype"]
+								},
+								"description": "Test Skype service directly. Bypasses orchestration and database."
+							},
+							"response": []
+						},
+						{
+							"name": "Test Ignorant",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9997260627\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/ignorant",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "ignorant"]
+								},
+								"description": "Test Ignorant service directly. Bypasses orchestration and database."
+							},
+							"response": []
+						},
+						{
+							"name": "Test LeakCheck",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9876543210\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/leakcheck",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "leakcheck"]
+								},
+								"description": "Test LeakCheck service directly. Bypasses orchestration and database."
+							},
+							"response": []
+						},
+						{
+							"name": "Test HLR",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9997260627\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/hlr",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "hlr"]
+								},
+								"description": "Test HLR service directly. Bypasses orchestration and database."
+							},
+							"response": []
+						},
+						{
+							"name": "Test All Phone Lookup Services",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9876543210\",\n  \"include_raw_response\": false\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/all",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "all"]
+								},
+								"description": "Test all phone lookup services in parallel. Useful for comparing service performance and identifying which services are failing."
+							},
+							"response": []
+						}
+					],
+					"description": "Test individual phone lookup services"
+				},
+				{
+					"name": "Test Email Lookup Service",
+					"item": [
+						{
+							"name": "Test Skype",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"user@example.com\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/email-lookup/skype",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "email-lookup", "skype"]
+								},
+								"description": "Test Skype email lookup service directly."
+							},
+							"response": []
+						},
+						{
+							"name": "Test SocialMedia",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"user@example.com\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/email-lookup/social_media",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "email-lookup", "social_media"]
+								},
+								"description": "Test SocialMedia email lookup service directly."
+							},
+							"response": []
+						},
+						{
+							"name": "Test Security",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"user@example.com\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/email-lookup/security",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "email-lookup", "security"]
+								},
+								"description": "Test Security email lookup service directly."
+							},
+							"response": []
+						},
+						{
+							"name": "Test Ghunt",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"user@example.com\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/email-lookup/ghunt",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "email-lookup", "ghunt"]
+								},
+								"description": "Test Ghunt email lookup service directly."
+							},
+							"response": []
+						},
+						{
+							"name": "Test PhilInt",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"user@example.com\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/email-lookup/philint",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "email-lookup", "philint"]
+								},
+								"description": "Test PhilInt email lookup service directly."
+							},
+							"response": []
+						}
+					],
+					"description": "Test individual email lookup services"
+				},
+				{
+					"name": "Service Health Checks",
+					"item": [
+						{
+							"name": "TrueCaller Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/truecaller/health?test_phone=919997260627",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "truecaller", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "919997260627",
+											"description": "Test phone number (without country code)"
+										}
+									]
+								},
+								"description": "Quick health check for TrueCaller service. Returns basic connectivity and response time information."
+							},
+							"response": []
+						},
+						{
+							"name": "Eyecon Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/eyecon/health?test_phone=234567890",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "eyecon", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "234567890"
+										}
+									]
+								},
+								"description": "Quick health check for Eyecon service."
+							},
+							"response": []
+						},
+						{
+							"name": "CallApp Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/callapp/health?test_phone=234567890",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "callapp", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "234567890",
+											"description": "Test phone number (without country code)"
+										}
+									]
+								},
+								"description": "Quick health check for CallApp service."
+							},
+							"response": []
+						},
+						{
+							"name": "ViewCaller Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/viewcaller/health?test_phone=234567890",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "viewcaller", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "234567890",
+											"description": "Test phone number (without country code)"
+										}
+									]
+								},
+								"description": "Quick health check for ViewCaller service."
+							},
+							"response": []
+						},
+						{
+							"name": "WhatsApp Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/whatsapp/health?test_phone=234567890",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "whatsapp", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "234567890",
+											"description": "Test phone number (without country code)"
+										}
+									]
+								},
+								"description": "Quick health check for WhatsApp service."
+							},
+							"response": []
+						},
+						{
+							"name": "Telegram Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/telegram/health?test_phone=919997260627",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "telegram", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "919997260627"
+										}
+									]
+								},
+								"description": "Quick health check for Telegram service."
+							},
+							"response": []
+						},
+						{
+							"name": "Skype Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/skype/health?test_phone=234567890",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "skype", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "234567890"
+										}
+									]
+								},
+								"description": "Quick health check for Skype service."
+							},
+							"response": []
+						},
+						{
+							"name": "Ignorant Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/ignorant/health?test_phone=9997260627",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "ignorant", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "9997260627"
+										}
+									]
+								},
+								"description": "Quick health check for Ignorant service."
+							},
+							"response": []
+						},
+						{
+							"name": "LeakCheck Phone Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/leakcheck/health?test_phone=919997260627",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "leakcheck", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "919997260627"
+										}
+									]
+								},
+								"description": "Quick health check for LeakCheck service."
+							},
+							"response": []
+						},
+						{
+							"name": "HLR Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/hlr/health?test_phone=234567890",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "hlr", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "234567890"
+										}
+									]
+								},
+								"description": "Quick health check for HLR service."
+							},
+							"response": []
+						},
+						{
+							"name": "SocialMedia Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/email-lookup/social_media/health",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "email-lookup", "social_media", "health"]
+								},
+								"description": "Quick health check for SocialMedia service."
+							},
+							"response": []
+						},
+						{
+							"name": "Email Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/email-lookup/email_lookup/health",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "email-lookup", "email_lookup", "health"]
+								},
+								"description": "Quick health check for Email Lookup service."
+							},
+							"response": []
+						}
+					],
+					"description": "Quick health checks for all phone and email lookup services"
+				},
+				{
+					"name": "List Available Services",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/debug/services",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "debug", "services"]
+						},
+						"description": "List all available services for debugging. Returns a catalog of all testable services grouped by type."
+					},
+					"response": []
+				}
+			],
+			"description": "Admin endpoints for debugging and testing services"
+		},
+		{
+			"name": "Health Check",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": ["{{base_url}}"],
+							"path": ["health"]
+						},
+						"description": "Health check endpoint for deployment verification. Returns service status, version, and timestamp."
+					},
+					"response": []
+				}
+			],
+			"description": "System health and status endpoints"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Pre-request script runs before each request",
+					"// You can add common setup logic here"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test script runs after each request",
+					"// Auto-extract tokens from login response",
+					"if (pm.response && pm.response.json() && pm.response.json().data) {",
+					"    const data = pm.response.json().data;",
+					"    if (data.access_token) {",
+					"        pm.environment.set('access_token', data.access_token);",
+					"    }",
+					"    if (data.refresh_token) {",
+					"        pm.environment.set('refresh_token', data.refresh_token);",
+					"    }",
+					"    if (data.user_id) {",
+					"        pm.environment.set('user_id', data.user_id);",
+					"    }",
+					"}",
+					"",
+					"// Basic response validation",
+					"pm.test('Status code is successful', function () {",
+					"    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+					"});",
+					"",
+					"pm.test('Response has success structure', function () {",
+					"    if (pm.response.code < 400) {",
+					"        const jsonData = pm.response.json();",
+					"        pm.expect(jsonData).to.have.property('success');",
+					"        pm.expect(jsonData).to.have.property('message');",
+					"    }",
+					"});"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000/api",
+			"type": "string"
+		},
+		{
+			"key": "access_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refresh_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "search_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

@@ -1,0 +1,27 @@
+{
+	"id": "cf5f69d2-cd61-4b5a-8c6d-c363749451bd",
+	"name": "Globals",
+	"values": [
+		{
+			"key": "api_version",
+			"value": "v2",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "content_type",
+			"value": "application/json",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "timeout",
+			"value": "30000",
+			"type": "default",
+			"enabled": true
+		}
+	],
+	"_postman_variable_scope": "globals",
+	"_postman_exported_at": "2025-12-05T06:37:46.174Z",
+	"_postman_exported_using": "Postman/10.0.0"
+}

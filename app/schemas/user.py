@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.models.user import UserType
 from app.utils.validators import validate_phone_number, validate_required_phone_number
 
 
@@ -12,13 +13,40 @@ class UserCreateRequest(BaseModel):
 
     email: EmailStr
     phone: str = Field(..., description="Phone number in E.164 format")
-    verifyByGovId: bool
     password: str = Field(..., min_length=8, max_length=100)
+    userType: UserType = UserType.USER
+    firstName: str | None = Field(None, max_length=100)
+    lastName: str | None = Field(None, max_length=100)
+    address: str | None = Field(None, max_length=200)
+    city: str | None = Field(None, max_length=100)
+    pinCode: str | None = Field(None, max_length=10)
+    state: str | None = Field(None, max_length=100)
+    organizationId: str | None = Field(None, description="Organization ID for org_user")
+    orgName: str | None = Field(
+        None, max_length=200, description="Organization name for org_admin"
+    )
 
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v):
         return validate_required_phone_number(v)
+
+    @field_validator("userType")
+    @classmethod
+    def validate_user_type(cls, v):
+        """
+        Validate that userType is not an elevated role for self-registration.
+
+        Only USER and ORG_USER are allowed for public registration.
+        ADMIN and ORG_ADMIN must be assigned via admin APIs.
+        """
+        if v in (UserType.ADMIN, UserType.ORG_ADMIN):
+            raise ValueError(
+                f"User type '{v.value}' cannot be self-assigned. "
+                f"Only 'user' and 'org_user' types are allowed for registration. "
+                f"Elevated roles must be assigned by administrators."
+            )
+        return v
 
 
 class UserUpdateRequest(BaseModel):
@@ -26,11 +54,20 @@ class UserUpdateRequest(BaseModel):
 
     email: EmailStr | None = None
     phone: str | None = Field(None, description="Phone number in E.164 format")
-    verifyByGovId: bool | None = None
+    userType: UserType | None = None
+    features: list[str] | None = Field(
+        None, description="List of feature access permissions"
+    )
     firstName: str | None = Field(None, max_length=100)
     lastName: str | None = Field(None, max_length=100)
+    address: str | None = Field(None, max_length=200)
+    city: str | None = Field(None, max_length=100)
     pinCode: str | None = Field(None, max_length=10)
     state: str | None = Field(None, max_length=100)
+    organizationId: str | None = Field(None, description="Organization ID for org_user")
+    orgName: str | None = Field(
+        None, max_length=200, description="Organization name for org_admin"
+    )
     isActive: bool | None = None
     isVerified: bool | None = None
 
@@ -46,11 +83,16 @@ class UserResponse(BaseModel):
     id: str
     email: str
     phone: str
-    verifyByGovId: bool
+    userType: UserType | None = None
+    features: list[str] | None = None
     firstName: str | None = None
     lastName: str | None = None
+    address: str | None = None
+    city: str | None = None
     pinCode: str | None = None
     state: str | None = None
+    organizationId: str | None = None
+    orgName: str | None = None
     isActive: bool
     isVerified: bool
     createdAt: datetime = Field(default_factory=lambda: datetime.now(UTC))

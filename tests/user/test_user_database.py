@@ -27,13 +27,14 @@ class TestUserTimestampBehavior:
                 "email": "test@example.com",
                 "phone": "+1234567890",
                 "password": "hashed_password",
+                "userType": "user",
+                "features": [],
                 "firstName": "Test",
                 "lastName": "User",
                 "pinCode": "12345",
                 "state": "Test State",
                 "isActive": True,
                 "isVerified": False,
-                "verifyByGovId": False,
             }
 
             # Create user instance
@@ -156,13 +157,18 @@ class TestUserDatabaseOperations:
         mock_user.email = "test@example.com"
         mock_user.phone = "+1234567890"
         mock_user.password = "hashed_password"
-        mock_user.verifyByGovId = True
+        mock_user.userType = "user"
+        mock_user.features = []
         mock_user.isActive = True
         mock_user.isVerified = False
         mock_user.firstName = None
         mock_user.lastName = None
+        mock_user.address = None
+        mock_user.city = None
         mock_user.pinCode = None
         mock_user.state = None
+        mock_user.organizationId = None
+        mock_user.orgName = None
         mock_user.createdAt = datetime.now(UTC)
         mock_user.updatedAt = datetime.now(UTC)
         mock_user.insert = AsyncMock()
@@ -183,7 +189,6 @@ class TestUserDatabaseOperations:
                 user_create = UserCreate(
                     email="test@example.com",
                     phone="+1234567890",
-                    verifyByGovId=True,
                     password="password123",
                 )
 
@@ -215,7 +220,6 @@ class TestUserDatabaseOperations:
             user_create = UserCreate(
                 email="test@example.com",
                 phone="+1234567890",
-                verifyByGovId=True,
                 password="password123",
             )
 
@@ -235,13 +239,18 @@ class TestUserDatabaseOperations:
         mock_user.email = "test@example.com"
         mock_user.phone = "+1234567890"
         mock_user.password = "hashed_password"
-        mock_user.verifyByGovId = True
+        mock_user.userType = "user"
+        mock_user.features = []
         mock_user.isActive = True
         mock_user.isVerified = False
         mock_user.firstName = None
         mock_user.lastName = None
+        mock_user.address = None
+        mock_user.city = None
         mock_user.pinCode = None
         mock_user.state = None
+        mock_user.organizationId = None
+        mock_user.orgName = None
         mock_user.createdAt = datetime.now(UTC)
         mock_user.updatedAt = datetime.now(UTC)
 
@@ -286,13 +295,18 @@ class TestUserDatabaseOperations:
         mock_user.email = "test@example.com"
         mock_user.phone = "+1234567890"
         mock_user.password = "hashed_password"
-        mock_user.verifyByGovId = True
+        mock_user.userType = "user"
+        mock_user.features = []
         mock_user.isActive = True
         mock_user.isVerified = False
         mock_user.firstName = None
         mock_user.lastName = None
+        mock_user.address = None
+        mock_user.city = None
         mock_user.pinCode = None
         mock_user.state = None
+        mock_user.organizationId = None
+        mock_user.orgName = None
         mock_user.createdAt = datetime.now(UTC)
         mock_user.updatedAt = datetime.now(UTC)
         mock_user.save = AsyncMock()
@@ -365,13 +379,18 @@ class TestUserDatabaseOperations:
         mock_user1.email = "user1@example.com"
         mock_user1.phone = "+1234567890"
         mock_user1.password = "hashed_password"
-        mock_user1.verifyByGovId = True
+        mock_user1.userType = "user"
+        mock_user1.features = []
         mock_user1.isActive = True
         mock_user1.isVerified = False
         mock_user1.firstName = None
         mock_user1.lastName = None
+        mock_user1.address = None
+        mock_user1.city = None
         mock_user1.pinCode = None
         mock_user1.state = None
+        mock_user1.organizationId = None
+        mock_user1.orgName = None
         mock_user1.createdAt = datetime.now(UTC)
         mock_user1.updatedAt = datetime.now(UTC)
 
@@ -380,13 +399,18 @@ class TestUserDatabaseOperations:
         mock_user2.email = "user2@example.com"
         mock_user2.phone = "+9876543210"
         mock_user2.password = "hashed_password"
-        mock_user2.verifyByGovId = False
+        mock_user2.userType = "user"
+        mock_user2.features = []
         mock_user2.isActive = True
         mock_user2.isVerified = False
         mock_user2.firstName = None
         mock_user2.lastName = None
+        mock_user2.address = None
+        mock_user2.city = None
         mock_user2.pinCode = None
         mock_user2.state = None
+        mock_user2.organizationId = None
+        mock_user2.orgName = None
         mock_user2.createdAt = datetime.now(UTC)
         mock_user2.updatedAt = datetime.now(UTC)
 
@@ -443,13 +467,18 @@ class TestUserFieldRestrictions:
         mock_user.email = "test@example.com"
         mock_user.phone = "+1234567890"
         mock_user.password = "hashed_password"
-        mock_user.verifyByGovId = True
+        mock_user.userType = "user"
+        mock_user.features = []
         mock_user.isActive = True
         mock_user.isVerified = False
         mock_user.firstName = None
         mock_user.lastName = None
+        mock_user.address = None
+        mock_user.city = None
         mock_user.pinCode = None
         mock_user.state = None
+        mock_user.organizationId = None
+        mock_user.orgName = None
         mock_user.createdAt = datetime.now(UTC)
         mock_user.updatedAt = datetime.now(UTC)
         mock_user.insert = AsyncMock()
@@ -469,7 +498,6 @@ class TestUserFieldRestrictions:
                 user_create = UserCreate(
                     email="test@example.com",
                     phone="+1234567890",
-                    verifyByGovId=True,
                     password="password123",
                 )
 
@@ -488,13 +516,18 @@ class TestUserFieldRestrictions:
         mock_user.email = "test@example.com"
         mock_user.phone = "+1234567890"
         mock_user.password = "hashed_password"
-        mock_user.verifyByGovId = True
+        mock_user.userType = "user"
+        mock_user.features = []
         mock_user.isActive = True
         mock_user.isVerified = False
         mock_user.firstName = None
         mock_user.lastName = None
+        mock_user.address = None
+        mock_user.city = None
         mock_user.pinCode = None
         mock_user.state = None
+        mock_user.organizationId = None
+        mock_user.orgName = None
         mock_user.createdAt = datetime.now(UTC)
         mock_user.updatedAt = datetime.now(UTC)
         mock_user.save = AsyncMock()
@@ -529,13 +562,18 @@ class TestUserFieldRestrictions:
         mock_user.email = "test@example.com"
         mock_user.phone = "+1234567890"
         mock_user.password = "hashed_password"
-        mock_user.verifyByGovId = True
+        mock_user.userType = "user"
+        mock_user.features = []
         mock_user.isActive = True
         mock_user.isVerified = False
         mock_user.firstName = None
         mock_user.lastName = None
+        mock_user.address = None
+        mock_user.city = None
         mock_user.pinCode = None
         mock_user.state = None
+        mock_user.organizationId = None
+        mock_user.orgName = None
         mock_user.createdAt = datetime.now(UTC)
         mock_user.updatedAt = datetime.now(UTC)
         mock_user.save = AsyncMock()

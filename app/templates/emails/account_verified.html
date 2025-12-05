@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Verified</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .email-header {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            padding: 40px 20px;
+            text-align: center;
+            color: #ffffff;
+        }
+        .email-header h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .verified-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        .email-body {
+            padding: 40px 30px;
+            color: #333333;
+        }
+        .email-body p {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            color: #555555;
+        }
+        .success-box {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            padding: 25px;
+            border-radius: 8px;
+            margin: 25px 0;
+            text-align: center;
+            border: 2px solid #4caf50;
+        }
+        .success-box p {
+            margin: 0;
+            font-size: 18px;
+            color: #2e7d32;
+            font-weight: 500;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: #ffffff;
+            padding: 14px 32px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+            font-size: 16px;
+        }
+        .email-footer {
+            background-color: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            color: #666666;
+            font-size: 14px;
+        }
+        .email-footer p {
+            margin: 5px 0;
+        }
+        .divider {
+            height: 1px;
+            background-color: #e0e0e0;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <div class="verified-icon">✅</div>
+            <h1>Account Verified!</h1>
+            <p style="margin: 0; font-size: 16px; opacity: 0.9;">{{app_name}}</p>
+        </div>
+
+        <div class="email-body">
+            <p>Hello {{first_name}},</p>
+            <p>Great news! Your email address has been successfully verified.</p>
+
+            <div class="success-box">
+                <p>🎉 Your account is now fully activated!</p>
+            </div>
+
+            <p>You now have full access to all features and services on {{app_name}}. Your account is secure and ready to use.</p>
+
+            <p>If you have any questions or need assistance, our support team is always here to help.</p>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="#" class="cta-button">Go to Dashboard</a>
+            </div>
+
+            <div class="divider"></div>
+
+            <p style="font-size: 14px; color: #888888;">
+                Thank you for verifying your account. Welcome to {{app_name}}!
+            </p>
+        </div>
+
+        <div class="email-footer">
+            <p><strong>{{app_name}}</strong></p>
+            <p>© 2025 All rights reserved</p>
+        </div>
+    </div>
+</body>
+</html>
