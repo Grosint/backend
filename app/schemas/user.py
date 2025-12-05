@@ -5,10 +5,7 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.models.user import UserType
-from app.utils.validators import (
-    validate_phone_number,
-    validate_required_phone_number,
-)
+from app.utils.validators import validate_phone_number, validate_required_phone_number
 
 
 class UserCreateRequest(BaseModel):
@@ -33,6 +30,23 @@ class UserCreateRequest(BaseModel):
     @classmethod
     def validate_phone(cls, v):
         return validate_required_phone_number(v)
+
+    @field_validator("userType")
+    @classmethod
+    def validate_user_type(cls, v):
+        """
+        Validate that userType is not an elevated role for self-registration.
+
+        Only USER and ORG_USER are allowed for public registration.
+        ADMIN and ORG_ADMIN must be assigned via admin APIs.
+        """
+        if v in (UserType.ADMIN, UserType.ORG_ADMIN):
+            raise ValueError(
+                f"User type '{v.value}' cannot be self-assigned. "
+                f"Only 'user' and 'org_user' types are allowed for registration. "
+                f"Elevated roles must be assigned by administrators."
+            )
+        return v
 
 
 class UserUpdateRequest(BaseModel):
@@ -69,8 +83,8 @@ class UserResponse(BaseModel):
     id: str
     email: str
     phone: str
-    userType: UserType
-    features: list[str] = Field(default_factory=list)
+    userType: UserType | None = None
+    features: list[str] | None = None
     firstName: str | None = None
     lastName: str | None = None
     address: str | None = None

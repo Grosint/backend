@@ -282,33 +282,51 @@ async def get_current_user(
         raise UnauthorizedException(f"Failed to get user: {str(e)}") from e
 
 
-async def require_user_type(
-    *allowed_types: UserType,
-    current_user: User = Depends(get_current_user),
-) -> User:
+def require_user_type(*allowed_types: UserType):
     """
-    Require specific user type(s) for access.
+    Dependency factory to require specific user type(s) for access.
 
     Args:
         *allowed_types: Allowed user types
-        current_user: Current user document
 
     Returns:
-        User document if user type is allowed
+        Dependency function that checks user type and returns user if allowed
 
-    Raises:
-        AuthorizationException: If user type is not allowed
+    Example:
+        @router.get("/admin-only")
+        async def admin_endpoint(
+            current_user: User = Depends(require_user_type(UserType.ADMIN))
+        ):
+            ...
     """
-    if not allowed_types:
-        # If no types specified, allow all authenticated users
+
+    async def check_user_type(
+        current_user: User = Depends(get_current_user),
+    ) -> User:
+        """
+        Check if current user has required user type(s).
+
+        Args:
+            current_user: Current user document
+
+        Returns:
+            User document if user type is allowed
+
+        Raises:
+            AuthorizationException: If user type is not allowed
+        """
+        if not allowed_types:
+            # If no types specified, allow all authenticated users
+            return current_user
+
+        if current_user.userType not in allowed_types:
+            raise AuthorizationException(
+                f"Access denied. Required user type(s): {', '.join(t.value for t in allowed_types)}"
+            )
+
         return current_user
 
-    if current_user.userType not in allowed_types:
-        raise AuthorizationException(
-            f"Access denied. Required user type(s): {', '.join(t.value for t in allowed_types)}"
-        )
-
-    return current_user
+    return check_user_type
 
 
 async def require_admin(
@@ -353,38 +371,62 @@ async def require_org_admin(
     return current_user
 
 
-async def require_feature(
-    feature: str | None = None,
-    current_user: User = Depends(get_current_user),
-) -> User:
+def require_feature(feature: str | None = None):
     """
-    Require specific feature access.
+    Dependency factory to require specific feature access.
 
     Args:
         feature: Feature name to check (e.g., "feature_a", "mobile360")
                  If None, allows all authenticated users
-        current_user: Current user document
 
     Returns:
-        User document if user has feature access
+        Dependency function that checks feature access and returns user if allowed
 
-    Raises:
-        AuthorizationException: If user doesn't have required feature access
+    Example:
+        @router.get("/mobile360-endpoint")
+        async def mobile360_endpoint(
+            current_user: User = Depends(require_feature("mobile360"))
+        ):
+            ...
+
+        @router.get("/any-authenticated")
+        async def any_endpoint(
+            current_user: User = Depends(require_feature(None))
+        ):
+            ...
     """
-    # Admin users have all features
-    if current_user.userType == UserType.ADMIN:
+
+    async def check_feature(
+        current_user: User = Depends(get_current_user),
+    ) -> User:
+        """
+        Check if current user has required feature access.
+
+        Args:
+            current_user: Current user document
+
+        Returns:
+            User document if user has feature access
+
+        Raises:
+            AuthorizationException: If user doesn't have required feature access
+        """
+        # Admin users have all features
+        if current_user.userType == UserType.ADMIN:
+            return current_user
+
+        # Org admin users have all features
+        if current_user.userType == UserType.ORG_ADMIN:
+            return current_user
+
+        # If no feature specified, allow all authenticated users
+        if feature is None:
+            return current_user
+
+        # Check if user has the required feature
+        if feature not in current_user.features:
+            raise AuthorizationException(f"Access denied. Required feature: {feature}")
+
         return current_user
 
-    # Org admin users have all features
-    if current_user.userType == UserType.ORG_ADMIN:
-        return current_user
-
-    # If no feature specified, allow all authenticated users
-    if feature is None:
-        return current_user
-
-    # Check if user has the required feature
-    if feature not in current_user.features:
-        raise AuthorizationException(f"Access denied. Required feature: {feature}")
-
-    return current_user
+    return check_feature

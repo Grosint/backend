@@ -6,6 +6,7 @@ import logging
 from enum import Enum
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote_plus
 
 from azure.communication.email import EmailClient
 from azure.core.exceptions import AzureError
@@ -294,14 +295,20 @@ class EmailService:
         Returns:
             True if email sent successfully, False otherwise
         """
-        full_name = (
-            f"{first_name} {last_name}".strip() if first_name or last_name else "User"
-        )
+        # Build full_name by joining only non-empty name parts
+        name_parts = []
+        if first_name and first_name.strip():
+            name_parts.append(first_name.strip())
+        if last_name and last_name.strip():
+            name_parts.append(last_name.strip())
+        full_name = " ".join(name_parts) if name_parts else "User"
 
         return await self.send_template_email(
             template=EmailTemplate.REGISTRATION_SUCCESS,
             to=email,
-            first_name=first_name or "User",
+            first_name=(
+                first_name.strip() if first_name and first_name.strip() else "User"
+            ),
             full_name=full_name,
             app_name=settings.PROJECT_NAME,
         )
@@ -323,14 +330,20 @@ class EmailService:
         Returns:
             True if email sent successfully, False otherwise
         """
-        full_name = (
-            f"{first_name} {last_name}".strip() if first_name or last_name else "User"
-        )
+        # Build full_name by joining only non-empty name parts
+        name_parts = []
+        if first_name and first_name.strip():
+            name_parts.append(first_name.strip())
+        if last_name and last_name.strip():
+            name_parts.append(last_name.strip())
+        full_name = " ".join(name_parts) if name_parts else "User"
 
         return await self.send_template_email(
             template=EmailTemplate.WELCOME,
             to=email,
-            first_name=first_name or "User",
+            first_name=(
+                first_name.strip() if first_name and first_name.strip() else "User"
+            ),
             full_name=full_name,
             app_name=settings.PROJECT_NAME,
         )
@@ -378,8 +391,10 @@ class EmailService:
         """
         if not reset_url:
             # Construct reset URL (adjust based on your frontend URL)
+            # URL-encode the token to handle special characters safely
             frontend_url = getattr(settings, "FRONTEND_URL", "https://your-app.com")
-            reset_url = f"{frontend_url}/reset-password?token={reset_token}"
+            encoded_token = quote_plus(reset_token)
+            reset_url = f"{frontend_url}/reset-password?token={encoded_token}"
 
         return await self.send_template_email(
             template=EmailTemplate.PASSWORD_RESET,

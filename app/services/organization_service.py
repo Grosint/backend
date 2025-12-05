@@ -169,7 +169,7 @@ class OrganizationService:
             if not org:
                 return None
 
-            update_data = org_update.dict(exclude_unset=True)
+            update_data = org_update.model_dump(exclude_unset=True)
             if not update_data:
                 return await self.get_organization_by_id(org_id)
 

@@ -319,8 +319,21 @@ async def send_otp(otp_request: SendOtpRequest, db=Depends(get_database)):
 
         # Generate and store OTP
         otp = generate_otp()
-        await store_otp(db, otp_request.email, otp)
-        await send_otp_email(otp_request.email, otp)
+        store_result = await store_otp(db, otp_request.email, otp)
+        if not store_result:
+            logger.error(f"Failed to store OTP for email: {otp_request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to store OTP. Please try again.",
+            )
+
+        send_result = await send_otp_email(otp_request.email, otp)
+        if not send_result:
+            logger.error(f"Failed to send OTP email to: {otp_request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send OTP email. Please try again.",
+            )
 
         return SuccessResponse(
             message="OTP sent successfully to your email",
@@ -453,8 +466,21 @@ async def resend_otp(otp_request: SendOtpRequest, db=Depends(get_database)):
 
         # Generate and store new OTP
         otp = generate_otp()
-        await store_otp(db, otp_request.email, otp)
-        await send_otp_email(otp_request.email, otp)
+        store_result = await store_otp(db, otp_request.email, otp)
+        if not store_result:
+            logger.error(f"Failed to store OTP for email: {otp_request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to store OTP. Please try again.",
+            )
+
+        send_result = await send_otp_email(otp_request.email, otp)
+        if not send_result:
+            logger.error(f"Failed to send OTP email to: {otp_request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send OTP email. Please try again.",
+            )
 
         return SuccessResponse(
             message="OTP resent successfully to your email",

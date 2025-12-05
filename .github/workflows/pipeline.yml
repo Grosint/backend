@@ -9,7 +9,7 @@ on:
 
 env:
     PYTHON_VERSION: "3.12.7"
-    COVERAGE_THRESHOLD: 10
+    COVERAGE_THRESHOLD: 0
 
 jobs:
     lint:

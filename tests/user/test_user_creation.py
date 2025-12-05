@@ -62,12 +62,10 @@ class TestUserValidation:
             email="test@example.com",
             phone="+1234567890",
             password="password123",
-            verifyByGovId=True,
         )
         assert valid_request.email == "test@example.com"
         assert valid_request.phone == "+1234567890"
         assert valid_request.password == "password123"
-        assert valid_request.verifyByGovId is True
 
         # Invalid email
         with pytest.raises(ValidationError) as exc_info:
@@ -75,7 +73,6 @@ class TestUserValidation:
                 email="invalid-email",
                 phone="+1234567890",
                 password="password123",
-                verifyByGovId=True,
             )
         assert "email" in str(exc_info.value)
 
@@ -85,7 +82,6 @@ class TestUserValidation:
                 email="test@example.com",
                 phone="",
                 password="password123",
-                verifyByGovId=True,
             )
         assert "Phone number cannot be empty" in str(exc_info.value)
 
@@ -95,16 +91,6 @@ class TestUserValidation:
                 email="test@example.com",
                 # phone missing
                 password="password123",
-                verifyByGovId=True,
-            )
-
-        # Invalid verifyByGovId type
-        with pytest.raises(ValidationError):
-            UserCreateRequest(
-                email="test@example.com",
-                phone="+1234567890",
-                password="password123",
-                verifyByGovId="not_boolean",  # Should be boolean
             )
 
     def test_user_update_request_validation(self):
@@ -113,13 +99,11 @@ class TestUserValidation:
         valid_update = UserUpdateRequest(
             email="new@example.com",
             phone="+9876543210",
-            verifyByGovId=False,
             firstName="John",
             lastName="Doe",
         )
         assert valid_update.email == "new@example.com"
         assert valid_update.phone == "+9876543210"
-        assert valid_update.verifyByGovId is False
 
         # Valid update with partial fields
         partial_update = UserUpdateRequest(firstName="Jane")
@@ -159,12 +143,10 @@ class TestUserModel:
         user_create = UserCreate(
             email="test@example.com",
             phone="+1234567890",
-            verifyByGovId=True,
             password="password123",
         )
         assert user_create.email == "test@example.com"
         assert user_create.phone == "+1234567890"
-        assert user_create.verifyByGovId is True
 
     def test_user_update_model(self):
         """Test UserUpdate model validation."""
@@ -230,13 +212,18 @@ class TestUserService:
         mock_user.email = user_create_data["email"]
         mock_user.phone = user_create_data["phone"]
         mock_user.password = "hashed_password"
-        mock_user.verifyByGovId = user_create_data["verifyByGovId"]
+        mock_user.userType = "user"
+        mock_user.features = []
         mock_user.isActive = True
         mock_user.isVerified = False
         mock_user.firstName = None
         mock_user.lastName = None
+        mock_user.address = None
+        mock_user.city = None
         mock_user.pinCode = None
         mock_user.state = None
+        mock_user.organizationId = None
+        mock_user.orgName = None
         mock_user.createdAt = datetime.now(UTC)
         mock_user.updatedAt = datetime.now(UTC)
         mock_user.insert = AsyncMock()
@@ -264,7 +251,6 @@ class TestUserService:
                 assert isinstance(result, UserInDB)
                 assert result.email == user_create_data["email"]
                 assert result.phone == user_create_data["phone"]
-                assert result.verifyByGovId == user_create_data["verifyByGovId"]
                 assert result.isActive is True  # Should be set to True
                 assert result.isVerified is False  # Should be set to False
                 assert result.password == "hashed_password"
@@ -308,13 +294,18 @@ class TestUserService:
         mock_user.email = mock_user_data["email"]
         mock_user.phone = mock_user_data["phone"]
         mock_user.password = mock_user_data["password"]
-        mock_user.verifyByGovId = mock_user_data["verifyByGovId"]
+        mock_user.userType = mock_user_data.get("userType", "user")
+        mock_user.features = mock_user_data.get("features", [])
         mock_user.isActive = mock_user_data["isActive"]
         mock_user.isVerified = mock_user_data["isVerified"]
         mock_user.firstName = mock_user_data.get("firstName")
         mock_user.lastName = mock_user_data.get("lastName")
+        mock_user.address = mock_user_data.get("address")
+        mock_user.city = mock_user_data.get("city")
         mock_user.pinCode = mock_user_data.get("pinCode")
         mock_user.state = mock_user_data.get("state")
+        mock_user.organizationId = mock_user_data.get("organizationId")
+        mock_user.orgName = mock_user_data.get("orgName")
         mock_user.createdAt = mock_user_data["createdAt"]
         mock_user.updatedAt = mock_user_data["updatedAt"]
 
@@ -363,13 +354,18 @@ class TestUserService:
         mock_user.email = existing_user_data["email"]
         mock_user.phone = existing_user_data["phone"]
         mock_user.password = existing_user_data["password"]
-        mock_user.verifyByGovId = existing_user_data["verifyByGovId"]
+        mock_user.userType = existing_user_data.get("userType", "user")
+        mock_user.features = existing_user_data.get("features", [])
         mock_user.isActive = existing_user_data["isActive"]
         mock_user.isVerified = existing_user_data["isVerified"]
         mock_user.firstName = existing_user_data.get("firstName")
         mock_user.lastName = existing_user_data.get("lastName")
+        mock_user.address = existing_user_data.get("address")
+        mock_user.city = existing_user_data.get("city")
         mock_user.pinCode = existing_user_data.get("pinCode")
         mock_user.state = existing_user_data.get("state")
+        mock_user.organizationId = existing_user_data.get("organizationId")
+        mock_user.orgName = existing_user_data.get("orgName")
         mock_user.createdAt = existing_user_data["createdAt"]
         mock_user.updatedAt = existing_user_data["updatedAt"]
         mock_user.save = AsyncMock()
@@ -413,13 +409,18 @@ class TestUserService:
         mock_user.email = existing_user_data["email"]
         mock_user.phone = existing_user_data["phone"]
         mock_user.password = existing_user_data["password"]
-        mock_user.verifyByGovId = existing_user_data["verifyByGovId"]
+        mock_user.userType = existing_user_data.get("userType", "user")
+        mock_user.features = existing_user_data.get("features", [])
         mock_user.isActive = existing_user_data["isActive"]
         mock_user.isVerified = existing_user_data["isVerified"]
         mock_user.firstName = existing_user_data.get("firstName")
         mock_user.lastName = existing_user_data.get("lastName")
+        mock_user.address = existing_user_data.get("address")
+        mock_user.city = existing_user_data.get("city")
         mock_user.pinCode = existing_user_data.get("pinCode")
         mock_user.state = existing_user_data.get("state")
+        mock_user.organizationId = existing_user_data.get("organizationId")
+        mock_user.orgName = existing_user_data.get("orgName")
         mock_user.createdAt = existing_user_data["createdAt"]
         mock_user.updatedAt = existing_user_data["updatedAt"]
         mock_user.save = AsyncMock()
@@ -497,13 +498,11 @@ class TestUserService:
                 id=str(ObjectId()),
                 email="user1@example.com",
                 phone="+1234567890",
-                verifyByGovId=True,
             ),
             test_data_factory.create_user_data(
                 id=str(ObjectId()),
                 email="user2@example.com",
                 phone="+9876543210",
-                verifyByGovId=False,
             ),
         ]
 
@@ -513,13 +512,18 @@ class TestUserService:
         mock_user1.email = mock_users_data[0]["email"]
         mock_user1.phone = mock_users_data[0]["phone"]
         mock_user1.password = mock_users_data[0]["password"]
-        mock_user1.verifyByGovId = mock_users_data[0]["verifyByGovId"]
+        mock_user1.userType = mock_users_data[0].get("userType", "user")
+        mock_user1.features = mock_users_data[0].get("features", [])
         mock_user1.isActive = mock_users_data[0]["isActive"]
         mock_user1.isVerified = mock_users_data[0]["isVerified"]
         mock_user1.firstName = mock_users_data[0].get("firstName")
         mock_user1.lastName = mock_users_data[0].get("lastName")
+        mock_user1.address = mock_users_data[0].get("address")
+        mock_user1.city = mock_users_data[0].get("city")
         mock_user1.pinCode = mock_users_data[0].get("pinCode")
         mock_user1.state = mock_users_data[0].get("state")
+        mock_user1.organizationId = mock_users_data[0].get("organizationId")
+        mock_user1.orgName = mock_users_data[0].get("orgName")
         mock_user1.createdAt = mock_users_data[0]["createdAt"]
         mock_user1.updatedAt = mock_users_data[0]["updatedAt"]
 
@@ -528,13 +532,18 @@ class TestUserService:
         mock_user2.email = mock_users_data[1]["email"]
         mock_user2.phone = mock_users_data[1]["phone"]
         mock_user2.password = mock_users_data[1]["password"]
-        mock_user2.verifyByGovId = mock_users_data[1]["verifyByGovId"]
+        mock_user2.userType = mock_users_data[1].get("userType", "user")
+        mock_user2.features = mock_users_data[1].get("features", [])
         mock_user2.isActive = mock_users_data[1]["isActive"]
         mock_user2.isVerified = mock_users_data[1]["isVerified"]
         mock_user2.firstName = mock_users_data[1].get("firstName")
         mock_user2.lastName = mock_users_data[1].get("lastName")
+        mock_user2.address = mock_users_data[1].get("address")
+        mock_user2.city = mock_users_data[1].get("city")
         mock_user2.pinCode = mock_users_data[1].get("pinCode")
         mock_user2.state = mock_users_data[1].get("state")
+        mock_user2.organizationId = mock_users_data[1].get("organizationId")
+        mock_user2.orgName = mock_users_data[1].get("orgName")
         mock_user2.createdAt = mock_users_data[1]["createdAt"]
         mock_user2.updatedAt = mock_users_data[1]["updatedAt"]
 
@@ -601,10 +610,22 @@ class TestUserAPIEndpoints:
             id=str(ObjectId()),
             email=user_create_data["email"],
             phone=user_create_data["phone"],
-            verifyByGovId=user_create_data["verifyByGovId"],
         )
 
-        with patch("app.api.endpoints.user.UserService") as mock_service:
+        with (
+            patch("app.api.endpoints.user.UserService") as mock_service,
+            patch("app.api.endpoints.user.generate_otp", return_value="123456"),
+            patch(
+                "app.api.endpoints.user.store_otp",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "app.api.endpoints.user.send_otp_email",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+        ):
             mock_service.return_value.create_user = AsyncMock(
                 return_value=UserInDB(**user_in_db_data)
             )
@@ -614,7 +635,7 @@ class TestUserAPIEndpoints:
             assert response.status_code == 200
             data = response.json()
             assert data["success"] is True
-            assert data["message"] == "User created successfully"
+            assert "User created successfully" in data["message"]
             assert data["data"]["email"] == user_create_data["email"]
             assert data["data"]["isActive"] is True
             assert data["data"]["isVerified"] is False
@@ -628,7 +649,6 @@ class TestUserAPIEndpoints:
                 "email": "invalid-email",
                 "phone": "+1234567890",
                 "password": "password123",
-                "verifyByGovId": True,
             },
         )
 
@@ -768,13 +788,11 @@ class TestUserAPIEndpoints:
                 id=str(ObjectId()),
                 email="user1@example.com",
                 phone="+1234567890",
-                verifyByGovId=True,
             ),
             test_data_factory.create_user_data(
                 id=str(ObjectId()),
                 email="user2@example.com",
                 phone="+9876543210",
-                verifyByGovId=False,
             ),
         ]
         mock_users = [UserInDB(**user_data) for user_data in mock_users_data]
@@ -988,7 +1006,6 @@ class TestUserEdgeCases:
             email="test@example.com",
             phone="+1234567890",
             password=valid_short_password,
-            verifyByGovId=True,
         )
         assert user_create.password == valid_short_password
 
@@ -998,7 +1015,6 @@ class TestUserEdgeCases:
             email="test@example.com",
             phone="+1234567890",
             password=valid_long_password,
-            verifyByGovId=True,
         )
         assert user_create.password == valid_long_password
 
@@ -1008,34 +1024,49 @@ class TestUserEdgeCases:
                 email="test@example.com",
                 phone="+1234567890",
                 password="short",  # 5 characters
-                verifyByGovId=True,
             )
 
     def test_boolean_field_validation(self, test_data_factory):
         """Test boolean field validation edge cases."""
-        # Test verifyByGovId with various boolean representations
-        test_cases = [
-            (True, True),
-            (False, False),
-            (1, True),
-            (0, False),
-            ("true", True),
-            ("false", False),
-            ("True", True),
-            ("False", False),
-            ("yes", True),
-            ("no", False),
+        # Test userType with various values
+        from pydantic import ValidationError
+
+        from app.models.user import UserType
+
+        # Valid userType values (only USER and ORG_USER allowed for self-registration)
+        valid_test_cases = [
+            (UserType.USER, UserType.USER),
+            (UserType.ORG_USER, UserType.ORG_USER),
+            ("user", UserType.USER),
+            ("org_user", UserType.ORG_USER),
         ]
 
-        for input_value, expected_value in test_cases:
+        for input_value, expected_value in valid_test_cases:
             # Use UserCreateRequest to test actual Pydantic validation
             user_create = UserCreateRequest(
                 email="test@example.com",
                 phone="+1234567890",
                 password="password123",
-                verifyByGovId=input_value,
+                userType=input_value,
             )
-            assert user_create.verifyByGovId == expected_value
+            assert user_create.userType == expected_value
+
+        # Test that elevated roles (ADMIN, ORG_ADMIN) are rejected
+        elevated_roles = [UserType.ADMIN, UserType.ORG_ADMIN, "admin", "org_admin"]
+        for elevated_role in elevated_roles:
+            with pytest.raises(ValidationError) as exc_info:
+                UserCreateRequest(
+                    email="test@example.com",
+                    phone="+1234567890",
+                    password="password123",
+                    userType=elevated_role,
+                )
+            # Verify the error message mentions self-assignment restriction
+            error_str = str(exc_info.value)
+            assert (
+                "cannot be self-assigned" in error_str
+                or "self-assigned" in error_str.lower()
+            )
 
     def test_email_validation_comprehensive(self):
         """Test comprehensive email validation scenarios."""
@@ -1053,7 +1084,6 @@ class TestUserEdgeCases:
                 email=email,
                 phone="+1234567890",
                 password="password123",
-                verifyByGovId=True,
             )
             assert user_create.email == email
 
@@ -1073,7 +1103,6 @@ class TestUserEdgeCases:
                     email=email,
                     phone="+1234567890",
                     password="password123",
-                    verifyByGovId=True,
                 )
 
     def test_timestamp_precision_and_timezone(self, test_data_factory):
@@ -1094,14 +1123,12 @@ class TestUserEdgeCases:
             email="test@example.com",
             phone="+1234567890",
             password="password123",
-            verifyByGovId=True,
         )
 
         # UserCreate should only have the required fields
         assert hasattr(user_create, "email")
         assert hasattr(user_create, "phone")
         assert hasattr(user_create, "password")
-        assert hasattr(user_create, "verifyByGovId")
 
         # UserCreate should NOT have isActive and isVerified (those are set by the service)
         assert not hasattr(user_create, "isActive")

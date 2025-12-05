@@ -54,7 +54,8 @@ class UserService:
             )
             await new_user.insert()
 
-            logger.info(f"User created: {user.email}, type: {user.userType.value}")
+            user_type = user.userType.value if user.userType is not None else "None"
+            logger.info(f"User created: {user.email}, type: {user_type}")
             return UserInDB(
                 id=new_user.id,
                 email=new_user.email,

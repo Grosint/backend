@@ -8,11 +8,7 @@ from app.core.database import get_database
 from app.core.exceptions import NotFoundException
 from app.models.user import UserCreate, UserUpdate
 from app.schemas.response import PaginatedResponse, SuccessResponse
-from app.schemas.user import (
-    UserCreateRequest,
-    UserResponse,
-    UserUpdateRequest,
-)
+from app.schemas.user import UserCreateRequest, UserResponse, UserUpdateRequest
 from app.services.user_service import UserService
 from app.utils.email_otp import generate_otp, send_otp_email, store_otp
 
@@ -36,12 +32,59 @@ async def create_user(user_request: UserCreateRequest, db=Depends(get_database))
 
         user = await user_service.create_user(user_create)
 
-        # Generate and send OTP
-        otp = generate_otp()
-        await store_otp(db, user.email, otp)
-        await send_otp_email(user.email, otp)
+        # Generate and send OTP - wrap in error handling to rollback user creation on failure
+        try:
+            otp = generate_otp()
 
-        logger.info(f"User created: {user.email}, OTP sent")
+            # Store OTP - check return value
+            store_result = await store_otp(db, user.email, otp)
+            if not store_result:
+                logger.error(
+                    f"Failed to store OTP for user {user.email} (ID: {user.id}). "
+                    f"Rolling back user creation."
+                )
+                # Rollback: delete the created user
+                await user_service.delete_user(str(user.id))
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to store OTP. User creation rolled back. Please try again.",
+                )
+
+            # Send OTP email - check return value
+            send_result = await send_otp_email(user.email, otp)
+            if not send_result:
+                logger.error(
+                    f"Failed to send OTP email to user {user.email} (ID: {user.id}). "
+                    f"Rolling back user creation."
+                )
+                # Rollback: delete the created user
+                await user_service.delete_user(str(user.id))
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to send OTP email. User creation rolled back. Please try again.",
+                )
+
+            logger.info(f"User created: {user.email}, OTP sent")
+        except HTTPException:
+            # Re-raise HTTPExceptions (already handled above)
+            raise
+        except Exception as e:
+            # Catch any other exceptions during OTP operations
+            logger.error(
+                f"Unexpected error during OTP operations for user {user.email} (ID: {user.id}): {e}",
+                exc_info=True,
+            )
+            # Rollback: delete the created user
+            try:
+                await user_service.delete_user(str(user.id))
+            except Exception as delete_error:
+                logger.error(
+                    f"Failed to rollback user creation for {user.email} (ID: {user.id}): {delete_error}"
+                )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to complete user registration. Please try again.",
+            ) from e
 
         # Convert to response format
         user_response = UserResponse(
@@ -195,7 +238,7 @@ async def list_users(
         users = await user_service.list_users(skip=skip, limit=size)
         total = await user_service.count_users()
 
-        # Convert to response format
+        # Convert to response format (excluding sensitive fields like userType and features)
         user_responses = [
             UserResponse(
                 id=str(user.id),

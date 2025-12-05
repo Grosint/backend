@@ -3,7 +3,7 @@
 import logging
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 
 from app.core.auth_dependencies import require_admin
 from app.core.database import get_database
@@ -188,7 +188,7 @@ async def activate_user(
 @router.post("/users/{user_id}/features", response_model=SuccessResponse[UserResponse])
 async def assign_features(
     user_id: str,
-    features: list[str],
+    features: list[str] = Body(...),
     admin_user: User = Depends(require_admin),
     db=Depends(get_database),
 ):

@@ -75,7 +75,7 @@ async def store_otp(
         # Insert new OTP
         await collection.insert_one(otp_doc)
 
-        logger.info(f"OTP stored for email: {email[:5]}*** (OTP: {otp})")
+        logger.info(f"OTP stored for email: {email[:5]}***")
         return True
 
     except Exception as e:
@@ -112,22 +112,17 @@ async def verify_otp(database, email: str, otp: str) -> bool:
         )
 
         if not otp_doc:
-            # Log more details for debugging
             # Check if OTP exists but OTP doesn't match
             existing_otp = await collection.find_one(
                 {"email": email, "verified": False}
             )
             if existing_otp:
-                stored_otp = existing_otp.get("otp", "")
                 logger.warning(
                     f"Invalid OTP attempt for email: {email[:5]}***. "
-                    f"Expected OTP: {stored_otp}, Provided: {otp}, "
-                    f"Match: {stored_otp == otp}, Types: stored={type(stored_otp).__name__}, provided={type(otp).__name__}"
+                    "Stored OTP does not match provided value."
                 )
             else:
-                logger.warning(
-                    f"No OTP found for email: {email[:5]}***. Provided OTP: {otp}"
-                )
+                logger.warning(f"No OTP found for email: {email[:5]}***")
             return False
 
         # Check if OTP is expired

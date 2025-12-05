@@ -28,7 +28,6 @@ class TestUserAPIErrorHandling:
                 "email": "invalid-email",
                 "phone": "",
                 "password": "short",
-                "verifyByGovId": "not_boolean",
             },
         )
 
@@ -68,7 +67,6 @@ class TestUserAPIErrorHandling:
                     "email": "test@example.com",
                     "phone": "+1234567890",
                     "password": "password123",
-                    "verifyByGovId": True,
                 },
             )
 
@@ -218,7 +216,6 @@ class TestUserAPIErrorHandling:
                         "email": "test@example.com",
                         "phone": "+1234567890",
                         "password": "password123",
-                        "verifyByGovId": True,
                     },
                 )
 
@@ -230,7 +227,6 @@ class TestUserAPIErrorHandling:
                 "email": "invalid-email",
                 "phone": "",
                 "password": "short",
-                "verifyByGovId": "not_boolean",
             },
         )
 
@@ -244,7 +240,7 @@ class TestUserAPIErrorHandling:
         assert "body.email" in field_names
         assert "body.phone" in field_names
         assert "body.password" in field_names
-        assert "body.verifyByGovId" in field_names
+        # verifyByGovId field no longer exists
 
     def test_validation_error_message_clarity(self, client):
         """Test that validation error messages are clear and helpful."""
@@ -254,7 +250,6 @@ class TestUserAPIErrorHandling:
                 "email": "invalid-email",
                 "phone": "",
                 "password": "short",
-                "verifyByGovId": "not_boolean",
             },
         )
 
@@ -269,7 +264,7 @@ class TestUserAPIErrorHandling:
         assert any(
             "String should have at least 8 characters" in msg for msg in messages
         )
-        assert any("Input should be a valid boolean" in msg for msg in messages)
+        # Boolean validation no longer needed for verifyByGovId
 
     def test_error_response_timestamp_format(self, client):
         """Test that error response timestamps are properly formatted."""
@@ -279,7 +274,6 @@ class TestUserAPIErrorHandling:
                 "email": "invalid-email",
                 "phone": "",
                 "password": "short",
-                "verifyByGovId": "not_boolean",
             },
         )
 
@@ -301,7 +295,6 @@ class TestUserAPIErrorHandling:
                 "email": "invalid-email",
                 "phone": "",
                 "password": "short",
-                "verifyByGovId": "not_boolean",
             },
         )
 
@@ -314,7 +307,7 @@ class TestUserAPIErrorHandling:
     def test_success_response_data_field(self, client):
         """Test that success responses have data field populated."""
         with patch("app.api.endpoints.user.UserService") as mock_service:
-            from app.models.user import UserInDB
+            from app.models.user import UserInDB, UserType
 
             mock_service.return_value.create_user = AsyncMock(
                 return_value=UserInDB(
@@ -322,7 +315,8 @@ class TestUserAPIErrorHandling:
                     email="test@example.com",
                     phone="+1234567890",
                     password="hashed_password",
-                    verifyByGovId=True,
+                    userType=UserType.USER,
+                    features=[],
                     isActive=True,
                     isVerified=False,
                     createdAt=datetime.now(UTC),
@@ -330,15 +324,27 @@ class TestUserAPIErrorHandling:
                 )
             )
 
-            response = client.post(
-                "/api/user/",
-                json={
-                    "email": "test@example.com",
-                    "phone": "+1234567890",
-                    "password": "password123",
-                    "verifyByGovId": True,
-                },
-            )
+            with (
+                patch("app.api.endpoints.user.generate_otp", return_value="123456"),
+                patch(
+                    "app.api.endpoints.user.store_otp",
+                    new_callable=AsyncMock,
+                    return_value=True,
+                ),
+                patch(
+                    "app.api.endpoints.user.send_otp_email",
+                    new_callable=AsyncMock,
+                    return_value=True,
+                ),
+            ):
+                response = client.post(
+                    "/api/user/",
+                    json={
+                        "email": "test@example.com",
+                        "phone": "+1234567890",
+                        "password": "password123",
+                    },
+                )
 
             assert response.status_code == 200
             data = response.json()
@@ -383,7 +389,6 @@ class TestUserServiceErrorHandling:
             user_create = UserCreate(
                 email="test@example.com",
                 phone="+1234567890",
-                verifyByGovId=True,
                 password="password123",
             )
 
@@ -497,7 +502,6 @@ class TestUserValidationErrorHandling:
                 email="invalid-email",
                 phone="+1234567890",
                 password="password123",
-                verifyByGovId=True,
             )
 
         # Verify that email validation error is raised
@@ -512,7 +516,6 @@ class TestUserValidationErrorHandling:
                 email="test@example.com",
                 phone="+1234567890",
                 password="short",
-                verifyByGovId=True,
             )
 
         # Verify that password validation error is raised
@@ -520,18 +523,19 @@ class TestUserValidationErrorHandling:
 
     def test_boolean_validation_error_messages(self):
         """Test boolean validation error messages."""
+        # verifyByGovId field no longer exists, so this test is no longer applicable
+        # Instead, test userType validation
+        from app.models.user import UserType
         from app.schemas.user import UserCreateRequest
 
-        with pytest.raises(ValueError) as exc_info:
-            UserCreateRequest(
-                email="test@example.com",
-                phone="+1234567890",
-                password="password123",
-                verifyByGovId="not_boolean",
-            )
-
-        # Verify that boolean validation error is raised
-        assert "verifyByGovId" in str(exc_info.value)
+        # Valid userType
+        request = UserCreateRequest(
+            email="test@example.com",
+            phone="+1234567890",
+            password="password123",
+            userType=UserType.USER,
+        )
+        assert request.userType == UserType.USER
 
 
 class TestUserEdgeCases:
@@ -549,7 +553,6 @@ class TestUserEdgeCases:
                 email=long_email,
                 phone="+1234567890",
                 password="password123",
-                verifyByGovId=True,
             )
 
     def test_very_long_password(self):
@@ -564,7 +567,6 @@ class TestUserEdgeCases:
                 email="test@example.com",
                 phone="+1234567890",
                 password=long_password,
-                verifyByGovId=True,
             )
 
     def test_unicode_characters_in_fields(self):
@@ -576,7 +578,6 @@ class TestUserEdgeCases:
             email="tëst@ëxämplë.com",
             phone="+1234567890",
             password="password123",
-            verifyByGovId=True,
         )
         assert request.email == "tëst@ëxämplë.com"
 
@@ -641,31 +642,51 @@ class TestUserEdgeCases:
             UserUpdateRequest(phone="")
 
     def test_boolean_edge_cases(self):
-        """Test boolean field edge cases."""
+        """Test userType field edge cases (replaces boolean field testing)."""
+        from pydantic import ValidationError
+
+        from app.models.user import UserType
         from app.schemas.user import UserCreateRequest
 
-        # Test various boolean representations
-        test_cases = [
-            (True, True),
-            (False, False),
-            (1, True),
-            (0, False),
+        # Test valid userType values (only USER and ORG_USER allowed for self-registration)
+        valid_test_cases = [
+            (UserType.USER, UserType.USER),
+            (UserType.ORG_USER, UserType.ORG_USER),
+            ("user", UserType.USER),
+            ("org_user", UserType.ORG_USER),
         ]
 
-        for input_value, expected in test_cases:
+        for input_value, expected in valid_test_cases:
             request = UserCreateRequest(
                 email="test@example.com",
                 phone="+1234567890",
                 password="password123",
-                verifyByGovId=input_value,
+                userType=input_value,
             )
-            assert request.verifyByGovId is expected
+            assert request.userType == expected
 
-        # Test invalid boolean values
-        with pytest.raises(ValueError):
+        # Test that elevated roles (ADMIN, ORG_ADMIN) are rejected for self-registration
+        elevated_roles = [UserType.ADMIN, UserType.ORG_ADMIN, "admin", "org_admin"]
+        for elevated_role in elevated_roles:
+            with pytest.raises(ValidationError) as exc_info:
+                UserCreateRequest(
+                    email="test@example.com",
+                    phone="+1234567890",
+                    password="password123",
+                    userType=elevated_role,
+                )
+            # Verify the error message mentions self-assignment restriction
+            error_str = str(exc_info.value)
+            assert (
+                "cannot be self-assigned" in error_str
+                or "self-assigned" in error_str.lower()
+            )
+
+        # Test invalid userType values (not a valid enum value)
+        with pytest.raises(ValidationError):
             UserCreateRequest(
                 email="test@example.com",
                 phone="+1234567890",
                 password="password123",
-                verifyByGovId="maybe",  # Invalid boolean
+                userType="invalid_type",  # Invalid user type
             )

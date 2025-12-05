@@ -73,7 +73,8 @@ class TestCreateUserEndpoint:
         user.id = ObjectId(user_data["id"])
         user.email = user_data["email"]
         user.phone = user_data["phone"]
-        user.verifyByGovId = user_data["verifyByGovId"]
+        user.userType = user_data.get("userType", "user")
+        user.features = user_data.get("features", [])
         user.firstName = user_data["firstName"]
         user.lastName = user_data["lastName"]
         user.pinCode = user_data["pinCode"]
@@ -102,12 +103,25 @@ class TestCreateUserEndpoint:
         mock_user_service.create_user.return_value = user_in_db
         mock_user_service_class.return_value = mock_user_service
 
-        response = client.post("/", json=valid_user_request.model_dump())
+        with (
+            patch("app.api.endpoints.user.generate_otp", return_value="123456"),
+            patch(
+                "app.api.endpoints.user.store_otp",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "app.api.endpoints.user.send_otp_email",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+        ):
+            response = client.post("/", json=valid_user_request.model_dump())
 
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert data["message"] == "User created successfully"
+        assert "User created successfully" in data["message"]
         assert data["data"]["email"] == user_data["email"]
         assert data["data"]["phone"] == user_data["phone"]
 
@@ -135,7 +149,6 @@ class TestCreateUserEndpoint:
         user_request = {
             "email": "invalid_email",
             "phone": "+1234567890",
-            "verifyByGovId": True,
             "password": "password123",
         }
 
@@ -148,7 +161,6 @@ class TestCreateUserEndpoint:
         user_request = {
             "email": "test@example.com",
             "phone": "invalid_phone",
-            "verifyByGovId": True,
             "password": "password123",
         }
 
@@ -161,7 +173,6 @@ class TestCreateUserEndpoint:
         user_request = {
             "email": "test@example.com",
             "phone": "+1234567890",
-            "verifyByGovId": True,
             "password": "123",  # Too weak
         }
 
@@ -173,7 +184,7 @@ class TestCreateUserEndpoint:
         """Test user creation with missing required fields."""
         user_request = {
             "email": "test@example.com",
-            # Missing phone, verifyByGovId, password
+            # Missing phone, password
         }
 
         response = client.post("/", json=user_request)
@@ -222,7 +233,8 @@ class TestGetCurrentUserInfoEndpoint:
         user.id = ObjectId(user_data["id"])
         user.email = user_data["email"]
         user.phone = user_data["phone"]
-        user.verifyByGovId = user_data["verifyByGovId"]
+        user.userType = user_data.get("userType", "user")
+        user.features = user_data.get("features", [])
         user.firstName = user_data["firstName"]
         user.lastName = user_data["lastName"]
         user.pinCode = user_data["pinCode"]
@@ -364,7 +376,8 @@ class TestUpdateCurrentUserEndpoint:
         user.id = ObjectId(user_data["id"])
         user.email = user_data["email"]
         user.phone = user_data["phone"]
-        user.verifyByGovId = user_data["verifyByGovId"]
+        user.userType = user_data.get("userType", "user")
+        user.features = user_data.get("features", [])
         user.firstName = user_data["firstName"]
         user.lastName = user_data["lastName"]
         user.pinCode = user_data["pinCode"]
