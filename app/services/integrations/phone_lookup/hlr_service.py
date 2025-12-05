@@ -165,8 +165,8 @@ class HLRService:
                 }
             )
 
-        # Extract ported information if available
-        ported = data.get("ported") or data.get("is_ported")
+        # Extract ported information if available (preserve explicit False)
+        ported = data.get("ported") if "ported" in data else data.get("is_ported")
         if ported is not None:
             formatted_response.append(
                 {
@@ -178,8 +178,8 @@ class HLRService:
                 }
             )
 
-        # Extract roaming information if available
-        roaming = data.get("roaming") or data.get("is_roaming")
+        # Extract roaming information if available (preserve explicit False)
+        roaming = data.get("roaming") if "roaming" in data else data.get("is_roaming")
         if roaming is not None:
             formatted_response.append(
                 {

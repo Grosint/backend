@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -85,8 +86,6 @@ class SearchOrchestrator:
                 )
 
             # Execute all adapters in parallel
-            import asyncio
-
             tasks = []
             for adapter in adapters:
                 search_fn = get_search_method(adapter, search.query)
@@ -147,7 +146,6 @@ class SearchOrchestrator:
                 "failed_count": failed_results,
                 "error_message": error_message,
                 "results": [self._format_result(r) for r in search_results],
-                "history": {},
             }
 
         except Exception as e:
