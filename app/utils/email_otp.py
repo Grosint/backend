@@ -4,13 +4,36 @@ import logging
 import secrets
 from datetime import UTC, datetime, timedelta
 
-from pymongo import ASCENDING
-
 logger = logging.getLogger(__name__)
 
 # OTP configuration
 OTP_LENGTH = 6
 OTP_EXPIRY_MINUTES = 10
+
+
+def mask_email(email: str) -> str:
+    """
+    Mask email address for logging to protect PII.
+
+    Shows first 5 characters followed by *** for privacy.
+    For shorter emails, shows first 2 characters.
+
+    Args:
+        email: Email address to mask
+
+    Returns:
+        Masked email string (e.g., "user@***" or "test***")
+    """
+    if not email:
+        return "***"
+
+    email = email.strip()
+    if len(email) <= 5:
+        # For very short emails, show first 2 chars
+        return f"{email[:2]}***"
+    else:
+        # Show first 5 chars
+        return f"{email[:5]}***"
 
 
 def generate_otp(length: int = OTP_LENGTH) -> str:
@@ -47,16 +70,6 @@ async def store_otp(
         # Normalize email to lowercase for consistent comparison
         email = email.lower().strip()
 
-        # Create TTL index if it doesn't exist
-        indexes = await collection.list_indexes().to_list(length=100)
-        index_names = [idx["name"] for idx in indexes]
-        if "expires_at_1" not in index_names:
-            collection.create_index(
-                [("expires_at", ASCENDING)],
-                expireAfterSeconds=0,
-                background=True,
-            )
-
         # Calculate expiration time
         expires_at = datetime.now(UTC) + timedelta(minutes=expires_in_minutes)
 
@@ -75,7 +88,7 @@ async def store_otp(
         # Insert new OTP
         await collection.insert_one(otp_doc)
 
-        logger.info(f"OTP stored for email: {email[:5]}***")
+        logger.info(f"OTP stored for email: {mask_email(email)}")
         return True
 
     except Exception as e:
@@ -118,11 +131,11 @@ async def verify_otp(database, email: str, otp: str) -> bool:
             )
             if existing_otp:
                 logger.warning(
-                    f"Invalid OTP attempt for email: {email[:5]}***. "
+                    f"Invalid OTP attempt for email: {mask_email(email)}. "
                     "Stored OTP does not match provided value."
                 )
             else:
-                logger.warning(f"No OTP found for email: {email[:5]}***")
+                logger.warning(f"No OTP found for email: {mask_email(email)}")
             return False
 
         # Check if OTP is expired
@@ -137,7 +150,7 @@ async def verify_otp(database, email: str, otp: str) -> bool:
 
             if current_time > expires_at:
                 logger.warning(
-                    f"Expired OTP attempt for email: {email[:5]}***. "
+                    f"Expired OTP attempt for email: {mask_email(email)}. "
                     f"Expired at: {expires_at}, Current time: {current_time}"
                 )
                 await collection.delete_one({"_id": otp_doc["_id"]})
@@ -148,7 +161,7 @@ async def verify_otp(database, email: str, otp: str) -> bool:
             {"_id": otp_doc["_id"]}, {"$set": {"verified": True}}
         )
 
-        logger.info(f"OTP verified successfully for email: {email[:5]}***")
+        logger.info(f"OTP verified successfully for email: {mask_email(email)}")
         return True
 
     except Exception as e:
@@ -173,7 +186,7 @@ async def send_otp_email(
     try:
         from app.services.email_service import email_service
 
-        logger.info(f"Sending OTP email to {email[:5]}***")
+        logger.info(f"Sending OTP email to {mask_email(email)}")
         result = await email_service.send_otp_email(
             email=email,
             otp=otp,
@@ -181,9 +194,9 @@ async def send_otp_email(
         )
 
         if result:
-            logger.info(f"OTP email sent successfully to {email[:5]}***")
+            logger.info(f"OTP email sent successfully to {mask_email(email)}")
         else:
-            logger.warning(f"Failed to send OTP email to {email[:5]}***")
+            logger.warning(f"Failed to send OTP email to {mask_email(email)}")
 
         return result
 
@@ -233,7 +246,9 @@ async def delete_otp(database, email: str) -> bool:
         # Normalize email to lowercase
         email = email.lower().strip()
         result = await collection.delete_many({"email": email})
-        logger.info(f"Deleted {result.deleted_count} OTP(s) for email: {email[:5]}***")
+        logger.info(
+            f"Deleted {result.deleted_count} OTP(s) for email: {mask_email(email)}"
+        )
         return result.deleted_count > 0
 
     except Exception as e:

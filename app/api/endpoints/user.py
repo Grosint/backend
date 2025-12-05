@@ -10,7 +10,7 @@ from app.models.user import UserCreate, UserUpdate
 from app.schemas.response import PaginatedResponse, SuccessResponse
 from app.schemas.user import UserCreateRequest, UserResponse, UserUpdateRequest
 from app.services.user_service import UserService
-from app.utils.email_otp import generate_otp, send_otp_email, store_otp
+from app.utils.email_otp import generate_otp, mask_email, send_otp_email, store_otp
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -33,6 +33,7 @@ async def create_user(user_request: UserCreateRequest, db=Depends(get_database))
         user = await user_service.create_user(user_create)
 
         # Generate and send OTP - wrap in error handling to rollback user creation on failure
+        masked_email = mask_email(user.email)
         try:
             otp = generate_otp()
 
@@ -40,7 +41,7 @@ async def create_user(user_request: UserCreateRequest, db=Depends(get_database))
             store_result = await store_otp(db, user.email, otp)
             if not store_result:
                 logger.error(
-                    f"Failed to store OTP for user {user.email} (ID: {user.id}). "
+                    f"Failed to store OTP for user {masked_email} (ID: {user.id}). "
                     f"Rolling back user creation."
                 )
                 # Rollback: delete the created user
@@ -54,7 +55,7 @@ async def create_user(user_request: UserCreateRequest, db=Depends(get_database))
             send_result = await send_otp_email(user.email, otp)
             if not send_result:
                 logger.error(
-                    f"Failed to send OTP email to user {user.email} (ID: {user.id}). "
+                    f"Failed to send OTP email to user {masked_email} (ID: {user.id}). "
                     f"Rolling back user creation."
                 )
                 # Rollback: delete the created user
@@ -64,14 +65,14 @@ async def create_user(user_request: UserCreateRequest, db=Depends(get_database))
                     detail="Failed to send OTP email. User creation rolled back. Please try again.",
                 )
 
-            logger.info(f"User created: {user.email}, OTP sent")
+            logger.info(f"User created: {masked_email}, OTP sent")
         except HTTPException:
             # Re-raise HTTPExceptions (already handled above)
             raise
         except Exception as e:
             # Catch any other exceptions during OTP operations
             logger.error(
-                f"Unexpected error during OTP operations for user {user.email} (ID: {user.id}): {e}",
+                f"Unexpected error during OTP operations for user {masked_email} (ID: {user.id}): {e}",
                 exc_info=True,
             )
             # Rollback: delete the created user
@@ -79,7 +80,7 @@ async def create_user(user_request: UserCreateRequest, db=Depends(get_database))
                 await user_service.delete_user(str(user.id))
             except Exception as delete_error:
                 logger.error(
-                    f"Failed to rollback user creation for {user.email} (ID: {user.id}): {delete_error}"
+                    f"Failed to rollback user creation for {masked_email} (ID: {user.id}): {delete_error}"
                 )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -177,6 +178,18 @@ async def update_current_user(
 
         # Update user - convert organizationId from string to ObjectId if provided
         update_dict = user_update.model_dump(exclude_unset=True)
+
+        # Security: Prevent privilege escalation by blocking sensitive field updates
+        # These fields can only be modified by admins through admin endpoints
+        restricted_fields = {"userType", "features", "isActive", "isVerified"}
+        for field in restricted_fields:
+            if field in update_dict:
+                logger.warning(
+                    f"Attempted to update restricted field '{field}' via self-update endpoint. "
+                    f"Field ignored for user ID: {current_user.user_id}"
+                )
+                update_dict.pop(field)
+
         if update_dict.get("organizationId"):
             update_dict["organizationId"] = ObjectId(update_dict["organizationId"])
 

@@ -96,6 +96,9 @@ async def connect_to_mongo():
         )
         logger.info("Initialized Beanie")
 
+        # Initialize non-Beanie collection indexes (e.g., email_otps)
+        await initialize_collection_indexes(db.database)
+
     except ConnectionFailure as e:
         logger.error(f"Failed to connect to MongoDB: {e}")
         raise
@@ -109,6 +112,40 @@ async def close_mongo_connection():
     if db.client:
         db.client.close()
         logger.info("Disconnected from MongoDB")
+
+
+async def initialize_collection_indexes(database):
+    """
+    Initialize indexes for non-Beanie collections.
+
+    This function creates indexes for collections that are not managed by Beanie,
+    such as email_otps, blocked_tokens, etc.
+
+    Args:
+        database: MongoDB database instance
+    """
+    try:
+        from pymongo import ASCENDING
+
+        # Create TTL index for email_otps collection
+        email_otps_collection = database.email_otps
+        indexes = await email_otps_collection.list_indexes().to_list(length=100)
+        index_names = [idx["name"] for idx in indexes]
+
+        if "expires_at_1" not in index_names:
+            await email_otps_collection.create_index(
+                [("expires_at", ASCENDING)],
+                expireAfterSeconds=0,  # Documents expire when expires_at is reached
+                background=True,
+            )
+            logger.info("Created TTL index for email_otps collection")
+        else:
+            logger.debug("TTL index for email_otps collection already exists")
+
+    except Exception as e:
+        logger.error(f"Error initializing collection indexes: {e}", exc_info=True)
+        # Don't raise - allow application to start even if index creation fails
+        # Indexes might already exist or be created manually
 
 
 async def create_indexes():

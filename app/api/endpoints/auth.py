@@ -1,7 +1,7 @@
 """Authentication API endpoints."""
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -33,6 +33,7 @@ from app.services.auth_service import AuthService
 from app.utils.email_otp import (
     delete_otp,
     generate_otp,
+    mask_email,
     send_otp_email,
     store_otp,
     verify_otp,
@@ -321,7 +322,9 @@ async def send_otp(otp_request: SendOtpRequest, db=Depends(get_database)):
         otp = generate_otp()
         store_result = await store_otp(db, otp_request.email, otp)
         if not store_result:
-            logger.error(f"Failed to store OTP for email: {otp_request.email}")
+            logger.error(
+                f"Failed to store OTP for email: {mask_email(otp_request.email)}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to store OTP. Please try again.",
@@ -329,7 +332,9 @@ async def send_otp(otp_request: SendOtpRequest, db=Depends(get_database)):
 
         send_result = await send_otp_email(otp_request.email, otp)
         if not send_result:
-            logger.error(f"Failed to send OTP email to: {otp_request.email}")
+            logger.error(
+                f"Failed to send OTP email to: {mask_email(otp_request.email)}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to send OTP email. Please try again.",
@@ -414,7 +419,7 @@ async def verify_otp_endpoint(
                 message="OTP verified successfully. Your account is now active.",
                 data=VerifyOtpResponse(
                     message="OTP verified successfully",
-                    verified_at=datetime.now(),
+                    verified_at=datetime.now(UTC),
                     is_verified=True,
                 ),
             )
@@ -427,7 +432,7 @@ async def verify_otp_endpoint(
                 message="OTP verified successfully. Your account will be activated by admin.",
                 data=VerifyOtpResponse(
                     message="OTP verified. Waiting for admin approval.",
-                    verified_at=datetime.now(),
+                    verified_at=datetime.now(UTC),
                     is_verified=False,
                 ),
             )
@@ -468,7 +473,9 @@ async def resend_otp(otp_request: SendOtpRequest, db=Depends(get_database)):
         otp = generate_otp()
         store_result = await store_otp(db, otp_request.email, otp)
         if not store_result:
-            logger.error(f"Failed to store OTP for email: {otp_request.email}")
+            logger.error(
+                f"Failed to store OTP for email: {mask_email(otp_request.email)}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to store OTP. Please try again.",
@@ -476,7 +483,9 @@ async def resend_otp(otp_request: SendOtpRequest, db=Depends(get_database)):
 
         send_result = await send_otp_email(otp_request.email, otp)
         if not send_result:
-            logger.error(f"Failed to send OTP email to: {otp_request.email}")
+            logger.error(
+                f"Failed to send OTP email to: {mask_email(otp_request.email)}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to send OTP email. Please try again.",
