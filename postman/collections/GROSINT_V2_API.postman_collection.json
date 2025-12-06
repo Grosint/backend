@@ -536,6 +536,214 @@
 			"description": "Search endpoints for phone and email lookups"
 		},
 		{
+			"name": "Upload",
+			"item": [
+				{
+					"name": "Get Upload Configuration",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/upload/config",
+							"host": ["{{base_url}}"],
+							"path": ["upload", "config"]
+						},
+						"description": "Get the current upload configuration including allowed file types, maximum file size, and pre-signed URL expiry settings."
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Pre-signed URL",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.presigned_url) {",
+									"        pm.environment.set('presigned_url', jsonData.data.presigned_url);",
+									"        pm.environment.set('content_type', jsonData.data.content_type);",
+									"        pm.environment.set('blob_name', jsonData.data.blob_name);",
+									"        console.log('✅ Pre-signed URL saved to environment');",
+									"        console.log('Content-Type:', jsonData.data.content_type);",
+									"        console.log('Upload Instructions:', JSON.stringify(jsonData.data.upload_instructions, null, 2));",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"filename\": \"document.pdf\",\n  \"folder\": \"documents\",\n  \"prefix\": \"user123\",\n  \"expiry_minutes\": 60,\n  \"metadata\": {\n    \"uploaded_by\": \"user123\",\n    \"category\": \"invoice\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/upload/presigned-url",
+							"host": ["{{base_url}}"],
+							"path": ["upload", "presigned-url"]
+						},
+						"description": "Generate a pre-signed URL for client-side file upload to Azure Blob Storage. The client can use this URL to upload files directly without going through the backend. Returns presigned_url, blob_name, expiration information, and upload_instructions with required headers. The presigned_url and content_type are automatically saved to environment variables for use in the 'Upload Using Pre-signed URL' request."
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Using Pre-signed URL",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "x-ms-blob-type",
+								"value": "BlockBlob",
+								"description": "REQUIRED: Must be set to 'BlockBlob' for Azure Blob Storage uploads. Without this header, upload will fail with MissingRequiredHeader error.",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "{{content_type}}",
+								"description": "Content type of the file (e.g., image/jpeg, application/pdf). Automatically set from pre-signed URL response.",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "file",
+							"file": {},
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{presigned_url}}"
+						},
+						"description": "Upload a file directly to Azure Blob Storage using the pre-signed URL.\n\n**CRITICAL**: The 'x-ms-blob-type: BlockBlob' header is REQUIRED. Without it, you will get a 400 Bad Request error with 'MissingRequiredHeader'.\n\n**Steps:**\n1. First, call 'Generate Pre-signed URL' endpoint\n2. The presigned_url and content_type are automatically saved to environment variables\n3. Use this request to upload your file\n4. Select your file in the Body tab (binary/file mode)\n\n**Manual Setup (if not using auto-saved variables):**\n- URL: Paste the presigned_url from the previous response\n- Header 'x-ms-blob-type': Set to 'BlockBlob' (REQUIRED)\n- Header 'Content-Type': Set to the content_type from response (e.g., 'application/pdf', 'image/jpeg')\n- Body: Select 'binary' or 'file' and choose your file"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload File Direct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": [],
+									"description": "File to upload"
+								},
+								{
+									"key": "folder",
+									"value": "images",
+									"type": "text",
+									"description": "Optional folder path for organization"
+								},
+								{
+									"key": "prefix",
+									"value": "user123",
+									"type": "text",
+									"description": "Optional prefix (e.g., user ID, category)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/upload/direct",
+							"host": ["{{base_url}}"],
+							"path": ["upload", "direct"]
+						},
+						"description": "Upload a file directly through the backend to Azure Blob Storage. The file is uploaded via the backend server. Returns blob_name, url, and upload metadata."
+					},
+					"response": []
+				},
+				{
+					"name": "Get File Information",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/upload/file/info?blob_name=images/user123/2025/01/15/photo_abc12345.jpg&generate_sas=false",
+							"host": ["{{base_url}}"],
+							"path": ["upload", "file", "info"],
+							"query": [
+								{
+									"key": "blob_name",
+									"value": "images/user123/2025/01/15/photo_abc12345.jpg",
+									"description": "Blob name/path in storage"
+								},
+								{
+									"key": "generate_sas",
+									"value": "false",
+									"description": "Whether to generate a SAS token for the URL",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Get information about a file including its URL. Optionally generate a SAS token for secure access."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete File",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"blob_name\": \"images/user123/2025/01/15/photo_abc12345.jpg\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/upload/file",
+							"host": ["{{base_url}}"],
+							"path": ["upload", "file"]
+						},
+						"description": "Delete a file from Azure Blob Storage. Requires the blob_name (full path) of the file to delete."
+					},
+					"response": []
+				}
+			],
+			"description": "File upload endpoints for Azure Blob Storage - supports both direct upload and pre-signed URL upload methods"
+		},
+		{
 			"name": "Admin",
 			"item": [
 				{
