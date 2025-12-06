@@ -9,6 +9,7 @@ from app.api.endpoints import (
     plan,
     search,
     subscription,
+    upload,
     user,
 )
 
@@ -27,3 +28,4 @@ api_router.include_router(
     subscription.router, prefix="/subscriptions", tags=["Subscriptions"]
 )
 api_router.include_router(credit.router, prefix="/credits", tags=["Credits"])
+api_router.include_router(upload.router, prefix="/upload", tags=["Upload"])

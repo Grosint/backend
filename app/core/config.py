@@ -138,6 +138,27 @@ class Settings(BaseSettings):
     # Frontend URL for email links (password reset, etc.)
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://your-app.com")
 
+    # Azure Blob Storage configuration
+    AZURE_STORAGE_ACCOUNT_NAME: str = os.getenv("AZURE_STORAGE_ACCOUNT_NAME", "")
+    AZURE_STORAGE_ACCOUNT_KEY: str = os.getenv("AZURE_STORAGE_ACCOUNT_KEY", "")
+    AZURE_STORAGE_CONTAINER_NAME: str = os.getenv(
+        "AZURE_STORAGE_CONTAINER_NAME", "uploads"
+    )
+    AZURE_STORAGE_CONNECTION_STRING: str = os.getenv(
+        "AZURE_STORAGE_CONNECTION_STRING", ""
+    )
+    # Pre-signed URL expiration time in minutes (default: 60 minutes)
+    AZURE_SAS_TOKEN_EXPIRY_MINUTES: int = int(
+        os.getenv("AZURE_SAS_TOKEN_EXPIRY_MINUTES", "60")
+    )
+    # Maximum file size in MB (default: 100 MB)
+    MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "100"))
+    # Allowed file extensions (comma-separated)
+    ALLOWED_FILE_EXTENSIONS: str = os.getenv(
+        "ALLOWED_FILE_EXTENSIONS",
+        "jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,txt,csv,zip,rar",
+    )
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: str | list[str]) -> list[str]:
