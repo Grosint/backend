@@ -516,12 +516,54 @@ jobs:
                       DEBUG=false
                       LOG_LEVEL=info
                       SECRET_KEY=${{ secrets.SECRET_KEY }}
+                      ENVIRONMENT=production
+
+                      # Azure Email Configuration
+                      AZURE_EMAIL_ENDPOINT=${{ secrets.AZURE_EMAIL_ENDPOINT }}
+                      AZURE_EMAIL_ACCESS_KEY=${{ secrets.AZURE_EMAIL_ACCESS_KEY }}
+                      AZURE_EMAIL_SENDER_ADDRESS=${{ secrets.AZURE_EMAIL_SENDER_ADDRESS }}
+
+                      # Azure Storage Configuration
+                      AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}
+                      AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
+                      AZURE_STORAGE_CONTAINER_NAME=${{ secrets.AZURE_STORAGE_CONTAINER_NAME }}
+
+                      # External API Keys
+                      RAPIDAPI_KEY=${{ secrets.RAPIDAPI_KEY }}
+                      LEAK_CHECK_API_KEY=${{ secrets.LEAK_CHECK_API_KEY }}
+                      HLR_API_KEY=${{ secrets.HLR_API_KEY }}
+                      AITAN_API_KEY=${{ secrets.AITAN_API_KEY }}
+                      BEFISC_API_KEY=${{ secrets.BEFISC_API_KEY }}
+
+                      # Telegram Configuration (Account 1)
+                      TELEGRAM_API_ID_1=${{ secrets.TELEGRAM_API_ID_1 }}
+                      TELEGRAM_API_HASH_1=${{ secrets.TELEGRAM_API_HASH_1 }}
+                      TELEGRAM_AUTH_MOBILE_1=${{ secrets.TELEGRAM_AUTH_MOBILE_1 }}
+
+                      # Telegram Configuration (Account 2)
+                      TELEGRAM_API_ID_2=${{ secrets.TELEGRAM_API_ID_2 }}
+                      TELEGRAM_API_HASH_2=${{ secrets.TELEGRAM_API_HASH_2 }}
+                      TELEGRAM_AUTH_MOBILE_2=${{ secrets.TELEGRAM_AUTH_MOBILE_2 }}
+
+                      # Telegram Configuration (Account 3)
+                      TELEGRAM_API_ID_3=${{ secrets.TELEGRAM_API_ID_3 }}
+                      TELEGRAM_API_HASH_3=${{ secrets.TELEGRAM_API_HASH_3 }}
+                      TELEGRAM_AUTH_MOBILE_3=${{ secrets.TELEGRAM_AUTH_MOBILE_3 }}
+
+                      # Skype Configuration (Account 1)
+                      SKYPE_USER_1=${{ secrets.SKYPE_USER_1 }}
+                      SKYPE_PASSWORD_1=${{ secrets.SKYPE_PASSWORD_1 }}
+
+                      # Skype Configuration (Account 2)
+                      SKYPE_USER_2=${{ secrets.SKYPE_USER_2 }}
+                      SKYPE_PASSWORD_2=${{ secrets.SKYPE_PASSWORD_2 }}
+
+                      # Skype Configuration (Account 3)
+                      SKYPE_USER_3=${{ secrets.SKYPE_USER_3 }}
+                      SKYPE_PASSWORD_3=${{ secrets.SKYPE_PASSWORD_3 }}
 
                       # Monitoring Configuration
                       GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
-
-                      # Environment
-                      ENVIRONMENT=production
                       EOF
                       echo "✅ .env file created with production secrets"
 

@@ -56,13 +56,19 @@ async def create_user(user_request: UserCreateRequest, db=Depends(get_database))
             if not send_result:
                 logger.error(
                     f"Failed to send OTP email to user {masked_email} (ID: {user.id}). "
-                    f"Rolling back user creation."
+                    f"Rolling back user creation. "
+                    f"Check Azure email configuration: AZURE_EMAIL_ENDPOINT, "
+                    f"AZURE_EMAIL_ACCESS_KEY, and AZURE_EMAIL_SENDER_ADDRESS must be set."
                 )
                 # Rollback: delete the created user
                 await user_service.delete_user(str(user.id))
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to send OTP email. User creation rolled back. Please try again.",
+                    detail=(
+                        "Failed to send OTP email. User creation rolled back. "
+                        "This is likely due to missing Azure email configuration. "
+                        "Please contact support or try again later."
+                    ),
                 )
 
             logger.info(f"User created: {masked_email}, OTP sent")

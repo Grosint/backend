@@ -24,6 +24,7 @@ from app.core.error_handlers import (
 from app.core.exceptions import BaseAPIException
 from app.core.logging import setup_logging
 from app.core.security import RateLimitMiddleware, add_security_headers
+from app.services.email_service import email_service
 
 
 # Lifespan event handler
@@ -32,6 +33,17 @@ async def lifespan(app: FastAPI):
     # Startup
     await connect_to_mongo()
     logger = logging.getLogger(__name__)
+
+    # Validate email service configuration
+    if email_service.client is None:
+        logger.error(
+            "⚠️  EMAIL SERVICE NOT CONFIGURED - User registration will fail! "
+            "Please set the following environment variables in production: "
+            "AZURE_EMAIL_ENDPOINT, AZURE_EMAIL_ACCESS_KEY, AZURE_EMAIL_SENDER_ADDRESS. "
+            "See AZURE_EMAIL_SETUP.md for configuration instructions."
+        )
+    else:
+        logger.info("✅ Email service initialized successfully")
 
     # Start credit scheduler
     credit_scheduler.start()
