@@ -3,13 +3,16 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from beanie import PydanticObjectId
 from bson import ObjectId
 
 from app.adapters.domain_adapter import DomainAdapter
 from app.adapters.email_adapter import EmailAdapter
 from app.adapters.phone_lookup_adapter import PhoneLookupAdapter
+from app.models.history import HistorySourceResult
 from app.models.result import ResultCreate
 from app.models.search import SearchStatus, SearchType, SearchUpdate
+from app.services.history_service import HistoryService
 from app.services.result_service import ResultService
 from app.services.search_service import SearchService
 
@@ -23,6 +26,7 @@ class SearchOrchestrator:
         self.db = db
         self.search_service = SearchService(db)
         self.result_service = ResultService(db)
+        self.history_service = HistoryService()
 
         # Initialize adapters
         self.email_adapter = EmailAdapter()
@@ -55,6 +59,7 @@ class SearchOrchestrator:
         Returns:
             dict: Search results and status
         """
+        history = None  # Initialize before try block to avoid UnboundLocalError
         try:
             # Get search details
             search = await self.search_service.get_search_by_id(search_id)
@@ -69,6 +74,31 @@ class SearchOrchestrator:
             logger.info(
                 f"Starting search execution for {search.search_type}: {search.query}"
             )
+
+            # Create history record for this search
+            if search.user_id:
+                try:
+                    # Map search type to history query type
+                    query_type_map = {
+                        SearchType.PHONE: "phone-lookup",
+                        SearchType.EMAIL: "email-lookup",
+                        SearchType.DOMAIN: "domain-lookup",
+                        SearchType.USERNAME: "username-lookup",
+                    }
+                    query_type = query_type_map.get(search.search_type, "search")
+
+                    history = await self.history_service.create_history(
+                        user_id=PydanticObjectId(str(search.user_id)),
+                        query_type=query_type,
+                        query_input=search.query,
+                    )
+                    logger.info(
+                        f"History created for search: {search.id} -> history: {history.id}"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to create history for search {search.id}: {e}"
+                    )
 
             # Get adapters for this search type
             adapters = self.adapters.get(search.search_type, [])
@@ -106,10 +136,26 @@ class SearchOrchestrator:
                 if isinstance(result, Exception):
                     logger.error(f"Search failed for adapter {adapter.name}: {result}")
                     failed_results += 1
+                    # Add failed result to history if history exists
+                    if history:
+                        try:
+                            history_result = HistorySourceResult(
+                                source=adapter.name,
+                                success=False,
+                                errorCode="EXCEPTION",
+                                message=str(result),
+                            )
+                            await self.history_service.add_result(
+                                history.id, history_result
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to add history result for {adapter.name}: {e}"
+                            )
                 else:
                     # Store results from the adapter/orchestrator
                     result_data = await self._store_adapter_results(
-                        search_id, adapter, result
+                        search_id, adapter, result, history
                     )
                     successful_results += result_data["successful_count"]
                     failed_results += result_data["failed_count"]
@@ -139,13 +185,35 @@ class SearchOrchestrator:
 
             logger.info(f"Search execution completed: {search_id} - Status: {status}")
 
+            # Flatten all results into a single list
+            flattened_results = []
+            for result in search_results:
+                flattened_data = self._flatten_result_data(result.data, result.source)
+                flattened_results.extend(flattened_data)
+
+            # Store flattened results in history if history was created
+            if history:
+                try:
+                    total_sources = successful_results + failed_results
+                    await self.history_service.finalize_history(
+                        history.id,
+                        total_sources=total_sources,
+                        flattened_results=flattened_results,
+                    )
+                    logger.info(
+                        f"History finalized with {len(flattened_results)} flattened results: {history.id}"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to finalize history {history.id}: {e}")
+
             return {
                 "search_id": search_id,
                 "status": status.value,
                 "results_count": successful_results,
                 "failed_count": failed_results,
                 "error_message": error_message,
-                "results": [self._format_result(r) for r in search_results],
+                "results": flattened_results,
+                "history_id": str(history.id) if history else None,
             }
 
         except Exception as e:
@@ -156,6 +224,20 @@ class SearchOrchestrator:
                 search_id,
                 SearchUpdate(status=SearchStatus.FAILED, error_message=str(e)),
             )
+
+            # Finalize history with failed status if history was created
+            if history:
+                try:
+                    await self.history_service.finalize_history(
+                        history.id,
+                        total_sources=0,
+                        flattened_results=[],
+                    )
+                    logger.info(f"History finalized with failed status: {history.id}")
+                except Exception as history_error:
+                    logger.warning(
+                        f"Failed to finalize history {history.id}: {history_error}"
+                    )
 
             raise
 
@@ -174,13 +256,28 @@ class SearchOrchestrator:
             raise
 
     async def _store_adapter_results(
-        self, search_id: str, adapter: Any, result: dict[str, Any]
+        self, search_id: str, adapter: Any, result: dict[str, Any], history: Any = None
     ) -> dict[str, Any]:
         """Store adapter results in database and return counts"""
         successful_count = 0
         failed_count = 0
 
         if not result.get("success", False):
+            # Add failed result to history if history exists
+            if history:
+                try:
+                    history_result = HistorySourceResult(
+                        source=adapter.name,
+                        success=False,
+                        errorCode="ADAPTER_FAILED",
+                        message=result.get("error", "Adapter returned success=False"),
+                        data=result,
+                    )
+                    await self.history_service.add_result(history.id, history_result)
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to add history result for {adapter.name}: {e}"
+                    )
             return {"successful_count": 0, "failed_count": 1}
 
         data = result.get("data", {})
@@ -190,9 +287,11 @@ class SearchOrchestrator:
         if lookup_results:
             for source_name, source_result in lookup_results.items():
                 try:
+                    is_success = False
                     if isinstance(source_result, dict) and "error" not in source_result:
                         if source_result.get("found", False):
                             successful_count += 1
+                            is_success = True
                         else:
                             failed_count += 1
                     else:
@@ -209,9 +308,65 @@ class SearchOrchestrator:
                         ),
                     )
                     await self.result_service.create_result(result_create)
+
+                    # Add result to history if history exists
+                    if history:
+                        try:
+                            history_result = HistorySourceResult(
+                                source=source_name,
+                                success=is_success,
+                                data=(
+                                    source_result
+                                    if isinstance(source_result, dict)
+                                    else None
+                                ),
+                                errorCode=(
+                                    (
+                                        None
+                                        if is_success
+                                        else source_result.get("error", "NOT_FOUND")
+                                    )
+                                    if isinstance(source_result, dict)
+                                    else "INVALID_FORMAT"
+                                ),
+                                message=(
+                                    (
+                                        None
+                                        if is_success
+                                        else source_result.get(
+                                            "message", "No data found"
+                                        )
+                                    )
+                                    if isinstance(source_result, dict)
+                                    else "Invalid result format"
+                                ),
+                            )
+                            await self.history_service.add_result(
+                                history.id, history_result
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to add history result for {source_name}: {e}"
+                            )
                 except Exception as e:
                     logger.error(f"Error storing result for {source_name}: {e}")
                     failed_count += 1
+                    # Add failed result to history if history exists
+                    if history:
+                        try:
+                            history_result = HistorySourceResult(
+                                source=source_name,
+                                success=False,
+                                errorCode="STORAGE_ERROR",
+                                message=str(e),
+                            )
+                            await self.history_service.add_result(
+                                history.id, history_result
+                            )
+                        except Exception as history_err:
+                            logger.warning(
+                                f"Failed to add history result for {source_name}: {history_err}"
+                            )
         else:
             # For domain and other adapters, store the main result
             try:
@@ -229,9 +384,46 @@ class SearchOrchestrator:
                 failed_count = (
                     data.get("summary", {}).get("total_sources", 0) - successful_count
                 )
+
+                # Add result to history if history exists
+                if history:
+                    try:
+                        is_success = successful_count > 0
+                        history_result = HistorySourceResult(
+                            source=adapter.name,
+                            success=is_success,
+                            data=data,
+                            errorCode=None if is_success else "NO_SUCCESSFUL_SOURCES",
+                            message=(
+                                None if is_success else "No successful sources found"
+                            ),
+                        )
+                        await self.history_service.add_result(
+                            history.id, history_result
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to add history result for {adapter.name}: {e}"
+                        )
             except Exception as e:
                 logger.error(f"Error storing result for {adapter.name}: {e}")
                 failed_count += 1
+                # Add failed result to history if history exists
+                if history:
+                    try:
+                        history_result = HistorySourceResult(
+                            source=adapter.name,
+                            success=False,
+                            errorCode="STORAGE_ERROR",
+                            message=str(e),
+                        )
+                        await self.history_service.add_result(
+                            history.id, history_result
+                        )
+                    except Exception as history_err:
+                        logger.warning(
+                            f"Failed to add history result for {adapter.name}: {history_err}"
+                        )
 
         return {
             "successful_count": successful_count,
@@ -332,12 +524,109 @@ class SearchOrchestrator:
 
         return country_code, phone
 
+    def _remove_raw_response(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Recursively remove _raw_response from data dictionary"""
+        if not isinstance(data, dict):
+            return data
+
+        cleaned = {}
+        for key, value in data.items():
+            if key == "_raw_response":
+                # Skip _raw_response field
+                continue
+            elif isinstance(value, dict):
+                cleaned[key] = self._remove_raw_response(value)
+            elif isinstance(value, list):
+                cleaned[key] = [
+                    self._remove_raw_response(item) if isinstance(item, dict) else item
+                    for item in value
+                ]
+            else:
+                cleaned[key] = value
+        return cleaned
+
+    def _flatten_result_data(
+        self, result_data: dict[str, Any], source: str
+    ) -> list[dict[str, Any]]:
+        """
+        Flatten result data into a single list of items.
+
+        For phone/email lookups, extracts data from nested structure:
+        - If data.data exists and is a list, extract those items
+        - Ensure each item has a 'source' field
+        - Remove _raw_response from all nested structures
+
+        Returns empty list if result has error or found=False
+        """
+        # Skip results with errors
+        if not isinstance(result_data, dict):
+            return []
+
+        if "error" in result_data:
+            return []
+
+        # Remove _raw_response first
+        cleaned_data = self._remove_raw_response(result_data)
+
+        # If this is a phone/email lookup result with nested data structure
+        if isinstance(cleaned_data, dict) and "data" in cleaned_data:
+            inner_data = cleaned_data.get("data")
+
+            # If inner data is a list, extract those items
+            if isinstance(inner_data, list):
+                flattened = []
+                for item in inner_data:
+                    if isinstance(item, dict):
+                        # Create a copy to avoid mutating original
+                        item_copy = item.copy()
+                        # Ensure source is present
+                        if "source" not in item_copy:
+                            item_copy["source"] = source
+                        flattened.append(item_copy)
+                    else:
+                        # If item is not a dict, wrap it
+                        flattened.append(
+                            {
+                                "source": source,
+                                "type": "unknown",
+                                "value": str(item),
+                                "category": "TEXT",
+                            }
+                        )
+                return flattened
+            elif isinstance(inner_data, dict):
+                # If inner data is a dict, convert to list item
+                item_copy = inner_data.copy()
+                if "source" not in item_copy:
+                    item_copy["source"] = source
+                return [item_copy]
+
+        # If data doesn't have nested structure, return as single item
+        if isinstance(cleaned_data, dict):
+            item_copy = cleaned_data.copy()
+            if "source" not in item_copy:
+                item_copy["source"] = source
+            return [item_copy]
+
+        # Fallback: wrap in a list
+        return [
+            {
+                "source": source,
+                "type": "unknown",
+                "value": str(cleaned_data),
+                "category": "TEXT",
+            }
+        ]
+
     def _format_result(self, result) -> dict[str, Any]:
-        """Format result for API response"""
+        """Format result for API response - returns flattened data without _raw_response"""
+        # Flatten the result data
+        flattened_data = self._flatten_result_data(result.data, result.source)
+
         return {
             "id": str(result.id),
             "source": result.source,
-            "data": result.data,
+            "data": flattened_data,
             "confidence_score": result.confidence_score,
             "created_at": result.created_at.isoformat(),
         }
@@ -352,6 +641,12 @@ class SearchOrchestrator:
             results = await self.result_service.get_results_by_search_id(search_id)
             stats = await self.result_service.get_result_stats(search_id)
 
+            # Flatten all results into a single list
+            flattened_results = []
+            for result in results:
+                flattened_data = self._flatten_result_data(result.data, result.source)
+                flattened_results.extend(flattened_data)
+
             return {
                 "search": {
                     "id": str(search.id),
@@ -364,7 +659,7 @@ class SearchOrchestrator:
                 "results": {
                     "total": len(results),
                     "by_source": stats,
-                    "data": [self._format_result(r) for r in results],
+                    "data": flattened_results,
                 },
             }
 

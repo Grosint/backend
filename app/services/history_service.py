@@ -44,7 +44,7 @@ class HistoryService:
         history.results.append(result)
         # update metadata counts
         meta = history.metadata
-        meta.totalSources += 1 if meta.totalSources < len(history.results) else 0
+        meta.totalSources = len(history.results)
         if result.success:
             meta.successfulSources += 1
         else:
@@ -61,11 +61,34 @@ class HistoryService:
         )
         return history
 
+    async def store_flattened_results(
+        self,
+        history_id: PydanticObjectId,
+        flattened_results: list[dict[str, Any]],
+    ) -> History:
+        """Store flattened results in history for easy UI rendering"""
+        history = await History.get(history_id)
+        if not history:
+            raise ValueError("History not found")
+
+        history.flattenedResults = flattened_results
+        history.updatedAt = datetime.now(UTC)
+        await history.save()
+        logger.info(
+            "Flattened results stored in history",
+            extra={
+                "history_id": str(history.id),
+                "results_count": len(flattened_results),
+            },
+        )
+        return history
+
     async def finalize_history(
         self,
         history_id: PydanticObjectId,
         *,
         total_sources: int,
+        flattened_results: list[dict[str, Any]] | None = None,
     ) -> History:
         history = await History.get(history_id)
         if not history:
@@ -92,6 +115,10 @@ class HistoryService:
         else:
             history.status = "COMPLETED"
 
+        # Store flattened results if provided
+        if flattened_results is not None:
+            history.flattenedResults = flattened_results
+
         history.updatedAt = datetime.now(UTC)
         await history.save()
         logger.info(
@@ -101,6 +128,9 @@ class HistoryService:
                 "status": history.status,
                 "success_count": meta.successfulSources,
                 "failed_count": meta.failedSources,
+                "flattened_results_count": (
+                    len(flattened_results) if flattened_results else 0
+                ),
             },
         )
         return history

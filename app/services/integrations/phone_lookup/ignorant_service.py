@@ -107,43 +107,19 @@ class IgnorantService:
 
             platform_name = result.get("name", "unknown")
             exists = result.get("exists", False)
-            domain = result.get("domain", "")
 
-            if exists:
-                # Add platform existence information
-                formatted_response.append(
-                    {
-                        "source": platform_name,
-                        "type": "platform_check",
-                        "value": f"Phone number found on {platform_name}",
-                        "showSource": True,
-                        "category": "TEXT",
-                    }
-                )
+            # Capitalize platform name for display (e.g., "snapchat" -> "Snapchat")
+            platform_name_capitalized = platform_name.capitalize()
 
-                # Add domain if available
-                if domain:
-                    formatted_response.append(
-                        {
-                            "source": platform_name,
-                            "type": "domain",
-                            "value": domain,
-                            "showSource": True,
-                            "category": "TEXT",
-                        }
-                    )
-
-                # Add method if available
-                method = result.get("method", "")
-                if method:
-                    formatted_response.append(
-                        {
-                            "source": platform_name,
-                            "type": "method",
-                            "value": method,
-                            "showSource": True,
-                            "category": "TEXT",
-                        }
-                    )
+            # Add platform existence information for all platforms
+            formatted_response.append(
+                {
+                    "source": platform_name_capitalized,
+                    "type": "platforms",
+                    "value": "Yes" if exists else "No",
+                    "showSource": True,
+                    "category": "TEXT",
+                }
+            )
 
         return formatted_response

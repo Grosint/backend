@@ -112,65 +112,110 @@ class LeakCheckService:
         if not result or not isinstance(result, list):
             return formatted_response
 
-        # Process each result item
+        # Process each result item (each item represents a breach from a different source)
         for item in result:
             if not isinstance(item, dict):
                 continue
 
-            # Extract breach information
-            source = item.get("source", "leakcheck")
-            email = item.get("email", "")
-            username = item.get("username", "")
-            domain = item.get("domain", "")
-            breach_date = item.get("date", "")
+            # Extract breach source information
+            source_obj = item.get("source", {})
+            if isinstance(source_obj, dict):
+                breach_source_name = source_obj.get("name", "Unknown")
+                breach_date = source_obj.get("breach_date", "")
+            else:
+                breach_source_name = str(source_obj) if source_obj else "Unknown"
+                breach_date = item.get("date", "")
 
-            # Add email if available
-            if email:
-                formatted_response.append(
-                    {
-                        "source": source,
-                        "type": "email",
-                        "value": email,
-                        "showSource": True,
-                        "category": "TEXT",
-                    }
-                )
-
-            # Add username if available
-            if username:
-                formatted_response.append(
-                    {
-                        "source": source,
-                        "type": "username",
-                        "value": username,
-                        "showSource": True,
-                        "category": "TEXT",
-                    }
-                )
-
-            # Add domain if available
-            if domain:
-                formatted_response.append(
-                    {
-                        "source": source,
-                        "type": "domain",
-                        "value": domain,
-                        "showSource": True,
-                        "category": "TEXT",
-                    }
-                )
+            # Add "Leaked on {source_name}" entry first
+            formatted_response.append(
+                {
+                    "source": "Leaked on",
+                    "type": "leaked_data",
+                    "value": breach_source_name,
+                    "showSource": True,
+                    "category": "TEXT",
+                    "breach_source": breach_source_name,
+                }
+            )
 
             # Add breach date if available
             if breach_date:
                 formatted_response.append(
                     {
-                        "source": source,
-                        "type": "breach_date",
+                        "source": "Breach Date",
+                        "type": "leaked_data",
                         "value": breach_date,
                         "showSource": True,
                         "category": "TEXT",
+                        "breach_source": breach_source_name,
                     }
                 )
+
+            # Get list of available fields from the item
+            available_fields = item.get("fields", [])
+
+            # Fields to extract (excluding internal fields like 'source' and 'fields')
+            fields_to_extract = [
+                "ip",
+                "name",
+                "phone",
+                "email",
+                "username",
+                "domain",
+                "password",
+                "hash",
+                "address",
+                "dob",
+                "ssn",
+            ]
+
+            # Extract all available fields dynamically
+            for field_name in fields_to_extract:
+                # Check if field exists in item and is in available_fields list
+                if field_name in item and (
+                    not available_fields or field_name in available_fields
+                ):
+                    field_value = item.get(field_name)
+                    # Only add if value is not empty/None
+                    if field_value and str(field_value).strip():
+                        formatted_response.append(
+                            {
+                                "source": field_name,
+                                "type": "leaked_data",
+                                "value": str(field_value),
+                                "showSource": True,
+                                "category": "TEXT",
+                                "breach_source": breach_source_name,
+                            }
+                        )
+
+            # Also extract any other fields that might be present but not in our standard list
+            for key, value in item.items():
+                # Skip internal/metadata fields
+                if key in ["source", "fields"]:
+                    continue
+
+                # Skip if already processed
+                if key in fields_to_extract:
+                    continue
+
+                # Only add if value is not empty/None and is a simple type
+                if (
+                    value
+                    and isinstance(value, (str, int, float))
+                    and not isinstance(value, bool)
+                    and str(value).strip()
+                ):
+                    formatted_response.append(
+                        {
+                            "source": key,
+                            "type": "leaked_data",
+                            "value": str(value),
+                            "showSource": True,
+                            "category": "TEXT",
+                            "breach_source": breach_source_name,
+                        }
+                    )
 
         return formatted_response
 

@@ -33,6 +33,9 @@ class History(Document):
     queryInput: dict[str, Any] | str
     status: str = "IN_PROGRESS"  # IN_PROGRESS | COMPLETED | PARTIAL | FAILED
     results: list[HistorySourceResult] = Field(default_factory=list)
+    flattenedResults: list[dict[str, Any]] = Field(
+        default_factory=list, description="Flattened results for easy UI rendering"
+    )
     metadata: HistoryMetadata = Field(default_factory=HistoryMetadata)
     createdAt: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updatedAt: datetime = Field(default_factory=lambda: datetime.now(UTC))
