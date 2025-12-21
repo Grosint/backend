@@ -68,98 +68,138 @@ class WhatsAppService:
         """Format WhatsApp response to standard format"""
         formatted_response = []
 
+        # Account exists indicator
+        formatted_response.append(
+            {
+                "source": "Account Exist",
+                "type": "whatsapp",
+                "value": "Yes",
+                "showSource": True,
+                "category": "TEXT",
+            }
+        )
+
+        # Extract phone number (prefer formatted phone, fallback to number)
+        phone = data.get("phone") or data.get("number")
+        if phone:
+            formatted_response.append(
+                {
+                    "source": "Phone Number",
+                    "type": "whatsapp",
+                    "value": phone,
+                    "showSource": True,
+                    "category": "TEXT",
+                }
+            )
+
+        # Extract country code
+        country_code = data.get("countryCode")
+        if country_code:
+            formatted_response.append(
+                {
+                    "source": "Country Code",
+                    "type": "whatsapp",
+                    "value": country_code,
+                    "showSource": True,
+                    "category": "TEXT",
+                }
+            )
+
+        # Extract about text (only if it exists and is not empty)
+        about = data.get("about")
+        if about:
+            formatted_response.append(
+                {
+                    "source": "About",
+                    "type": "whatsapp",
+                    "value": about,
+                    "showSource": True,
+                    "category": "TEXT",
+                }
+            )
+
+        # Extract profile picture (only if available and authorized)
+        profile_pic = data.get("profilePic")
+        image_status = data.get("image_status")
+        if profile_pic and image_status != "not-authorized":
+            formatted_response.append(
+                {
+                    "source": "whatsapp",
+                    "type": "image",
+                    "value": profile_pic,
+                    "showSource": False,
+                    "category": "IMAGE",
+                }
+            )
+
+        # Extract verification status
+        is_verified = data.get("isVerified", False)
+        formatted_response.append(
+            {
+                "source": "Verified",
+                "type": "whatsapp",
+                "value": "Yes" if is_verified else "No",
+                "showSource": True,
+                "category": "TEXT",
+            }
+        )
+
+        # Business account specific fields
         if data.get("isBusiness", False):
-            # Business account
-            formatted_response.append(
-                {
-                    "source": "Account Exist",
-                    "type": "whatsapp",
-                    "value": "Yes",
-                    "showSource": True,
-                    "category": "TEXT",
-                }
-            )
-
-            formatted_response.append(
-                {
-                    "source": "About",
-                    "type": "whatsapp",
-                    "value": data.get("about"),
-                    "showSource": True,
-                    "category": "TEXT",
-                }
-            )
-
+            # Extract business profile information
             if "businessProfile" in data:
+                business_profile = data["businessProfile"]
+
+                # Extract business address
+                address = business_profile.get("address")
+                if address:
+                    formatted_response.append(
+                        {
+                            "source": "Address",
+                            "type": "whatsapp",
+                            "value": address,
+                            "showSource": True,
+                            "category": "TEXT",
+                        }
+                    )
+
+                # Extract business description
+                description = business_profile.get("description")
+                if description:
+                    formatted_response.append(
+                        {
+                            "source": "Description",
+                            "type": "whatsapp",
+                            "value": description,
+                            "showSource": True,
+                            "category": "TEXT",
+                        }
+                    )
+
+                # Extract business email
+                email = business_profile.get("email")
+                if email:
+                    formatted_response.append(
+                        {
+                            "source": "Email",
+                            "type": "whatsapp",
+                            "value": email,
+                            "showSource": True,
+                            "category": "TEXT",
+                        }
+                    )
+
+            # Extract enterprise status
+            is_enterprise = data.get("isEnterprise", False)
+            if is_enterprise:
                 formatted_response.append(
                     {
-                        "source": "Address",
+                        "source": "Enterprise Account",
                         "type": "whatsapp",
-                        "value": data["businessProfile"].get("address"),
+                        "value": "Yes",
                         "showSource": True,
                         "category": "TEXT",
                     }
                 )
-
-                formatted_response.append(
-                    {
-                        "source": "Description",
-                        "type": "whatsapp",
-                        "value": data["businessProfile"].get("description"),
-                        "showSource": True,
-                        "category": "TEXT",
-                    }
-                )
-
-                formatted_response.append(
-                    {
-                        "source": "Email",
-                        "type": "whatsapp",
-                        "value": data["businessProfile"].get("email"),
-                        "showSource": True,
-                        "category": "TEXT",
-                    }
-                )
-
-            formatted_response.append(
-                {
-                    "source": "whatsapp",
-                    "type": "image",
-                    "value": data.get("profilePic"),
-                    "showSource": False,
-                    "category": "IMAGE",
-                }
-            )
-        else:
-            # Personal account
-            formatted_response.append(
-                {
-                    "source": "Account Exist",
-                    "type": "whatsapp",
-                    "value": "Yes",
-                    "showSource": True,
-                    "category": "TEXT",
-                }
-            )
-
-            formatted_response.append(
-                {
-                    "source": "whatsapp",
-                    "type": "image",
-                    "value": data.get("profilePic"),
-                    "showSource": False,
-                    "category": "IMAGE",
-                }
-            )
-
-            formatted_response.append(
-                {
-                    "source": "About",
-                    "type": "whatsapp",
-                    "value": data.get("about"),
-                    "showSource": True,
-                    "category": "TEXT",
-                }
-            )
 
         return formatted_response

@@ -13,6 +13,7 @@ postman/
 │   └── Production.postman_environment.json      # Production environment
 ├── globals/
 │   └── workspace.postman_globals.json          # Global variables
+├── watch-collection.sh                          # File watcher for auto-sync
 └── README.md                                    # This file
 ```
 
@@ -71,6 +72,10 @@ postman/
 - **List Searches** - Get searches with pagination
 - **Get Search Statistics** - Get search statistics
 
+### History
+- **List Histories** - Get paginated list of user's search history (metadata only: id, queryType, queryInput, status, createdAt)
+- **Get History Details** - Get full history details by ID including flattenedResults for UI rendering
+
 ### Admin
 - **Authentication** - Admin login endpoints
 - **Test Phone Lookup Service** - Test individual phone lookup services
@@ -90,6 +95,7 @@ postman/
 - `admin_token`: Auto-populated from admin login
 - `user_id`: Auto-populated from login
 - `search_id`: Manually set after creating a search
+- `history_id`: Manually set after listing histories (use from list response)
 - `user_email`: Default test email
 - `user_password`: Default test password
 
@@ -120,6 +126,11 @@ The collection automatically saves tokens and user information:
    - Use **Phone Lookup** or **Email Lookup** to create a search
    - Copy the `search_id` from response
    - Use **Get Search Results** with the `search_id` to retrieve results
+
+4. **Viewing History:**
+   - Use **List Histories** to get paginated list of your search history (metadata only)
+   - Copy a `history_id` from the list response
+   - Use **Get History Details** with the `history_id` to get full details including flattenedResults
 
 4. **Environment Switching:**
    - Switch between Local and Production environments using the dropdown in Postman
@@ -153,6 +164,35 @@ When adding new endpoints:
 3. Add descriptions for each endpoint
 4. Include example request bodies
 5. Update this README if needed
+
+## 🔄 Auto-Sync with File Watcher
+
+To automatically get notified when the Postman collection changes:
+
+1. **Install fswatch** (if not already installed):
+   ```bash
+   brew install fswatch
+   ```
+
+2. **Run the watcher script**:
+   ```bash
+   chmod +x postman/watch-collection.sh
+   ./postman/watch-collection.sh
+   ```
+
+3. **When notified of changes**:
+   - Open Postman
+   - Click **Import** → **File**
+   - Select `postman/collections/GROSINT_V2_API.postman_collection.json`
+   - Click **Import** (this updates your existing collection)
+
+The watcher will:
+- ✅ Monitor the collection file for changes
+- 🔔 Show macOS notifications when file changes
+- 📂 Open Finder to the file location
+- 💡 Display clear instructions for re-importing
+
+**Note:** Keep the watcher running in a terminal while you're working. Press `Ctrl+C` to stop.
 
 ## 📞 Support
 

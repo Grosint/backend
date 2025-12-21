@@ -536,6 +536,62 @@
 			"description": "Search endpoints for phone and email lookups"
 		},
 		{
+			"name": "History",
+			"item": [
+				{
+					"name": "List Histories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/history/?page=1&size=10",
+							"host": ["{{base_url}}"],
+							"path": ["history", ""],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number (default: 1, min: 1)"
+								},
+								{
+									"key": "size",
+									"value": "10",
+									"description": "Number of items per page (default: 10, min: 1, max: 100)"
+								}
+							]
+						},
+						"description": "Get paginated list of user's search history with metadata only. Returns: id, queryType, queryInput, status, createdAt. Use the detail endpoint to get full information including flattenedResults."
+					},
+					"response": []
+				},
+				{
+					"name": "Get History Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/history/{{history_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["history", "{{history_id}}"]
+						},
+						"description": "Get full history details by ID including flattenedResults. Use this endpoint when clicking on a history item from the list. Returns complete history information with flattened results ready for UI rendering."
+					},
+					"response": []
+				}
+			],
+			"description": "History endpoints for viewing user's search history with paginated metadata and detailed results"
+		},
+		{
 			"name": "Admin",
 			"item": [
 				{

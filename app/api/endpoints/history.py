@@ -5,12 +5,13 @@ import logging
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.core.auth_dependencies import get_current_user_optional
-from app.models.user import User
+from app.core.auth_dependencies import TokenData, get_current_user_optional
 from app.schemas.history import (
+    HistoryListItemSchema,
+    HistoryListResponse,
     HistorySchema,
 )
-from app.schemas.response import SuccessResponse
+from app.schemas.response import PaginationMeta, SuccessResponse
 from app.services.history_service import HistoryService
 
 router = APIRouter()
@@ -20,8 +21,16 @@ logger = logging.getLogger(__name__)
 @router.get("/{history_id}", response_model=SuccessResponse[HistorySchema])
 async def get_history(
     history_id: str,
-    current_user: User | None = Depends(get_current_user_optional),
+    current_user: TokenData | None = Depends(get_current_user_optional),
 ):
+    """
+    Get full history details by ID including flattenedResults.
+    Use this endpoint when clicking on a history item from the list.
+    """
+    # Require authentication for accessing history
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
     service = HistoryService()
     try:
         history = await service.get_history_by_id(PydanticObjectId(history_id))
@@ -35,8 +44,8 @@ async def get_history(
     if not history:
         raise HTTPException(status_code=404, detail="History not found")
 
-    # Optionally enforce user access if current_user is used
-    if current_user and history.userId and str(history.userId) != str(current_user.id):
+    # Enforce user access - users can only access their own history
+    if history.userId and str(history.userId) != current_user.user_id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
     payload: HistorySchema = HistorySchema(
@@ -45,7 +54,7 @@ async def get_history(
         queryType=history.queryType,
         queryInput=history.queryInput,
         status=history.status,
-        results=[r.model_dump() for r in history.results],
+        flattenedResults=history.flattenedResults or [],
         metadata=history.metadata.model_dump(),
         createdAt=history.createdAt,
         updatedAt=history.updatedAt,
@@ -56,38 +65,53 @@ async def get_history(
     )
 
 
-@router.get("/", response_model=SuccessResponse[list[HistorySchema]])
+@router.get("/", response_model=HistoryListResponse)
 async def list_histories(
     page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    current_user: User | None = Depends(get_current_user_optional),
+    size: int = Query(
+        10, ge=1, le=100, description="Number of items per page (default: 10)"
+    ),
+    current_user: TokenData | None = Depends(get_current_user_optional),
 ):
+    """
+    Get paginated list of user's search history with metadata only.
+    Returns only: id, queryType, queryInput, status, createdAt
+    Use the detail endpoint to get full information including flattenedResults.
+    """
     if not current_user:
-        # If you want to allow unauthenticated listing, adjust accordingly
         raise HTTPException(status_code=401, detail="Authentication required")
 
     service = HistoryService()
     items, total = await service.get_user_histories(
-        current_user.id, page=page, size=size
+        PydanticObjectId(current_user.user_id), page=page, size=size
     )
 
+    # Return only metadata for list view
     payload = [
-        HistorySchema(
+        HistoryListItemSchema(
             id=str(h.id),
-            userId=str(h.userId) if h.userId else None,
             queryType=h.queryType,
             queryInput=h.queryInput,
             status=h.status,
-            results=[r.model_dump() for r in h.results],
-            metadata=h.metadata.model_dump(),
             createdAt=h.createdAt,
-            updatedAt=h.updatedAt,
         )
         for h in items
     ]
 
-    return SuccessResponse[list[HistorySchema]](
+    # Calculate pagination metadata
+    pages = (total + size - 1) // size if total > 0 else 0
+    pagination = PaginationMeta(
+        page=page,
+        size=size,
+        total=total,
+        pages=pages,
+        has_next=page < pages,
+        has_prev=page > 1,
+    )
+
+    return HistoryListResponse(
         success=True,
-        message="Histories retrieved",
+        message=f"Retrieved {len(payload)} history items",
         data=payload,
+        pagination=pagination,
     )

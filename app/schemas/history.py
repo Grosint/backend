@@ -26,13 +26,25 @@ class HistoryMetadataSchema(BaseModel):
     durationMs: int | None = None
 
 
+class HistoryListItemSchema(BaseModel):
+    """Schema for history list items - contains only metadata"""
+
+    id: str
+    queryType: str
+    queryInput: dict[str, Any] | str
+    status: str
+    createdAt: datetime
+
+
 class HistorySchema(BaseModel):
+    """Full history schema with all details including flattened results (without raw results to reduce API load)"""
+
     id: str
     userId: str | None = None
     queryType: str
     queryInput: dict[str, Any] | str
     status: str
-    results: list[HistorySourceResultSchema]
+    flattenedResults: list[dict[str, Any]] = []
     metadata: HistoryMetadataSchema
     createdAt: datetime
     updatedAt: datetime
@@ -42,5 +54,5 @@ class HistoryResponse(BaseResponse[HistorySchema]):
     pass
 
 
-class HistoryListResponse(PaginatedResponse[HistorySchema]):
+class HistoryListResponse(PaginatedResponse[HistoryListItemSchema]):
     pass

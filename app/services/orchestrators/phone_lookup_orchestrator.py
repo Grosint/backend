@@ -3,14 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.services.integrations.phone_lookup.aitan_service import AITANService
-from app.services.integrations.phone_lookup.befisc_service import BefiscService
 from app.services.integrations.phone_lookup.callapp_service import CallAppService
 from app.services.integrations.phone_lookup.eyecon_service import EyeconService
 from app.services.integrations.phone_lookup.hlr_service import HLRService
 from app.services.integrations.phone_lookup.ignorant_service import IgnorantService
 from app.services.integrations.phone_lookup.leakcheck_service import LeakCheckService
-from app.services.integrations.phone_lookup.skype_service import SkypeService
 from app.services.integrations.phone_lookup.telegram_service import TelegramService
 from app.services.integrations.phone_lookup.truecaller_service import TrueCallerService
 from app.services.integrations.phone_lookup.viewcaller_service import ViewCallerService
@@ -32,12 +29,9 @@ class PhoneLookupOrchestrator:
         self.callapp_service = CallAppService()
         self.whatsapp_service = WhatsAppService()
         self.telegram_service = TelegramService()
-        self.skype_service = SkypeService()
         self.ignorant_service = IgnorantService()
         self.leakcheck_service = LeakCheckService()
         self.hlr_service = HLRService()
-        self.aitan_service = AITANService()
-        self.befisc_service = BefiscService()
 
     async def search_phone(self, country_code: str, phone: str) -> dict[str, Any]:
         """Search phone number across all phone lookup services"""
@@ -55,8 +49,6 @@ class PhoneLookupOrchestrator:
                 self.ignorant_service.search_phone(country_code, phone),
                 self.leakcheck_service.search_phone(country_code, phone),
                 self.hlr_service.search_phone(country_code, phone),
-                self.aitan_service.search_phone(country_code, phone, "phone-lookup"),
-                self.befisc_service.search_phone(country_code, phone, "phone-lookup"),
             ]
 
             import asyncio
@@ -84,8 +76,6 @@ class PhoneLookupOrchestrator:
                 "ignorant",
                 "leakcheck",
                 "hlr",
-                "aitan",
-                "befisc",
             ]
             for i, result in enumerate(results):
                 service_name = service_names[i]
