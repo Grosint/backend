@@ -132,7 +132,7 @@ The collection automatically saves tokens and user information:
    - Copy a `history_id` from the list response
    - Use **Get History Details** with the `history_id` to get full details including flattenedResults
 
-4. **Environment Switching:**
+5. **Environment Switching:**
    - Switch between Local and Production environments using the dropdown in Postman
    - All requests will use the correct base URL automatically
 

@@ -203,6 +203,7 @@ class LeakCheckService:
                 if (
                     value
                     and isinstance(value, (str, int, float))
+                    and not isinstance(value, bool)
                     and str(value).strip()
                 ):
                     formatted_response.append(

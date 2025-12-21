@@ -44,7 +44,7 @@ class HistoryService:
         history.results.append(result)
         # update metadata counts
         meta = history.metadata
-        meta.totalSources += 1 if meta.totalSources < len(history.results) else 0
+        meta.totalSources = len(history.results)
         if result.success:
             meta.successfulSources += 1
         else:

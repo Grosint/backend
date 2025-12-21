@@ -9,6 +9,7 @@ from bson import ObjectId
 from app.adapters.domain_adapter import DomainAdapter
 from app.adapters.email_adapter import EmailAdapter
 from app.adapters.phone_lookup_adapter import PhoneLookupAdapter
+from app.models.history import HistorySourceResult
 from app.models.result import ResultCreate
 from app.models.search import SearchStatus, SearchType, SearchUpdate
 from app.services.history_service import HistoryService
@@ -58,6 +59,7 @@ class SearchOrchestrator:
         Returns:
             dict: Search results and status
         """
+        history = None  # Initialize before try block to avoid UnboundLocalError
         try:
             # Get search details
             search = await self.search_service.get_search_by_id(search_id)
@@ -74,7 +76,6 @@ class SearchOrchestrator:
             )
 
             # Create history record for this search
-            history = None
             if search.user_id:
                 try:
                     # Map search type to history query type
@@ -135,10 +136,26 @@ class SearchOrchestrator:
                 if isinstance(result, Exception):
                     logger.error(f"Search failed for adapter {adapter.name}: {result}")
                     failed_results += 1
+                    # Add failed result to history if history exists
+                    if history:
+                        try:
+                            history_result = HistorySourceResult(
+                                source=adapter.name,
+                                success=False,
+                                errorCode="EXCEPTION",
+                                message=str(result),
+                            )
+                            await self.history_service.add_result(
+                                history.id, history_result
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to add history result for {adapter.name}: {e}"
+                            )
                 else:
                     # Store results from the adapter/orchestrator
                     result_data = await self._store_adapter_results(
-                        search_id, adapter, result
+                        search_id, adapter, result, history
                     )
                     successful_results += result_data["successful_count"]
                     failed_results += result_data["failed_count"]
@@ -239,13 +256,28 @@ class SearchOrchestrator:
             raise
 
     async def _store_adapter_results(
-        self, search_id: str, adapter: Any, result: dict[str, Any]
+        self, search_id: str, adapter: Any, result: dict[str, Any], history: Any = None
     ) -> dict[str, Any]:
         """Store adapter results in database and return counts"""
         successful_count = 0
         failed_count = 0
 
         if not result.get("success", False):
+            # Add failed result to history if history exists
+            if history:
+                try:
+                    history_result = HistorySourceResult(
+                        source=adapter.name,
+                        success=False,
+                        errorCode="ADAPTER_FAILED",
+                        message=result.get("error", "Adapter returned success=False"),
+                        data=result,
+                    )
+                    await self.history_service.add_result(history.id, history_result)
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to add history result for {adapter.name}: {e}"
+                    )
             return {"successful_count": 0, "failed_count": 1}
 
         data = result.get("data", {})
@@ -255,9 +287,11 @@ class SearchOrchestrator:
         if lookup_results:
             for source_name, source_result in lookup_results.items():
                 try:
+                    is_success = False
                     if isinstance(source_result, dict) and "error" not in source_result:
                         if source_result.get("found", False):
                             successful_count += 1
+                            is_success = True
                         else:
                             failed_count += 1
                     else:
@@ -274,9 +308,65 @@ class SearchOrchestrator:
                         ),
                     )
                     await self.result_service.create_result(result_create)
+
+                    # Add result to history if history exists
+                    if history:
+                        try:
+                            history_result = HistorySourceResult(
+                                source=source_name,
+                                success=is_success,
+                                data=(
+                                    source_result
+                                    if isinstance(source_result, dict)
+                                    else None
+                                ),
+                                errorCode=(
+                                    (
+                                        None
+                                        if is_success
+                                        else source_result.get("error", "NOT_FOUND")
+                                    )
+                                    if isinstance(source_result, dict)
+                                    else "INVALID_FORMAT"
+                                ),
+                                message=(
+                                    (
+                                        None
+                                        if is_success
+                                        else source_result.get(
+                                            "message", "No data found"
+                                        )
+                                    )
+                                    if isinstance(source_result, dict)
+                                    else "Invalid result format"
+                                ),
+                            )
+                            await self.history_service.add_result(
+                                history.id, history_result
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to add history result for {source_name}: {e}"
+                            )
                 except Exception as e:
                     logger.error(f"Error storing result for {source_name}: {e}")
                     failed_count += 1
+                    # Add failed result to history if history exists
+                    if history:
+                        try:
+                            history_result = HistorySourceResult(
+                                source=source_name,
+                                success=False,
+                                errorCode="STORAGE_ERROR",
+                                message=str(e),
+                            )
+                            await self.history_service.add_result(
+                                history.id, history_result
+                            )
+                        except Exception as history_err:
+                            logger.warning(
+                                f"Failed to add history result for {source_name}: {history_err}"
+                            )
         else:
             # For domain and other adapters, store the main result
             try:
@@ -294,9 +384,46 @@ class SearchOrchestrator:
                 failed_count = (
                     data.get("summary", {}).get("total_sources", 0) - successful_count
                 )
+
+                # Add result to history if history exists
+                if history:
+                    try:
+                        is_success = successful_count > 0
+                        history_result = HistorySourceResult(
+                            source=adapter.name,
+                            success=is_success,
+                            data=data,
+                            errorCode=None if is_success else "NO_SUCCESSFUL_SOURCES",
+                            message=(
+                                None if is_success else "No successful sources found"
+                            ),
+                        )
+                        await self.history_service.add_result(
+                            history.id, history_result
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to add history result for {adapter.name}: {e}"
+                        )
             except Exception as e:
                 logger.error(f"Error storing result for {adapter.name}: {e}")
                 failed_count += 1
+                # Add failed result to history if history exists
+                if history:
+                    try:
+                        history_result = HistorySourceResult(
+                            source=adapter.name,
+                            success=False,
+                            errorCode="STORAGE_ERROR",
+                            message=str(e),
+                        )
+                        await self.history_service.add_result(
+                            history.id, history_result
+                        )
+                    except Exception as history_err:
+                        logger.warning(
+                            f"Failed to add history result for {adapter.name}: {history_err}"
+                        )
 
         return {
             "successful_count": successful_count,
