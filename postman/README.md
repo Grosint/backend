@@ -78,9 +78,19 @@ postman/
 
 ### Admin
 - **Authentication** - Admin login endpoints
-- **Test Phone Lookup Service** - Test individual phone lookup services
+- **Test Phone Lookup Service** - Test individual phone lookup services (including AITAN and Befisc)
 - **Test Email Lookup Service** - Test individual email lookup services
-- **Service Health Checks** - Health checks for all services
+- **Test Befisc Service** - Test Befisc service with different lookup types (phone, vehicle, bank, PAN, driving license, voter ID)
+- **Test AITAN Service** - Test AITAN service with:
+  - **Phone Lookup** - Test phone lookup (calls mobile_to_profile, mobile_address, mobile_to_vpa_advance in parallel)
+  - **Vehicle Lookup (All Methods)** - Test all vehicle lookup methods in parallel (rc_advance, challan_advance, chassis_to_rc, fasttag_history)
+  - **Vehicle - RC Advance** - Test RC advance lookup only
+  - **Vehicle - Challan Advance** - Test challan advance lookup only
+  - **Vehicle - Chassis to RC** - Test chassis to RC lookup only
+  - **Vehicle - FastTag History** - Test FastTag history lookup only
+  - **Phone Lookup Health** - Health check for phone lookup service
+  - **Vehicle Lookup Health** - Health check for vehicle lookup service
+- **Service Health Checks** - Health checks for all services (including AITAN and Befisc)
 - **List Available Services** - List all available services
 
 ### Health Check

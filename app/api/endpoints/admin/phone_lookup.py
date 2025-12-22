@@ -20,12 +20,9 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.schemas.admin import (
-    PhoneLookupDebugRequest,
-    ServiceTestResponse,
-)
+from app.schemas.admin import PhoneLookupDebugRequest, ServiceTestResponse
 from app.schemas.response import SuccessResponse
-from app.services.integrations.phone_lookup.aitan_service import AITANService
+from app.services.integrations.phone_lookup.aitan import AITANService
 from app.services.integrations.phone_lookup.befisc_service import BefiscService
 from app.services.integrations.phone_lookup.callapp_service import CallAppService
 from app.services.integrations.phone_lookup.eyecon_service import EyeconService
