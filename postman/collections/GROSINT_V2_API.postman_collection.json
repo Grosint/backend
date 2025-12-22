@@ -958,6 +958,64 @@
 							"response": []
 						},
 						{
+							"name": "Test AITAN",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9997260627\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/aitan",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "aitan"]
+								},
+								"description": "Test AITAN service directly. Bypasses orchestration and database."
+							},
+							"response": []
+						},
+						{
+							"name": "Test Befisc",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9997260627\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/befisc",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "befisc"]
+								},
+								"description": "Test Befisc service directly. Bypasses orchestration and database."
+							},
+							"response": []
+						},
+						{
 							"name": "Test All Phone Lookup Services",
 							"request": {
 								"method": "POST",
@@ -1139,6 +1197,611 @@
 						}
 					],
 					"description": "Test individual email lookup services"
+				},
+				{
+					"name": "Test Befisc Service",
+					"item": [
+						{
+							"name": "Phone Lookup",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"lookup_type\": \"phone-lookup\",\n  \"country_code\": \"+91\",\n  \"phone\": \"9997260627\",\n  \"name\": \"\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/phone-lookup",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "phone-lookup"]
+								},
+								"description": "Test Befisc phone lookup service. Requires country_code and phone."
+							},
+							"response": []
+						},
+						{
+							"name": "Vehicle Lookup",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"lookup_type\": \"vehicle-lookup\",\n  \"vehicle_number\": \"MH12AB1234\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/vehicle-lookup",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "vehicle-lookup"]
+								},
+								"description": "Test Befisc vehicle lookup service. Requires vehicle_number. Returns RC details, challan info, and FastTag info."
+							},
+							"response": []
+						},
+						{
+							"name": "Bank Lookup (Account/IFSC)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"lookup_type\": \"bank-lookup\",\n  \"account_no\": \"1234567890\",\n  \"ifsc_code\": \"SBIN0001234\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/bank-lookup",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "bank-lookup"]
+								},
+								"description": "Test Befisc bank lookup service with account number and IFSC code. Requires account_no and ifsc_code."
+							},
+							"response": []
+						},
+						{
+							"name": "Bank Lookup (UPI)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"lookup_type\": \"bank-lookup\",\n  \"upi\": \"user@paytm\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/bank-lookup",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "bank-lookup"]
+								},
+								"description": "Test Befisc bank lookup service with UPI ID. Requires upi parameter."
+							},
+							"response": []
+						},
+						{
+							"name": "PAN Lookup",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"lookup_type\": \"pan-lookup\",\n  \"pan\": \"ABCDE1234F\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/pan-lookup",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "pan-lookup"]
+								},
+								"description": "Test Befisc PAN lookup service. Requires pan number."
+							},
+							"response": []
+						},
+						{
+							"name": "Driving License Lookup",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"lookup_type\": \"driving-license-lookup\",\n  \"license_number\": \"DL1234567890123\",\n  \"dob\": \"01-01-1990\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/driving-license-lookup",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "driving-license-lookup"]
+								},
+								"description": "Test Befisc driving license lookup service. Requires license_number and dob (format: DD-MM-YYYY)."
+							},
+							"response": []
+						},
+						{
+							"name": "Voter ID Lookup",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"lookup_type\": \"voter-id-lookup\",\n  \"epic_number\": \"ABC1234567\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/voter-id-lookup",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "voter-id-lookup"]
+								},
+								"description": "Test Befisc voter ID lookup service. Requires epic_number (EPIC - Electoral Photo Identity Card)."
+							},
+							"response": []
+						},
+						{
+							"name": "Phone Lookup Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/phone-lookup/health?test_value=234567890",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "phone-lookup", "health"],
+									"query": [
+										{
+											"key": "test_value",
+											"value": "234567890",
+											"description": "Test phone number (without country code)"
+										}
+									]
+								},
+								"description": "Quick health check for Befisc phone lookup service."
+							},
+							"response": []
+						},
+						{
+							"name": "Vehicle Lookup Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/vehicle-lookup/health?test_value=MH12AB1234",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "vehicle-lookup", "health"],
+									"query": [
+										{
+											"key": "test_value",
+											"value": "MH12AB1234",
+											"description": "Test vehicle number"
+										}
+									]
+								},
+								"description": "Quick health check for Befisc vehicle lookup service."
+							},
+							"response": []
+						},
+						{
+							"name": "Bank Lookup Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/bank-lookup/health?test_value=1234567890",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "bank-lookup", "health"],
+									"query": [
+										{
+											"key": "test_value",
+											"value": "1234567890",
+											"description": "Test account number"
+										}
+									]
+								},
+								"description": "Quick health check for Befisc bank lookup service."
+							},
+							"response": []
+						},
+						{
+							"name": "PAN Lookup Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/pan-lookup/health?test_value=ABCDE1234F",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "pan-lookup", "health"],
+									"query": [
+										{
+											"key": "test_value",
+											"value": "ABCDE1234F",
+											"description": "Test PAN number"
+										}
+									]
+								},
+								"description": "Quick health check for Befisc PAN lookup service."
+							},
+							"response": []
+						},
+						{
+							"name": "Driving License Lookup Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/driving-license-lookup/health?test_value=DL1234567890123",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "driving-license-lookup", "health"],
+									"query": [
+										{
+											"key": "test_value",
+											"value": "DL1234567890123",
+											"description": "Test driving license number"
+										}
+									]
+								},
+								"description": "Quick health check for Befisc driving license lookup service."
+							},
+							"response": []
+						},
+						{
+							"name": "Voter ID Lookup Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/befisc/voter-id-lookup/health?test_value=ABC1234567",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "befisc", "voter-id-lookup", "health"],
+									"query": [
+										{
+											"key": "test_value",
+											"value": "ABC1234567",
+											"description": "Test EPIC number"
+										}
+									]
+								},
+								"description": "Quick health check for Befisc voter ID lookup service."
+							},
+							"response": []
+						}
+					],
+					"description": "Test Befisc service with different lookup types: phone, vehicle, bank, PAN, driving license, and voter ID"
+				},
+				{
+					"name": "Test AITAN Service",
+					"item": [
+						{
+							"name": "Phone Lookup",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"country_code\": \"+91\",\n  \"phone\": \"9997260627\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/aitan/phone",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "aitan", "phone"]
+								},
+								"description": "Test AITAN phone lookup service. Requires country_code and phone. Calls mobile_to_profile, mobile_address, and mobile_to_vpa_advance in parallel."
+							},
+							"response": []
+						},
+						{
+							"name": "Vehicle Lookup (All Methods)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"vehicle_number\": \"MH12AB1234\",\n  \"chassis_number\": null,\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/aitan/vehicle",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "aitan", "vehicle"]
+								},
+								"description": "Test AITAN vehicle lookup service (all methods in parallel). Requires vehicle_number. Optionally accepts chassis_number. Calls rc_advance, challan_advance, chassis_to_rc, and mobile_to_fasttag_history."
+							},
+							"response": []
+						},
+						{
+							"name": "Vehicle - RC Advance",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"vehicle_number\": \"MH12AB1234\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/aitan/vehicle/rc-advance",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "aitan", "vehicle", "rc-advance"]
+								},
+								"description": "Test AITAN RC advance lookup only. Returns Vehicle Info, Owner Info, and Insurance Info."
+							},
+							"response": []
+						},
+						{
+							"name": "Vehicle - Challan Advance",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"vehicle_number\": \"MH12AB1234\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/aitan/vehicle/challan-advance",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "aitan", "vehicle", "challan-advance"]
+								},
+								"description": "Test AITAN challan advance lookup only. Returns challan details for the vehicle."
+							},
+							"response": []
+						},
+						{
+							"name": "Vehicle - Chassis to RC",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"vehicle_number\": \"MH12AB1234\",\n  \"chassis_number\": \"ABC1234567890\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/aitan/vehicle/chassis-to-rc",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "aitan", "vehicle", "chassis-to-rc"]
+								},
+								"description": "Test AITAN chassis to RC lookup only. Requires chassis_number or vehicle_number. Returns vehicle registration details from chassis number."
+							},
+							"response": []
+						},
+						{
+							"name": "Vehicle - FastTag History",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"vehicle_number\": \"MH12AB1234\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/aitan/vehicle/fasttag-history",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "aitan", "vehicle", "fasttag-history"]
+								},
+								"description": "Test AITAN FastTag history lookup only. Returns FastTag transaction history for the vehicle."
+							},
+							"response": []
+						},
+						{
+							"name": "Phone Lookup Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/aitan/phone/health?test_phone=234567890",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "aitan", "phone", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "234567890",
+											"description": "Test phone number (without country code)"
+										}
+									]
+								},
+								"description": "Quick health check for AITAN phone lookup service. Returns basic connectivity and response time information."
+							},
+							"response": []
+						},
+						{
+							"name": "Vehicle Lookup Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/aitan/vehicle/health?test_vehicle=MH12AB1234",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "aitan", "vehicle", "health"],
+									"query": [
+										{
+											"key": "test_vehicle",
+											"value": "MH12AB1234",
+											"description": "Test vehicle number"
+										}
+									]
+								},
+								"description": "Quick health check for AITAN vehicle lookup service. Returns basic connectivity and response time information."
+							},
+							"response": []
+						}
+					],
+					"description": "Test AITAN service with different lookup types: phone and vehicle. All endpoints bypass orchestration and database, returning detailed debugging information without creating search records or deducting credits."
 				},
 				{
 					"name": "Service Health Checks",
@@ -1408,6 +2071,60 @@
 							"response": []
 						},
 						{
+							"name": "AITAN Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/aitan/health?test_phone=234567890",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "aitan", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "234567890",
+											"description": "Test phone number (without country code)"
+										}
+									]
+								},
+								"description": "Quick health check for AITAN service."
+							},
+							"response": []
+						},
+						{
+							"name": "Befisc Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/phone-lookup/befisc/health?test_phone=234567890",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "phone-lookup", "befisc", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "234567890",
+											"description": "Test phone number (without country code)"
+										}
+									]
+								},
+								"description": "Quick health check for Befisc service."
+							},
+							"response": []
+						},
+						{
 							"name": "SocialMedia Health",
 							"request": {
 								"method": "GET",
@@ -1499,10 +2216,7 @@
 			"listen": "prerequest",
 			"script": {
 				"type": "text/javascript",
-				"exec": [
-					"// Pre-request script runs before each request",
-					"// You can add common setup logic here"
-				]
+				"exec": ["// Pre-request script runs before each request", "// You can add common setup logic here"]
 			}
 		},
 		{

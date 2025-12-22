@@ -1195,16 +1195,4 @@ class BefiscService:
                                 }
                             )
 
-            # For other structured data, add as raw
-            if formatted_response:
-                formatted_response.append(
-                    {
-                        "source": "befisc",
-                        "type": "raw_data",
-                        "value": str(data),
-                        "showSource": False,
-                        "category": "TEXT",
-                    }
-                )
-
         return formatted_response
