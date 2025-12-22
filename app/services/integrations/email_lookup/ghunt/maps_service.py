@@ -6,6 +6,8 @@ from typing import Any
 import httpx
 from ghunt.helpers.gmaps import get_reviews
 
+# Ensure GHunt gmaps helpers are patched before importing get_reviews
+from app.services.integrations.email_lookup.ghunt import gmaps_patch  # noqa: F401
 from app.services.integrations.email_lookup.ghunt.credentials_manager import (
     GHuntCredentialsManager,
 )
@@ -28,16 +30,50 @@ class GHuntMapsService:
 
     async def get_maps_reviews(self, gaia_id: str) -> dict[str, Any]:
         """Get Google Maps reviews for a GAIA ID"""
+        logger.info(
+            f"GHuntMapsService: Starting get_maps_reviews for gaia_id={gaia_id}"
+        )
+
+        # Verify patch is applied
+        import ghunt.helpers.gmaps as gmaps_module
+
+        current_get_reviews = getattr(gmaps_module, "get_reviews", None)
+        if current_get_reviews and hasattr(current_get_reviews, "_ghunt_patched"):
+            logger.debug("GHuntMapsService: Verified gmaps patch is applied")
+        else:
+            logger.warning(
+                "GHuntMapsService: gmaps patch may not be applied! "
+                f"get_reviews={current_get_reviews}"
+            )
+
         try:
             async with httpx.AsyncClient() as client:
+                logger.debug(
+                    f"GHuntMapsService: Calling get_reviews(client, {gaia_id})"
+                )
                 # get_reviews returns: (error_status, stats, reviews, photos)
                 error_status, stats, reviews, photos = await get_reviews(
                     client, gaia_id
                 )
 
+                logger.info(
+                    f"GHuntMapsService: get_reviews returned - "
+                    f"error_status={error_status}, "
+                    f"stats={stats}, "
+                    f"reviews_count={len(reviews) if reviews else 0}, "
+                    f"photos_count={len(photos) if photos else 0}"
+                )
+
                 if error_status == "failed":
+                    logger.warning(
+                        "GHuntMapsService: get_reviews returned 'failed' status"
+                    )
                     return {"found": False, "error": "Failed to fetch reviews"}
                 if error_status == "empty" or not reviews:
+                    logger.info(
+                        f"GHuntMapsService: No reviews found - "
+                        f"error_status={error_status}, reviews={reviews}"
+                    )
                     return {"found": False, "error": "No reviews found"}
 
                 # Calculate photos stats from photos list
@@ -48,6 +84,11 @@ class GHuntMapsService:
                     ),
                 }
 
+                logger.info(
+                    f"GHuntMapsService: Successfully processed reviews - "
+                    f"total_reviews={len(reviews)}, total_photos={len(photos)}"
+                )
+
                 return {
                     "found": True,
                     "total_reviews": len(reviews),
@@ -57,7 +98,10 @@ class GHuntMapsService:
                     "photos": self._process_photos(photos),
                 }
         except Exception as e:
-            logger.error(f"GHunt Maps API error: {e}")
+            logger.error(
+                f"GHuntMapsService: Exception in get_maps_reviews for gaia_id={gaia_id}: {e}",
+                exc_info=True,
+            )
             return {"found": False, "error": str(e)}
 
     def _process_reviews(self, reviews: list) -> list[dict]:

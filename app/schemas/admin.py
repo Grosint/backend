@@ -15,6 +15,13 @@ class PhoneLookupDebugRequest(BaseModel):
     country_code: str = Field(..., description="Country code (e.g., '+1', '+91')")
     phone: str = Field(..., description="Phone number without country code")
     include_raw_response: bool = Field(False, description="Include raw API response")
+    is_advance: bool = Field(
+        False,
+        description=(
+            "Whether to enable advanced phone lookup behaviour. "
+            "Currently used by certain orchestrated/extended lookup flows."
+        ),
+    )
 
 
 class EmailLookupDebugRequest(BaseModel):

@@ -457,10 +457,17 @@ class SearchOrchestrator:
     ) -> Callable[[], Awaitable[dict[str, Any]]]:
         """Get phone search method for adapter"""
 
-        async def fn(a=adapter, q=query):
+        # Support optional "ADV|" prefix to signal advanced phone lookup
+        is_advance = False
+        normalized_query = query
+        if query.startswith("ADV|"):
+            is_advance = True
+            normalized_query = query[4:]
+
+        async def fn(a=adapter, q=normalized_query, adv=is_advance):
             # Parse country code and phone from query
             country_code, phone = self._parse_phone_query(q)
-            raw = await a.search_phone(country_code, phone)
+            raw = await a.search_phone(country_code, phone, is_advance=adv)
             return raw
 
         return fn

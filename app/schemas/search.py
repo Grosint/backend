@@ -21,6 +21,13 @@ class PhoneLookupRequest(BaseModel):
 
     phone: str = Field(..., description="Phone number to search (without country code)")
     country_code: str = Field("+1", description="Country code (e.g., +1, +91)")
+    is_advance: bool = Field(
+        False,
+        description=(
+            "Whether to enable advanced AITAN phone lookup. "
+            "If true, additional AITAN sources will be queried."
+        ),
+    )
 
 
 class EmailLookupRequest(BaseModel):
