@@ -53,39 +53,44 @@ async def test_aitan_phone_lookup(request: PhoneLookupDebugRequest):
             f"Admin debug: Testing AITAN phone lookup for {request.country_code}{request.phone}"
         )
 
-        # Initialize service
-        service = AITANService()
+        # Initialize service and ensure underlying HTTP client is cleaned up
+        async with AITANService() as service:
+            # Measure execution time
+            start_time = time.time()
 
-        # Measure execution time
-        start_time = time.time()
+            # Call service
+            result = await service.search_phone(
+                request.country_code, request.phone, "phone-lookup"
+            )
+            execution_time = (
+                time.time() - start_time
+            ) * 1000  # Convert to milliseconds
 
-        # Call service
-        result = await service.search_phone(
-            request.country_code, request.phone, "phone-lookup"
-        )
-        execution_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+            # Build response
+            is_success = (
+                not isinstance(result, Exception)
+                and isinstance(result, dict)
+                and not result.get("error")
+            )
 
-        # Build response
-        is_success = (
-            not isinstance(result, Exception)
-            and isinstance(result, dict)
-            and not result.get("error")
-        )
+            # Extract raw response from service result
+            raw_response = None
+            if request.include_raw_response and isinstance(result, dict):
+                raw_response = result.get("_raw_response")
 
-        # Extract raw response from service result
-        raw_response = None
-        if request.include_raw_response and isinstance(result, dict):
-            raw_response = result.get("_raw_response")
-
-        response_data = ServiceTestResponse(
-            service_name="aitan-phone",
-            success=is_success,
-            execution_time_ms=round(execution_time, 2),
-            found=result.get("found") if isinstance(result, dict) else None,
-            data=result if isinstance(result, dict) else None,
-            error=str(result) if isinstance(result, Exception) else result.get("error"),
-            raw_response=raw_response,
-        )
+            response_data = ServiceTestResponse(
+                service_name="aitan-phone",
+                success=is_success,
+                execution_time_ms=round(execution_time, 2),
+                found=result.get("found") if isinstance(result, dict) else None,
+                data=result if isinstance(result, dict) else None,
+                error=(
+                    str(result)
+                    if isinstance(result, Exception)
+                    else result.get("error")
+                ),
+                raw_response=raw_response,
+            )
 
         logger.info(
             f"Admin debug: AITAN phone lookup completed in {execution_time:.2f}ms"
@@ -115,17 +120,16 @@ async def check_aitan_phone_health(
     Returns basic connectivity and response time information.
     """
     try:
-        service = AITANService()
+        async with AITANService() as service:
+            start_time = time.time()
+            result = await service.search_phone("+1", test_phone, "phone-lookup")
+            execution_time = (time.time() - start_time) * 1000
 
-        start_time = time.time()
-        result = await service.search_phone("+1", test_phone, "phone-lookup")
-        execution_time = (time.time() - start_time) * 1000
-
-        is_healthy = (
-            isinstance(result, dict)
-            and not result.get("error")
-            and not isinstance(result, Exception)
-        )
+            is_healthy = (
+                isinstance(result, dict)
+                and not result.get("error")
+                and not isinstance(result, Exception)
+            )
 
         return SuccessResponse[dict[str, Any]](
             data={
@@ -177,39 +181,44 @@ async def test_aitan_vehicle_lookup(request: AITANVehicleLookupRequest):
             f"Admin debug: Testing AITAN vehicle lookup for {request.vehicle_number}"
         )
 
-        # Initialize service
-        service = AITANService()
+        # Initialize service and ensure underlying HTTP client is cleaned up
+        async with AITANService() as service:
+            # Measure execution time
+            start_time = time.time()
 
-        # Measure execution time
-        start_time = time.time()
+            # Call service (searches all vehicle lookup methods)
+            result = await service.search_vehicle(
+                request.vehicle_number, "vehicle-lookup", request.chassis_number
+            )
+            execution_time = (
+                time.time() - start_time
+            ) * 1000  # Convert to milliseconds
 
-        # Call service (searches all vehicle lookup methods)
-        result = await service.search_vehicle(
-            request.vehicle_number, "vehicle-lookup", request.chassis_number
-        )
-        execution_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+            # Build response
+            is_success = (
+                not isinstance(result, Exception)
+                and isinstance(result, dict)
+                and not result.get("error")
+            )
 
-        # Build response
-        is_success = (
-            not isinstance(result, Exception)
-            and isinstance(result, dict)
-            and not result.get("error")
-        )
+            # Extract raw response from service result
+            raw_response = None
+            if request.include_raw_response and isinstance(result, dict):
+                raw_response = result.get("_raw_response")
 
-        # Extract raw response from service result
-        raw_response = None
-        if request.include_raw_response and isinstance(result, dict):
-            raw_response = result.get("_raw_response")
-
-        response_data = ServiceTestResponse(
-            service_name="aitan-vehicle",
-            success=is_success,
-            execution_time_ms=round(execution_time, 2),
-            found=result.get("found") if isinstance(result, dict) else None,
-            data=result if isinstance(result, dict) else None,
-            error=str(result) if isinstance(result, Exception) else result.get("error"),
-            raw_response=raw_response,
-        )
+            response_data = ServiceTestResponse(
+                service_name="aitan-vehicle",
+                success=is_success,
+                execution_time_ms=round(execution_time, 2),
+                found=result.get("found") if isinstance(result, dict) else None,
+                data=result if isinstance(result, dict) else None,
+                error=(
+                    str(result)
+                    if isinstance(result, Exception)
+                    else result.get("error")
+                ),
+                raw_response=raw_response,
+            )
 
         logger.info(
             f"Admin debug: AITAN vehicle lookup completed in {execution_time:.2f}ms"
@@ -239,26 +248,26 @@ async def test_aitan_rc_advance(request: AITANVehicleLookupRequest):
         )
 
     try:
-        service = AITANService()
-        start_time = time.time()
-        result = await service._rc_advance(request.vehicle_number)
-        execution_time = (time.time() - start_time) * 1000
+        async with AITANService() as service:
+            start_time = time.time()
+            result = await service._rc_advance(request.vehicle_number)
+            execution_time = (time.time() - start_time) * 1000
 
-        is_success = isinstance(result, dict) and not result.get("error")
+            is_success = isinstance(result, dict) and not result.get("error")
 
-        raw_response = None
-        if request.include_raw_response and isinstance(result, dict):
-            raw_response = result.get("_raw_response")
+            raw_response = None
+            if request.include_raw_response and isinstance(result, dict):
+                raw_response = result.get("_raw_response")
 
-        response_data = ServiceTestResponse(
-            service_name="aitan-rc-advance",
-            success=is_success,
-            execution_time_ms=round(execution_time, 2),
-            found=result.get("found") if isinstance(result, dict) else None,
-            data=result if isinstance(result, dict) else None,
-            error=result.get("error") if isinstance(result, dict) else None,
-            raw_response=raw_response,
-        )
+            response_data = ServiceTestResponse(
+                service_name="aitan-rc-advance",
+                success=is_success,
+                execution_time_ms=round(execution_time, 2),
+                found=result.get("found") if isinstance(result, dict) else None,
+                data=result if isinstance(result, dict) else None,
+                error=result.get("error") if isinstance(result, dict) else None,
+                raw_response=raw_response,
+            )
 
         return SuccessResponse[ServiceTestResponse](
             data=response_data,
@@ -285,26 +294,26 @@ async def test_aitan_challan_advance(request: AITANVehicleLookupRequest):
         )
 
     try:
-        service = AITANService()
-        start_time = time.time()
-        result = await service._challan_advance(request.vehicle_number)
-        execution_time = (time.time() - start_time) * 1000
+        async with AITANService() as service:
+            start_time = time.time()
+            result = await service._challan_advance(request.vehicle_number)
+            execution_time = (time.time() - start_time) * 1000
 
-        is_success = isinstance(result, dict) and not result.get("error")
+            is_success = isinstance(result, dict) and not result.get("error")
 
-        raw_response = None
-        if request.include_raw_response and isinstance(result, dict):
-            raw_response = result.get("_raw_response")
+            raw_response = None
+            if request.include_raw_response and isinstance(result, dict):
+                raw_response = result.get("_raw_response")
 
-        response_data = ServiceTestResponse(
-            service_name="aitan-challan-advance",
-            success=is_success,
-            execution_time_ms=round(execution_time, 2),
-            found=result.get("found") if isinstance(result, dict) else None,
-            data=result if isinstance(result, dict) else None,
-            error=result.get("error") if isinstance(result, dict) else None,
-            raw_response=raw_response,
-        )
+            response_data = ServiceTestResponse(
+                service_name="aitan-challan-advance",
+                success=is_success,
+                execution_time_ms=round(execution_time, 2),
+                found=result.get("found") if isinstance(result, dict) else None,
+                data=result if isinstance(result, dict) else None,
+                error=result.get("error") if isinstance(result, dict) else None,
+                raw_response=raw_response,
+            )
 
         return SuccessResponse[ServiceTestResponse](
             data=response_data,
@@ -332,26 +341,26 @@ async def test_aitan_chassis_to_rc(request: AITANVehicleLookupRequest):
         )
 
     try:
-        service = AITANService()
-        start_time = time.time()
-        result = await service._chassis_to_rc(chassis)
-        execution_time = (time.time() - start_time) * 1000
+        async with AITANService() as service:
+            start_time = time.time()
+            result = await service._chassis_to_rc(chassis)
+            execution_time = (time.time() - start_time) * 1000
 
-        is_success = isinstance(result, dict) and not result.get("error")
+            is_success = isinstance(result, dict) and not result.get("error")
 
-        raw_response = None
-        if request.include_raw_response and isinstance(result, dict):
-            raw_response = result.get("_raw_response")
+            raw_response = None
+            if request.include_raw_response and isinstance(result, dict):
+                raw_response = result.get("_raw_response")
 
-        response_data = ServiceTestResponse(
-            service_name="aitan-chassis-to-rc",
-            success=is_success,
-            execution_time_ms=round(execution_time, 2),
-            found=result.get("found") if isinstance(result, dict) else None,
-            data=result if isinstance(result, dict) else None,
-            error=result.get("error") if isinstance(result, dict) else None,
-            raw_response=raw_response,
-        )
+            response_data = ServiceTestResponse(
+                service_name="aitan-chassis-to-rc",
+                success=is_success,
+                execution_time_ms=round(execution_time, 2),
+                found=result.get("found") if isinstance(result, dict) else None,
+                data=result if isinstance(result, dict) else None,
+                error=result.get("error") if isinstance(result, dict) else None,
+                raw_response=raw_response,
+            )
 
         return SuccessResponse[ServiceTestResponse](
             data=response_data,
@@ -378,26 +387,26 @@ async def test_aitan_fasttag_history(request: AITANVehicleLookupRequest):
         )
 
     try:
-        service = AITANService()
-        start_time = time.time()
-        result = await service._mobile_to_fasttag_history(request.vehicle_number)
-        execution_time = (time.time() - start_time) * 1000
+        async with AITANService() as service:
+            start_time = time.time()
+            result = await service._mobile_to_fasttag_history(request.vehicle_number)
+            execution_time = (time.time() - start_time) * 1000
 
-        is_success = isinstance(result, dict) and not result.get("error")
+            is_success = isinstance(result, dict) and not result.get("error")
 
-        raw_response = None
-        if request.include_raw_response and isinstance(result, dict):
-            raw_response = result.get("_raw_response")
+            raw_response = None
+            if request.include_raw_response and isinstance(result, dict):
+                raw_response = result.get("_raw_response")
 
-        response_data = ServiceTestResponse(
-            service_name="aitan-fasttag-history",
-            success=is_success,
-            execution_time_ms=round(execution_time, 2),
-            found=result.get("found") if isinstance(result, dict) else None,
-            data=result if isinstance(result, dict) else None,
-            error=result.get("error") if isinstance(result, dict) else None,
-            raw_response=raw_response,
-        )
+            response_data = ServiceTestResponse(
+                service_name="aitan-fasttag-history",
+                success=is_success,
+                execution_time_ms=round(execution_time, 2),
+                found=result.get("found") if isinstance(result, dict) else None,
+                data=result if isinstance(result, dict) else None,
+                error=result.get("error") if isinstance(result, dict) else None,
+                raw_response=raw_response,
+            )
 
         return SuccessResponse[ServiceTestResponse](
             data=response_data,
@@ -421,17 +430,16 @@ async def check_aitan_vehicle_health(
     Returns basic connectivity and response time information.
     """
     try:
-        service = AITANService()
+        async with AITANService() as service:
+            start_time = time.time()
+            result = await service.search_vehicle(test_vehicle, "vehicle-lookup")
+            execution_time = (time.time() - start_time) * 1000
 
-        start_time = time.time()
-        result = await service.search_vehicle(test_vehicle, "vehicle-lookup")
-        execution_time = (time.time() - start_time) * 1000
-
-        is_healthy = (
-            isinstance(result, dict)
-            and not result.get("error")
-            and not isinstance(result, Exception)
-        )
+            is_healthy = (
+                isinstance(result, dict)
+                and not result.get("error")
+                and not isinstance(result, Exception)
+            )
 
         return SuccessResponse[dict[str, Any]](
             data={

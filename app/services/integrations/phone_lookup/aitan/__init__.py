@@ -12,51 +12,20 @@ from typing import Any
 
 from app.core.resilience import ResilientHttpClient
 from app.services.integrations.phone_lookup.aitan import bank, phone, vehicle
+from app.services.integrations.phone_lookup.aitan.vehicle import (
+    INSURANCE_INFO_AITAN,
+    OWNER_INFO_AITAN,
+    VEHICLE_INFO_AITAN,
+)
 
 logger = logging.getLogger(__name__)
 
-# Constants for vehicle RC processing
-VEHICLE_INFO_AITAN = [
-    "vehicle_no",
-    "registration_no",
-    "chassis_no",
-    "engine_no",
-    "vehicle_class",
-    "fuel_type",
-    "maker_model",
-    "manufacturing_date",
-    "registration_date",
-    "fitness_upto",
-    "tax_upto",
-    "insurance_upto",
-    "permit_upto",
-    "permit_type",
-    "financer",
-    "owner_name",
-    "owner_father_name",
-    "owner_address",
-    "rc_status",
-    "vehicle_color",
-    "norms",
-    "vehicle_category",
-]
-
-OWNER_INFO_AITAN = [
-    "owner_name",
-    "owner_father_name",
-    "owner_address",
-    "split_permanent_address",
-    "split_present_address",
-    "owner_mobile",
-    "owner_email",
-]
-
-INSURANCE_INFO_AITAN = [
-    "insurance_company",
-    "insurance_policy_no",
-    "insurance_valid_from",
-    "insurance_valid_to",
-    "insurance_upto",
+# Explicitly declare public exports
+__all__ = [
+    "AITANService",
+    "INSURANCE_INFO_AITAN",
+    "OWNER_INFO_AITAN",
+    "VEHICLE_INFO_AITAN",
 ]
 
 
@@ -94,6 +63,27 @@ class AITANService:
         self._phone_service = phone.AITANPhoneService(self)
         self._vehicle_service = vehicle.AITANVehicleService(self)
         self._bank_service = bank.AITANBankService(self)
+
+    async def aclose(self) -> None:
+        """
+        Close underlying HTTP resources.
+
+        This ensures the wrapped httpx.AsyncClient (via ResilientHttpClient)
+        is properly closed and its connection pools are released.
+        """
+        await self.client.aclose()
+
+    async def __aenter__(self) -> AITANService:
+        """
+        Support usage as an async context manager:
+
+            async with AITANService() as service:
+                ...
+        """
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        await self.aclose()
 
     async def search_phone(
         self, country_code: str, phone: str, lookup_type: str = "phone-lookup"

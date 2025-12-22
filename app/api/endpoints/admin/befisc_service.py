@@ -7,12 +7,12 @@ orchestration, database persistence, or billing logic.
 
 Endpoints:
 - POST /admin/debug/befisc/{lookup_type} - Test Befisc service with specific lookup type
-- POST /admin/debug/befisc/all - Test all Befisc lookup types
 - GET /admin/debug/befisc/{lookup_type}/health - Quick health check for a lookup type
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import Any
@@ -89,8 +89,6 @@ async def _call_befisc_service(
         # For vehicle lookup, we need to call the individual methods
         # Since search_phone doesn't handle vehicle lookup directly,
         # we'll call the internal methods
-        import asyncio
-
         tasks = []
         if hasattr(service, "_rc_search_advance_v3"):
             tasks.append(service._rc_search_advance_v3(request.vehicle_number or ""))
@@ -114,8 +112,17 @@ async def _call_befisc_service(
         found_any = False
         raw_responses = {}
 
-        for result in results:
+        for idx, result in enumerate(results):
             if isinstance(result, Exception):
+                logger.error(
+                    "Befisc vehicle lookup task failed",
+                    exc_info=True,
+                    extra={
+                        "vehicle_number": request.vehicle_number,
+                        "task_index": idx,
+                        "lookup_type": request.lookup_type,
+                    },
+                )
                 continue
             if isinstance(result, dict):
                 raw_responses.update(result.get("_raw_response", {}))

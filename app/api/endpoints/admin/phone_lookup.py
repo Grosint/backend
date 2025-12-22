@@ -82,8 +82,18 @@ async def test_phone_lookup_service(
         )
 
     try:
+        # Mask phone number in logs to avoid exposing PII
+        phone_str = request.phone or ""
+        if len(phone_str) > 2:
+            masked_phone = "X" * (len(phone_str) - 2) + phone_str[-2:]
+        else:
+            masked_phone = "X" * len(phone_str)
+        safe_phone = f"{request.country_code or ''}{masked_phone}"
+
         logger.info(
-            f"Admin debug: Testing {service_name_lower} for {request.country_code}{request.phone}"
+            "Admin debug: Testing %s for %s",
+            service_name_lower,
+            safe_phone,
         )
 
         # Initialize service
