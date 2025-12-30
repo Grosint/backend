@@ -587,6 +587,25 @@
 						"description": "Get full history details by ID including flattenedResults. Use this endpoint when clicking on a history item from the list. Returns complete history information with flattened results ready for UI rendering."
 					},
 					"response": []
+				},
+				{
+					"name": "Delete All History",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/history/",
+							"host": ["{{base_url}}"],
+							"path": ["history", ""]
+						},
+						"description": "Delete all history data for the current authenticated user. Only history data is deleted; user, credits, and credits_transaction data remain untouched. Returns the count of deleted history records."
+					},
+					"response": []
 				}
 			],
 			"description": "History endpoints for viewing user's search history with paginated metadata and detailed results"

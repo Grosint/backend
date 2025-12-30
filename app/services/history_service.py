@@ -41,6 +41,9 @@ class HistoryService:
         if not history:
             raise ValueError("History not found")
 
+        # Decrypt data before modifying
+        history.decrypt_sensitive_data()
+
         history.results.append(result)
         # update metadata counts
         meta = history.metadata
@@ -50,6 +53,7 @@ class HistoryService:
         else:
             meta.failedSources += 1
         history.updatedAt = datetime.now(UTC)
+        # Encryption happens automatically in @before_event hook
         await history.save()
         logger.info(
             "History result added",
@@ -71,8 +75,12 @@ class HistoryService:
         if not history:
             raise ValueError("History not found")
 
+        # Decrypt existing data (if any) before updating
+        history.decrypt_sensitive_data()
+
         history.flattenedResults = flattened_results
         history.updatedAt = datetime.now(UTC)
+        # Encryption happens automatically in @before_event hook
         await history.save()
         logger.info(
             "Flattened results stored in history",
@@ -93,6 +101,9 @@ class HistoryService:
         history = await History.get(history_id)
         if not history:
             raise ValueError("History not found")
+
+        # Decrypt existing data before modifying
+        history.decrypt_sensitive_data()
 
         meta = history.metadata
         meta.totalSources = total_sources
@@ -120,6 +131,7 @@ class HistoryService:
             history.flattenedResults = flattened_results
 
         history.updatedAt = datetime.now(UTC)
+        # Encryption happens automatically in @before_event hook
         await history.save()
         logger.info(
             "History finalized",
@@ -136,7 +148,11 @@ class HistoryService:
         return history
 
     async def get_history_by_id(self, history_id: PydanticObjectId) -> History | None:
-        return await History.get(history_id)
+        history = await History.get(history_id)
+        if history:
+            # Decrypt data after loading
+            history.decrypt_sensitive_data()
+        return history
 
     async def get_user_histories(
         self,
@@ -149,4 +165,43 @@ class HistoryService:
         cursor = History.find(History.userId == user_id).sort("-createdAt")
         total = await cursor.count()
         items = await cursor.skip(skip).limit(size).to_list()
+
+        # Decrypt all items after loading
+        for item in items:
+            item.decrypt_sensitive_data()
+
         return items, total
+
+    async def delete_all_user_history(
+        self,
+        user_id: PydanticObjectId,
+    ) -> int:
+        """
+        Delete all history records for a specific user.
+
+        Args:
+            user_id: User ID whose history should be deleted
+
+        Returns:
+            Number of history records deleted
+        """
+        try:
+            result = await History.find(History.userId == user_id).delete_many()
+            deleted_count = result.deleted_count
+            logger.info(
+                "All user history deleted",
+                extra={
+                    "user_id": str(user_id),
+                    "deleted_count": deleted_count,
+                },
+            )
+            return deleted_count
+        except Exception as e:
+            logger.error(
+                "Error deleting user history",
+                extra={
+                    "user_id": str(user_id),
+                    "exception": type(e).__name__,
+                },
+            )
+            raise

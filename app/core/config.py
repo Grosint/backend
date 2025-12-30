@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # 15 minutes (short-lived)
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # 7 days
+    # Encryption key for history data (required)
+    # Set via ENCRYPTION_KEY environment variable
+    # Generate with: openssl rand -base64 32
 
     # Token blocklist configuration (using MongoDB)
     # No additional configuration needed - uses existing MongoDB connection

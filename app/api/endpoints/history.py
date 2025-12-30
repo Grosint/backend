@@ -5,7 +5,11 @@ import logging
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.core.auth_dependencies import TokenData, get_current_user_optional
+from app.core.auth_dependencies import (
+    TokenData,
+    get_current_user_optional,
+    get_current_user_token,
+)
 from app.schemas.history import (
     HistoryListItemSchema,
     HistoryListResponse,
@@ -115,3 +119,41 @@ async def list_histories(
         data=payload,
         pagination=pagination,
     )
+
+
+@router.delete("/", response_model=SuccessResponse[dict])
+async def delete_all_history(
+    current_user: TokenData = Depends(get_current_user_token),
+):
+    """
+    Delete all history data for the current authenticated user.
+    Only history data is deleted; user, credits, and credits_transaction data remain untouched.
+    """
+    service = HistoryService()
+    try:
+        deleted_count = await service.delete_all_user_history(
+            PydanticObjectId(current_user.user_id)
+        )
+        logger.info(
+            "All user history deleted via API",
+            extra={
+                "user_id": current_user.user_id,
+                "deleted_count": deleted_count,
+            },
+        )
+        return SuccessResponse[dict](
+            success=True,
+            message=f"Successfully deleted {deleted_count} history record(s)",
+            data={"deleted_count": deleted_count},
+        )
+    except Exception as e:
+        logger.error(
+            "Error deleting all user history",
+            extra={
+                "user_id": current_user.user_id,
+                "exception": type(e).__name__,
+            },
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete history: {str(e)}"
+        ) from e
