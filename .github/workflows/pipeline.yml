@@ -34,12 +34,12 @@ jobs:
             - name: Black formatting check
               run: |
                   black --version
-                  black --check --diff app/ tests/
+                  black --check --diff .
 
             - name: Ruff linting and import sorting check
               run: |
-                  ruff check app/ tests/
-                  ruff check --select I app/ tests/
+                  ruff check --config ruff.toml .
+                  ruff check --select I --config ruff.toml .
 
             - name: Security check with Bandit
               run: bandit -r app/ -c bandit.yaml
