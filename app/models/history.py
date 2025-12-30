@@ -84,16 +84,17 @@ class History(Document):
         """
         encryption = get_encryption()
         if encryption is None:
-            # Encryption not available - skip encryption and store data as-is
-            logger.warning(
-                "Encryption not available - storing data unencrypted",
-                extra={
-                    "history_id": (
-                        str(self.id) if hasattr(self, "id") and self.id else "new"
-                    )
-                },
+            history_id = str(self.id) if hasattr(self, "id") and self.id else "new"
+            error_msg = f"CRITICAL: Encryption not available (ENCRYPTION_KEY missing) for history_id={history_id}"
+            logger.error(error_msg, extra={"history_id": history_id})
+
+            # Fail the save in ALL environments to prevent unencrypted data storage
+            # This ensures data integrity and security regardless of environment
+            raise ValueError(
+                "Encryption not available (ENCRYPTION_KEY missing). "
+                "Save operation aborted to prevent storing unencrypted sensitive data. "
+                "ENCRYPTION_KEY must be set. Generate one with: openssl rand -base64 32"
             )
-            return
 
         try:
             # Encrypt results if not already encrypted
@@ -167,17 +168,16 @@ class History(Document):
                 )
 
         except Exception as e:
-            logger.error(
-                f"Error encrypting history data: {e}",
-                exc_info=True,
-                extra={
-                    "history_id": (
-                        str(self.id) if hasattr(self, "id") and self.id else "new"
-                    )
-                },
-            )
-            # Don't raise - allow save to proceed, but log the error
-            # In production, you might want to raise here
+            history_id = str(self.id) if hasattr(self, "id") and self.id else "new"
+            error_msg = f"CRITICAL: Failed to encrypt history data for history_id={history_id}: {e}"
+            logger.error(error_msg, exc_info=True, extra={"history_id": history_id})
+
+            # Fail the save in ALL environments to prevent unencrypted data storage
+            # This ensures data integrity and security regardless of environment
+            raise ValueError(
+                f"Encryption failed for history data. Save operation aborted to prevent "
+                f"storing unencrypted sensitive data. Original error: {str(e)}"
+            ) from e
 
     def decrypt_sensitive_data(self):
         """Decrypt sensitive fields (results and flattenedResults) after loading from database.
