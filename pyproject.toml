@@ -16,6 +16,7 @@ extend-exclude = '''
   | dist
   | logs
   | __pycache__
+  | app/externals
 )/
 '''
 
@@ -33,6 +34,7 @@ exclude = [
     "build",
     "dist",
     "logs",
+    "app/externals",
 ]
 select = [
     "E",  # pycodestyle errors
@@ -90,6 +92,9 @@ ignore = [
     "ARG003", # unused class method argument
     "ARG004", # unused static method argument
     "ARG005", # unused lambda argument
+]
+"app/externals/**/*.py" = [
+    "S",  # flake8-bandit - exclude all bandit security checks for external APIs
 ]
 
 [tool.ruff.isort]
