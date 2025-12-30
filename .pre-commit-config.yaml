@@ -32,6 +32,7 @@ repos:
       hooks:
           - id: bandit
             exclude: '^tests/|^run_tests\.py$'
+            args: ['--exclude', 'app/externals', '--skip', 'B101']
             additional_dependencies: ['pbr>=5.11.0']
 
     # Safety - Check for known security vulnerabilities (disabled due to mixed dependency management)

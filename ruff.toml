@@ -2,6 +2,20 @@
 target-version = "py312"
 line-length = 88
 
+exclude = [
+    "__pycache__",
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+    "build",
+    "dist",
+    "logs",
+    "app/externals",
+]
+
 [lint]
 select = [
     "E",    # pycodestyle errors

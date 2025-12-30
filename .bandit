@@ -1,5 +1,5 @@
 [bandit];
-(exclude_dirs = tests), venv, __pycache__, htmlcov, logs;
+(exclude_dirs = tests), venv, __pycache__, htmlcov, logs, app/externals;
 (skips = B101), B601;
 (tests = B201),
 	B301,

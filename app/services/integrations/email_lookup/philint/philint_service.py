@@ -36,7 +36,7 @@ class PhilINTService:
 
             # Import philINT classes
             try:
-                from philINT.classes import Email, Person
+                from app.externals.philINT.classes import Email, Person
             except ImportError as e:
                 logger.error(f"PhilINT: Failed to import philINT classes: {e}")
                 raise ExternalServiceException(
@@ -513,7 +513,115 @@ class PhilINTService:
             logger.warning(f"PhilINT: Error extracting names: {e}")
             raw_data["person_data"]["names"] = []
 
+        # Extract data with their source service information
         try:
+            pictures_with_source = []
+            usernames_with_source = []
+            names_with_source = []
+            emails_with_source = []
+
+            # Extract data from connections with their service names
+            if hasattr(email_obj, "connections") and email_obj.connections is not None:
+                for connection in email_obj.connections:
+                    try:
+                        service_name = type(connection).__name__
+                        # Normalize service name (e.g., "Chess" -> "Chess.com")
+                        if service_name == "Chess":
+                            service_name = "Chess.com"
+                        service_name_lower = service_name.lower()
+
+                        # Extract Username
+                        if (
+                            hasattr(connection, "_fields")
+                            and connection._fields
+                            and "Username" in connection._fields
+                        ):
+                            username = getattr(connection, "Username", None)
+                            if username is not None:
+                                usernames_with_source.append(
+                                    {"value": username, "service": service_name_lower}
+                                )
+
+                        # Extract Name
+                        if (
+                            hasattr(connection, "_fields")
+                            and connection._fields
+                            and "Name" in connection._fields
+                        ):
+                            name = getattr(connection, "Name", None)
+                            if name is not None:
+                                names_with_source.append(
+                                    {"value": name, "service": service_name_lower}
+                                )
+
+                        # Extract Emails
+                        if (
+                            hasattr(connection, "_fields")
+                            and connection._fields
+                            and "Emails" in connection._fields
+                        ):
+                            emails = getattr(connection, "Emails", None)
+                            if emails is not None:
+                                if isinstance(emails, (list, tuple)):
+                                    for email_addr in emails:
+                                        if email_addr is not None:
+                                            emails_with_source.append(
+                                                {
+                                                    "value": email_addr,
+                                                    "service": service_name_lower,
+                                                }
+                                            )
+                                else:
+                                    emails_with_source.append(
+                                        {"value": emails, "service": service_name_lower}
+                                    )
+
+                        # Extract Picture (singular)
+                        if (
+                            hasattr(connection, "_fields")
+                            and connection._fields
+                            and "Picture" in connection._fields
+                        ):
+                            picture = getattr(connection, "Picture", None)
+                            if picture is not None:
+                                pictures_with_source.append(
+                                    {"url": picture, "service": service_name_lower}
+                                )
+
+                        # Extract Pictures (plural)
+                        if (
+                            hasattr(connection, "_fields")
+                            and connection._fields
+                            and "Pictures" in connection._fields
+                        ):
+                            pictures = getattr(connection, "Pictures", None)
+                            if pictures is not None:
+                                if isinstance(pictures, (list, tuple)):
+                                    for pic in pictures:
+                                        if pic is not None:
+                                            pictures_with_source.append(
+                                                {
+                                                    "url": pic,
+                                                    "service": service_name_lower,
+                                                }
+                                            )
+                                else:
+                                    pictures_with_source.append(
+                                        {"url": pictures, "service": service_name_lower}
+                                    )
+                    except Exception as e:
+                        logger.debug(
+                            f"PhilINT: Error extracting data from connection: {e}"
+                        )
+                        continue
+
+            raw_data["person_data"]["usernames_with_source"] = usernames_with_source
+            raw_data["person_data"]["names_with_source"] = names_with_source
+            raw_data["person_data"]["emails_with_source"] = emails_with_source
+
+            raw_data["person_data"]["pictures_with_source"] = pictures_with_source
+
+            # Also keep the old pictures list for backward compatibility
             if hasattr(person_obj, "pictures"):
                 try:
                     pictures = getattr(person_obj, "pictures", None)
@@ -535,6 +643,7 @@ class PhilINTService:
         except Exception as e:
             logger.warning(f"PhilINT: Error extracting pictures: {e}")
             raw_data["person_data"]["pictures"] = []
+            raw_data["person_data"]["pictures_with_source"] = []
 
         try:
             if hasattr(person_obj, "accounts"):
@@ -619,127 +728,320 @@ class PhilINTService:
         person_data = raw_data.get("person_data", {}) or {}
         email_data = raw_data.get("email_data", {}) or {}
 
-        # Extract names
+        # Extract names with service information
         try:
-            names = person_data.get("names")
-            if names is not None:
-                if not isinstance(names, (list, tuple, set)):
-                    logger.warning(
-                        f"PhilINT: names is not iterable, type: {type(names)}"
-                    )
-                    names = []
-                else:
-                    names = list(names)
-            else:
-                names = []
+            names_with_source = person_data.get("names_with_source", [])
 
-            if names:
-                logger.debug(f"PhilINT: Processing {len(names)} names")
-                for name in names:
-                    if name:
+            if names_with_source:
+                logger.debug(
+                    f"PhilINT: Processing {len(names_with_source)} names with source"
+                )
+                for name_info in names_with_source:
+                    if isinstance(name_info, dict):
+                        name_value = name_info.get("value")
+                        service_name = name_info.get("service", "philint")
+                    else:
+                        name_value = name_info
+                        service_name = "philint"
+
+                    if name_value:
+                        # Normalize service name
+                        service_mapping = {
+                            "github": "github",
+                            "gravatar": "gravatar",
+                            "adobe": "adobe",
+                            "imgur": "imgur",
+                            "wordpress": "wordpress",
+                            "duolingo": "duolingo",
+                            "chess.com": "chess",
+                            "chess": "chess",
+                            "mewe": "mewe",
+                            "twitter": "twitter",
+                            "myanimelist": "myanimelist",
+                        }
+                        service_type = service_mapping.get(
+                            service_name.lower(), service_name.lower()
+                        )
+
                         formatted_response.append(
                             {
-                                "type": "name",
+                                "type": service_type,
                                 "source": "philint",
-                                "value": str(name),
-                                "showSource": False,
+                                "value": str(name_value),
+                                "showSource": True,
                                 "category": "TEXT",
                             }
                         )
+            else:
+                # Fallback to old names list
+                names = person_data.get("names", [])
+                if names is not None:
+                    if not isinstance(names, (list, tuple, set)):
+                        logger.warning(
+                            f"PhilINT: names is not iterable, type: {type(names)}"
+                        )
+                        names = []
+                    else:
+                        names = list(names)
+                else:
+                    names = []
+
+                if names:
+                    logger.debug(f"PhilINT: Processing {len(names)} names (fallback)")
+                    for name in names:
+                        if name:
+                            formatted_response.append(
+                                {
+                                    "type": "philint",
+                                    "source": "philint",
+                                    "value": str(name),
+                                    "showSource": True,
+                                    "category": "TEXT",
+                                }
+                            )
         except Exception as e:
             logger.warning(f"PhilINT: Error extracting names: {e}")
 
-        # Extract email addresses
+        # Extract email addresses with service information
         try:
-            email_addresses = person_data.get("email_addresses")
-            if email_addresses is not None:
-                if not isinstance(email_addresses, (list, tuple, set)):
-                    logger.warning(
-                        f"PhilINT: email_addresses is not iterable, type: {type(email_addresses)}"
-                    )
-                    email_addresses = []
-                else:
-                    email_addresses = list(email_addresses)
-            else:
-                email_addresses = []
+            emails_with_source = person_data.get("emails_with_source", [])
 
-            if email_addresses:
+            if emails_with_source:
                 logger.debug(
-                    f"PhilINT: Processing {len(email_addresses)} email addresses"
+                    f"PhilINT: Processing {len(emails_with_source)} emails with source"
                 )
-                for email_addr in email_addresses:
+                for email_info in emails_with_source:
+                    if isinstance(email_info, dict):
+                        email_addr = email_info.get("value")
+                        service_name = email_info.get("service", "philint")
+                    else:
+                        email_addr = email_info
+                        service_name = "philint"
+
                     if (
                         email_addr and email_addr != email
                     ):  # Don't duplicate the search email
+                        # Normalize service name
+                        service_mapping = {
+                            "github": "github",
+                            "gravatar": "gravatar",
+                            "adobe": "adobe",
+                            "imgur": "imgur",
+                            "wordpress": "wordpress",
+                            "duolingo": "duolingo",
+                            "chess.com": "chess",
+                            "chess": "chess",
+                            "mewe": "mewe",
+                            "twitter": "twitter",
+                            "myanimelist": "myanimelist",
+                        }
+                        service_type = service_mapping.get(
+                            service_name.lower(), service_name.lower()
+                        )
+
                         formatted_response.append(
                             {
-                                "type": "email",
+                                "type": service_type,
                                 "source": "philint",
                                 "value": str(email_addr),
-                                "showSource": False,
+                                "showSource": True,
                                 "category": "TEXT",
                             }
                         )
+            else:
+                # Fallback to old email_addresses list
+                email_addresses = person_data.get("email_addresses", [])
+                if email_addresses is not None:
+                    if not isinstance(email_addresses, (list, tuple, set)):
+                        logger.warning(
+                            f"PhilINT: email_addresses is not iterable, type: {type(email_addresses)}"
+                        )
+                        email_addresses = []
+                    else:
+                        email_addresses = list(email_addresses)
+                else:
+                    email_addresses = []
+
+                if email_addresses:
+                    logger.debug(
+                        f"PhilINT: Processing {len(email_addresses)} email addresses (fallback)"
+                    )
+                    for email_addr in email_addresses:
+                        if (
+                            email_addr and email_addr != email
+                        ):  # Don't duplicate the search email
+                            formatted_response.append(
+                                {
+                                    "type": "philint",
+                                    "source": "philint",
+                                    "value": str(email_addr),
+                                    "showSource": True,
+                                    "category": "TEXT",
+                                }
+                            )
         except Exception as e:
             logger.warning(f"PhilINT: Error extracting email addresses: {e}")
 
-        # Extract usernames
+        # Extract usernames with service information
         try:
-            usernames = person_data.get("usernames")
-            if usernames is not None:
-                if not isinstance(usernames, (list, tuple, set)):
-                    logger.warning(
-                        f"PhilINT: usernames is not iterable, type: {type(usernames)}"
-                    )
-                    usernames = []
-                else:
-                    usernames = list(usernames)
-            else:
-                usernames = []
+            usernames_with_source = person_data.get("usernames_with_source", [])
 
-            if usernames:
-                logger.debug(f"PhilINT: Processing {len(usernames)} usernames")
-                for username in usernames:
-                    if username:
+            if usernames_with_source:
+                logger.debug(
+                    f"PhilINT: Processing {len(usernames_with_source)} usernames with source"
+                )
+                for username_info in usernames_with_source:
+                    if isinstance(username_info, dict):
+                        username_value = username_info.get("value")
+                        service_name = username_info.get("service", "philint")
+                    else:
+                        username_value = username_info
+                        service_name = "philint"
+
+                    if username_value:
+                        # Normalize service name
+                        service_mapping = {
+                            "github": "github",
+                            "gravatar": "gravatar",
+                            "adobe": "adobe",
+                            "imgur": "imgur",
+                            "wordpress": "wordpress",
+                            "duolingo": "duolingo",
+                            "chess.com": "chess",
+                            "chess": "chess",
+                            "mewe": "mewe",
+                            "twitter": "twitter",
+                            "myanimelist": "myanimelist",
+                        }
+                        service_type = service_mapping.get(
+                            service_name.lower(), service_name.lower()
+                        )
+
                         formatted_response.append(
                             {
-                                "type": "username",
-                                "source": "philint",
-                                "value": str(username),
-                                "showSource": False,
+                                "type": service_type,
+                                "source": "username",
+                                "value": str(username_value),
+                                "showSource": True,
                                 "category": "TEXT",
                             }
                         )
+            else:
+                # Fallback to old usernames list
+                usernames = person_data.get("usernames", [])
+                if usernames is not None:
+                    if not isinstance(usernames, (list, tuple, set)):
+                        logger.warning(
+                            f"PhilINT: usernames is not iterable, type: {type(usernames)}"
+                        )
+                        usernames = []
+                    else:
+                        usernames = list(usernames)
+                else:
+                    usernames = []
+
+                if usernames:
+                    logger.debug(
+                        f"PhilINT: Processing {len(usernames)} usernames (fallback)"
+                    )
+                    for username in usernames:
+                        if username:
+                            formatted_response.append(
+                                {
+                                    "type": "philint",
+                                    "source": "username",
+                                    "value": str(username),
+                                    "showSource": True,
+                                    "category": "TEXT",
+                                }
+                            )
         except Exception as e:
             logger.warning(f"PhilINT: Error extracting usernames: {e}")
 
-        # Extract pictures/images
+        # Extract pictures/images with service information
         try:
-            pictures = person_data.get("pictures")
-            if pictures is not None:
-                if not isinstance(pictures, (list, tuple, set)):
-                    logger.warning(
-                        f"PhilINT: pictures is not iterable, type: {type(pictures)}"
-                    )
-                    pictures = []
-                else:
-                    pictures = list(pictures)
-            else:
-                pictures = []
+            # Use pictures_with_source if available, otherwise fall back to pictures
+            pictures_with_source = person_data.get("pictures_with_source", [])
 
-            if pictures:
-                logger.debug(f"PhilINT: Processing {len(pictures)} pictures")
-                for picture_url in pictures:
+            if pictures_with_source:
+                logger.debug(
+                    f"PhilINT: Processing {len(pictures_with_source)} pictures with source"
+                )
+                for pic_info in pictures_with_source:
+                    if isinstance(pic_info, dict):
+                        picture_url = pic_info.get("url")
+                        service_name = pic_info.get("service", "philint")
+                    else:
+                        # Fallback for old format
+                        picture_url = pic_info
+                        service_name = "philint"
+
                     if picture_url:
-                        formatted_response.append(
-                            {
-                                "type": "image",
-                                "source": "philint",
-                                "value": str(picture_url),
-                                "showSource": False,
-                                "category": "IMAGE",
+                        picture_url_str = str(picture_url)
+                        # Only include URLs (filter out numbers and non-URL values)
+                        if picture_url_str.startswith(("http://", "https://", "//")):
+                            # Normalize service name - map to account names
+                            service_mapping = {
+                                "github": "github",
+                                "gravatar": "gravatar",
+                                "adobe": "adobe",
+                                "imgur": "imgur",
+                                "wordpress": "wordpress",
+                                "duolingo": "duolingo",
+                                "chess.com": "chess",
+                                "chess": "chess",
+                                "mewe": "mewe",
+                                "twitter": "twitter",
+                                "myanimelist": "myanimelist",
                             }
+                            # Get the service type, defaulting to the service name if not in mapping
+                            service_type = service_mapping.get(
+                                service_name.lower(), service_name.lower()
+                            )
+
+                            formatted_response.append(
+                                {
+                                    "type": service_type,
+                                    "source": "philint",
+                                    "value": picture_url_str,
+                                    "showSource": True,
+                                    "category": "IMAGE",
+                                }
+                            )
+            else:
+                # Fallback to old pictures list if pictures_with_source not available
+                pictures = person_data.get("pictures", [])
+                if pictures is not None:
+                    if not isinstance(pictures, (list, tuple, set)):
+                        logger.warning(
+                            f"PhilINT: pictures is not iterable, type: {type(pictures)}"
                         )
+                        pictures = []
+                    else:
+                        pictures = list(pictures)
+                else:
+                    pictures = []
+
+                if pictures:
+                    logger.debug(
+                        f"PhilINT: Processing {len(pictures)} pictures (fallback)"
+                    )
+                    for picture_url in pictures:
+                        if picture_url:
+                            picture_url_str = str(picture_url)
+                            # Only include URLs (filter out numbers and non-URL values)
+                            if picture_url_str.startswith(
+                                ("http://", "https://", "//")
+                            ):
+                                formatted_response.append(
+                                    {
+                                        "type": "philint",
+                                        "source": "philint",
+                                        "value": picture_url_str,
+                                        "showSource": True,
+                                        "category": "IMAGE",
+                                    }
+                                )
         except Exception as e:
             logger.warning(f"PhilINT: Error extracting pictures: {e}")
 
@@ -761,12 +1063,29 @@ class PhilINTService:
                 logger.debug(f"PhilINT: Processing {len(accounts)} accounts")
                 for account in accounts:
                     if account:
+                        # Normalize account name to service type
+                        account_str = str(account).lower()
+                        service_mapping = {
+                            "github": "github",
+                            "gravatar": "gravatar",
+                            "adobe": "adobe",
+                            "imgur": "imgur",
+                            "wordpress": "wordpress",
+                            "duolingo": "duolingo",
+                            "chess.com": "chess",
+                            "chess": "chess",
+                            "mewe": "mewe",
+                            "twitter": "twitter",
+                            "myanimelist": "myanimelist",
+                        }
+                        service_type = service_mapping.get(account_str, account_str)
+
                         formatted_response.append(
                             {
-                                "type": "account",
-                                "source": "philint",
-                                "value": str(account),
-                                "showSource": False,
+                                "type": service_type,
+                                "source": "Account Exists",
+                                "value": True,  # Account exists since it's in the accounts list
+                                "showSource": True,
                                 "category": "TEXT",
                             }
                         )
@@ -778,30 +1097,30 @@ class PhilINTService:
             if email_data.get("spam") is not None:
                 formatted_response.append(
                     {
-                        "type": "emailMetadata",
+                        "type": "philint",
                         "source": "philint",
                         "value": f"Spam: {email_data.get('spam')}",
-                        "showSource": False,
+                        "showSource": True,
                         "category": "TEXT",
                     }
                 )
             if email_data.get("deliverable") is not None:
                 formatted_response.append(
                     {
-                        "type": "emailMetadata",
+                        "type": "philint",
                         "source": "philint",
                         "value": f"Deliverable: {email_data.get('deliverable')}",
-                        "showSource": False,
+                        "showSource": True,
                         "category": "TEXT",
                     }
                 )
             if email_data.get("disposable") is not None:
                 formatted_response.append(
                     {
-                        "type": "emailMetadata",
+                        "type": "philint",
                         "source": "philint",
                         "value": f"Disposable: {email_data.get('disposable')}",
-                        "showSource": False,
+                        "showSource": True,
                         "category": "TEXT",
                     }
                 )

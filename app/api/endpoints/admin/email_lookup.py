@@ -28,6 +28,7 @@ from app.schemas.admin import (
 )
 from app.schemas.response import SuccessResponse
 from app.services.integrations.email_lookup.ghunt import GHuntService
+from app.services.integrations.email_lookup.holehe import HoleheService
 from app.services.integrations.email_lookup.philint import PhilINTService
 from app.services.integrations.phone_lookup.leakcheck_service import LeakCheckService
 from app.services.integrations.phone_lookup.skype_service import SkypeService
@@ -44,6 +45,7 @@ EMAIL_LOOKUP_SERVICES = {
     "leakcheck": LeakCheckService,
     "ghunt": GHuntService,
     "philint": PhilINTService,
+    "holehe": HoleheService,
     "email_lookup": EmailLookupOrchestrator,  # Full orchestrator
 }
 
@@ -128,7 +130,7 @@ async def test_email_lookup_service(
     - Returns detailed debugging information
     - Does NOT create search records or deduct credits
 
-    Available services: skype, leakcheck, ghunt, philint, email_lookup (full orchestrator)
+    Available services: skype, leakcheck, ghunt, philint, holehe, email_lookup (full orchestrator)
     """
     service_name_lower = service_name.lower()
 

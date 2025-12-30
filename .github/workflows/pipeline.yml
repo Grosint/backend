@@ -42,7 +42,7 @@ jobs:
                   ruff check --select I app/ tests/
 
             - name: Security check with Bandit
-              run: bandit -r app/ --skip B101
+              run: bandit -r app/ -c bandit.yaml
 
     test:
         name: 🧪 Test & Coverage
