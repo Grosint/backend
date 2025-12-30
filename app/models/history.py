@@ -5,7 +5,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from beanie import Document, Indexed, Insert, Replace, before_event
+from beanie import Document, Indexed, Insert, Replace, Update, before_event
 from pydantic import BaseModel, Field
 
 from app.utils.encryption import get_encryption
@@ -69,7 +69,7 @@ class History(Document):
         except Exception:
             return False
 
-    @before_event([Insert, Replace])
+    @before_event([Insert, Replace, Update])
     def set_timestamps(self):
         now = datetime.now(UTC)
         if self.createdAt is None:
@@ -82,19 +82,100 @@ class History(Document):
 
         Note: queryInput is NOT encrypted to allow indexing and analysis.
         """
+        encryption = get_encryption()
+        if encryption is None:
+            # Encryption not available - skip encryption and store data as-is
+            logger.warning(
+                "Encryption not available - storing data unencrypted",
+                extra={
+                    "history_id": (
+                        str(self.id) if hasattr(self, "id") and self.id else "new"
+                    )
+                },
+            )
+            return
+
         try:
-            encryption = get_encryption()
+            # Encrypt results if not already encrypted
+            # Note: Empty lists are still encrypted to maintain consistency
+            if not isinstance(self.results, str):
+                logger.info(
+                    f"Encrypting results: type={type(self.results).__name__}, "
+                    f"is_list={isinstance(self.results, list)}, "
+                    f"len={len(self.results) if isinstance(self.results, list) else 'N/A'}",
+                    extra={
+                        "history_id": (
+                            str(self.id) if hasattr(self, "id") and self.id else "new"
+                        )
+                    },
+                )
+                # Convert Pydantic models to dicts before encryption
+                if isinstance(self.results, list):
+                    results_data = [
+                        item.model_dump() if isinstance(item, BaseModel) else item
+                        for item in self.results
+                    ]
+                elif isinstance(self.results, BaseModel):
+                    results_data = self.results.model_dump()
+                else:
+                    results_data = self.results
+                # Encrypt even if empty list to maintain consistency
+                encrypted_results = encryption.encrypt(results_data)
+                self.results = encrypted_results
+                logger.info(
+                    f"Results encrypted successfully: encrypted_length={len(encrypted_results)}",
+                    extra={
+                        "history_id": (
+                            str(self.id) if hasattr(self, "id") and self.id else "new"
+                        )
+                    },
+                )
 
-            # Encrypt results if not empty and not already encrypted
-            if self.results and not isinstance(self.results, str):
-                self.results = encryption.encrypt(self.results)
-
-            # Encrypt flattenedResults if not empty and not already encrypted
-            if self.flattenedResults and not isinstance(self.flattenedResults, str):
-                self.flattenedResults = encryption.encrypt(self.flattenedResults)
+            # Encrypt flattenedResults if not already encrypted
+            # Note: Empty lists are still encrypted to maintain consistency
+            if not isinstance(self.flattenedResults, str):
+                logger.info(
+                    f"Encrypting flattenedResults: type={type(self.flattenedResults).__name__}, "
+                    f"is_list={isinstance(self.flattenedResults, list)}, "
+                    f"len={len(self.flattenedResults) if isinstance(self.flattenedResults, list) else 'N/A'}",
+                    extra={
+                        "history_id": (
+                            str(self.id) if hasattr(self, "id") and self.id else "new"
+                        )
+                    },
+                )
+                # Convert Pydantic models to dicts before encryption
+                if isinstance(self.flattenedResults, list):
+                    flattened_data = [
+                        item.model_dump() if isinstance(item, BaseModel) else item
+                        for item in self.flattenedResults
+                    ]
+                elif isinstance(self.flattenedResults, BaseModel):
+                    flattened_data = self.flattenedResults.model_dump()
+                else:
+                    flattened_data = self.flattenedResults
+                # Encrypt even if empty list to maintain consistency
+                encrypted_flattened = encryption.encrypt(flattened_data)
+                self.flattenedResults = encrypted_flattened
+                logger.info(
+                    f"FlattenedResults encrypted successfully: encrypted_length={len(encrypted_flattened)}",
+                    extra={
+                        "history_id": (
+                            str(self.id) if hasattr(self, "id") and self.id else "new"
+                        )
+                    },
+                )
 
         except Exception as e:
-            logger.error(f"Error encrypting history data: {e}", exc_info=True)
+            logger.error(
+                f"Error encrypting history data: {e}",
+                exc_info=True,
+                extra={
+                    "history_id": (
+                        str(self.id) if hasattr(self, "id") and self.id else "new"
+                    )
+                },
+            )
             # Don't raise - allow save to proceed, but log the error
             # In production, you might want to raise here
 
@@ -103,9 +184,24 @@ class History(Document):
 
         Note: queryInput is NOT encrypted, so no decryption needed.
         """
-        try:
-            encryption = get_encryption()
+        encryption = get_encryption()
+        if encryption is None:
+            # Encryption not available - if data is encrypted, we can't decrypt it
+            # Check if data appears to be encrypted and log a warning
+            if (
+                isinstance(self.results, str)
+                and self._is_encrypted_string(self.results)
+            ) or (
+                isinstance(self.flattenedResults, str)
+                and self._is_encrypted_string(self.flattenedResults)
+            ):
+                logger.warning(
+                    "Encrypted history data found but ENCRYPTION_KEY is not set. "
+                    "Data will remain encrypted and cannot be decrypted."
+                )
+            return
 
+        try:
             # Decrypt results if encrypted
             if (
                 self.results

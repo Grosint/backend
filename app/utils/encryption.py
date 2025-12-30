@@ -99,11 +99,35 @@ class DataEncryption:
 
 # Global encryption instance (lazy initialization)
 _encryption_instance: DataEncryption | None = None
+_encryption_unavailable: bool = False
 
 
-def get_encryption() -> DataEncryption:
-    """Get or create encryption instance."""
-    global _encryption_instance
-    if _encryption_instance is None:
+def get_encryption() -> DataEncryption | None:
+    """
+    Get or create encryption instance.
+
+    Returns:
+        DataEncryption instance if ENCRYPTION_KEY is available, None otherwise.
+    """
+    global _encryption_instance, _encryption_unavailable
+
+    # If we've already determined encryption is unavailable, return None
+    if _encryption_unavailable:
+        return None
+
+    # If instance exists, return it
+    if _encryption_instance is not None:
+        return _encryption_instance
+
+    # Try to create instance
+    try:
         _encryption_instance = DataEncryption()
-    return _encryption_instance
+        return _encryption_instance
+    except ValueError:
+        # ENCRYPTION_KEY is missing - mark as unavailable and return None
+        _encryption_unavailable = True
+        logger.warning(
+            "ENCRYPTION_KEY not set - encryption/decryption will be skipped. "
+            "Set ENCRYPTION_KEY environment variable to enable encryption."
+        )
+        return None

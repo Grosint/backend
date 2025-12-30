@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -147,13 +148,18 @@ async def delete_all_history(
             data={"deleted_count": deleted_count},
         )
     except Exception as e:
+        reference_id = str(uuid.uuid4())[:8]
         logger.error(
             "Error deleting all user history",
             extra={
                 "user_id": current_user.user_id,
                 "exception": type(e).__name__,
+                "error": str(e),
+                "reference_id": reference_id,
             },
+            exc_info=True,
         )
         raise HTTPException(
-            status_code=500, detail=f"Failed to delete history: {str(e)}"
+            status_code=500,
+            detail=f"Failed to delete history. Reference ID: {reference_id}",
         ) from e
