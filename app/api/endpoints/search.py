@@ -180,10 +180,17 @@ async def create_phone_lookup_search(
         user_id = (
             PydanticObjectId(current_user.user_id) if current_user.user_id else None
         )
+
+        # Encode advanced lookup flag into the query so that the search orchestrator
+        # can pass it down to the phone lookup adapter/orchestrator without changing
+        # the search model schema.
+        base_query = f"{request.country_code}{request.phone}"
+        query = f"ADV|{base_query}" if request.is_advance else base_query
+
         search_create = SearchCreate(
             user_id=user_id,
             search_type=SearchType.PHONE,
-            query=f"{request.country_code}{request.phone}",
+            query=query,
         )
 
         search = await search_service.create_search(search_create)

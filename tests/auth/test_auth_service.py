@@ -27,6 +27,7 @@ class TestAuthService:
         user = Mock(spec=User)
         user.id = ObjectId("507f1f77bcf86cd799439011")
         user.email = "test@example.com"
+        user.phone = "+1234567890"
         user.password = "hashed_password"
         user.isActive = True
         user.isVerified = True
@@ -35,7 +36,7 @@ class TestAuthService:
     @pytest.fixture
     def valid_login_request(self):
         """Create valid login request."""
-        return LoginRequest(email="test@example.com", password="password123")
+        return LoginRequest(phone="+1234567890", password="password123")
 
     @pytest.fixture
     def valid_refresh_request(self):
@@ -58,13 +59,14 @@ class TestAuthenticateUser:
         user = Mock(spec=User)
         user.id = ObjectId("507f1f77bcf86cd799439011")
         user.email = "test@example.com"
+        user.phone = "+1234567890"
         user.password = "hashed_password"
         user.isActive = True
         user.isVerified = True
         return user
 
     @pytest.mark.asyncio
-    @patch("app.services.auth_service.AuthService._find_user_by_email")
+    @patch("app.services.auth_service.AuthService._find_user_by_phone")
     @patch("app.services.auth_service.verify_password")
     async def test_authenticate_user_success(
         self, mock_verify_password, mock_find_user, auth_service, mock_user
@@ -74,26 +76,24 @@ class TestAuthenticateUser:
         mock_find_user.return_value = mock_user
         mock_verify_password.return_value = True
 
-        result = await auth_service.authenticate_user("test@example.com", "password123")
+        result = await auth_service.authenticate_user("+1234567890", "password123")
 
         assert result == mock_user
-        mock_find_user.assert_called_once_with("test@example.com")
+        mock_find_user.assert_called_once_with("+1234567890")
         mock_verify_password.assert_called_once_with("password123", "hashed_password")
 
     @pytest.mark.asyncio
-    @patch("app.services.auth_service.AuthService._find_user_by_email")
+    @patch("app.services.auth_service.AuthService._find_user_by_phone")
     async def test_authenticate_user_not_found(self, mock_find_user, auth_service):
         """Test authentication with user not found."""
         mock_find_user.return_value = None
 
-        result = await auth_service.authenticate_user(
-            "nonexistent@example.com", "password123"
-        )
+        result = await auth_service.authenticate_user("+9999999999", "password123")
 
         assert result is None
 
     @pytest.mark.asyncio
-    @patch("app.services.auth_service.AuthService._find_user_by_email")
+    @patch("app.services.auth_service.AuthService._find_user_by_phone")
     @patch("app.services.auth_service.verify_password")
     async def test_authenticate_user_wrong_password(
         self, mock_verify_password, mock_find_user, auth_service, mock_user
@@ -102,14 +102,12 @@ class TestAuthenticateUser:
         mock_find_user.return_value = mock_user
         mock_verify_password.return_value = False
 
-        result = await auth_service.authenticate_user(
-            "test@example.com", "wrong_password"
-        )
+        result = await auth_service.authenticate_user("+1234567890", "wrong_password")
 
         assert result is None
 
     @pytest.mark.asyncio
-    @patch("app.services.auth_service.AuthService._find_user_by_email")
+    @patch("app.services.auth_service.AuthService._find_user_by_phone")
     @patch("app.services.auth_service.verify_password")
     async def test_authenticate_user_inactive(
         self, mock_verify_password, mock_find_user, auth_service
@@ -121,17 +119,17 @@ class TestAuthenticateUser:
         mock_find_user.return_value = mock_user
         mock_verify_password.return_value = True
 
-        result = await auth_service.authenticate_user("test@example.com", "password123")
+        result = await auth_service.authenticate_user("+1234567890", "password123")
 
         assert result is None
 
     @pytest.mark.asyncio
-    @patch("app.services.auth_service.AuthService._find_user_by_email")
+    @patch("app.services.auth_service.AuthService._find_user_by_phone")
     async def test_authenticate_user_exception(self, mock_find_user, auth_service):
         """Test authentication with database exception."""
         mock_find_user.side_effect = Exception("Database error")
 
-        result = await auth_service.authenticate_user("test@example.com", "password123")
+        result = await auth_service.authenticate_user("+1234567890", "password123")
 
         assert result is None
 
@@ -151,6 +149,7 @@ class TestLogin:
         user = Mock(spec=User)
         user.id = ObjectId("507f1f77bcf86cd799439011")
         user.email = "test@example.com"
+        user.phone = "+1234567890"
         user.password = "hashed_password"
         user.isActive = True
         user.isVerified = True
@@ -159,7 +158,7 @@ class TestLogin:
     @pytest.fixture
     def valid_login_request(self):
         """Create valid login request."""
-        return LoginRequest(email="test@example.com", password="password123")
+        return LoginRequest(phone="+1234567890", password="password123")
 
     @pytest.mark.asyncio
     @pytest.mark.asyncio
@@ -197,7 +196,7 @@ class TestLogin:
         """Test login with invalid credentials."""
         mock_authenticate.return_value = None
 
-        with pytest.raises(UnauthorizedException, match="Invalid email or password"):
+        with pytest.raises(UnauthorizedException, match="Invalid phone or password"):
             await auth_service.login(valid_login_request)
 
     @pytest.mark.asyncio

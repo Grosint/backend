@@ -40,7 +40,7 @@ class TestLoginEndpoint:
     @pytest.fixture
     def valid_login_request(self):
         """Create valid login request."""
-        return LoginRequest(email="test@example.com", password="password123")
+        return LoginRequest(phone="+1234567890", password="password123")
 
     @pytest.fixture
     def valid_login_response(self):
@@ -77,19 +77,17 @@ class TestLoginEndpoint:
         """Test login with invalid credentials."""
         mock_auth_service = AsyncMock()
         mock_auth_service.login.side_effect = UnauthorizedException(
-            "Invalid email or password"
+            "Invalid phone or password"
         )
         mock_auth_service_class.return_value = mock_auth_service
 
-        login_request = LoginRequest(
-            email="test@example.com", password="wrong_password"
-        )
+        login_request = LoginRequest(phone="+1234567890", password="wrong_password")
 
         response = client.post("/login", json=login_request.dict())
 
         assert response.status_code == 401
         data = response.json()
-        assert "Invalid email or password" in data["detail"]
+        assert "Invalid phone or password" in data["detail"]
 
     @patch("app.api.endpoints.auth.AuthService")
     def test_login_account_deactivated(self, mock_auth_service_class, client):
@@ -100,7 +98,7 @@ class TestLoginEndpoint:
         )
         mock_auth_service_class.return_value = mock_auth_service
 
-        login_request = LoginRequest(email="test@example.com", password="password123")
+        login_request = LoginRequest(phone="+1234567890", password="password123")
 
         response = client.post("/login", json=login_request.dict())
 
@@ -115,7 +113,7 @@ class TestLoginEndpoint:
         mock_auth_service.login.side_effect = Exception("Database connection failed")
         mock_auth_service_class.return_value = mock_auth_service
 
-        login_request = LoginRequest(email="test@example.com", password="password123")
+        login_request = LoginRequest(phone="+1234567890", password="password123")
 
         response = client.post("/login", json=login_request.dict())
 
@@ -123,9 +121,9 @@ class TestLoginEndpoint:
         data = response.json()
         assert "Login failed" in data["detail"]
 
-    def test_login_invalid_email_format(self, client):
-        """Test login with invalid email format."""
-        login_request = {"email": "invalid_email", "password": "password123"}
+    def test_login_invalid_phone_format(self, client):
+        """Test login with invalid phone format."""
+        login_request = {"phone": "123", "password": "password123"}
 
         response = client.post("/login", json=login_request)
 
@@ -133,7 +131,7 @@ class TestLoginEndpoint:
 
     def test_login_empty_password(self, client):
         """Test login with empty password."""
-        login_request = {"email": "test@example.com", "password": ""}
+        login_request = {"phone": "+1234567890", "password": ""}
 
         response = client.post("/login", json=login_request)
 

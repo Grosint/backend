@@ -30,20 +30,20 @@ class AuthService:
         """Initialize auth service with database connection."""
         self.database = database
 
-    async def authenticate_user(self, email: str, password: str) -> User | None:
+    async def authenticate_user(self, phone: str, password: str) -> User | None:
         """
-        Authenticate user with email and password.
+        Authenticate user with phone and password.
 
         Args:
-            email: User email
+            phone: User phone number
             password: User password
 
         Returns:
             User object if authentication successful, None otherwise
         """
         try:
-            # Find user by email
-            user = await self._find_user_by_email(email)
+            # Find user by phone
+            user = await self._find_user_by_phone(phone)
 
             if not user:
                 return None
@@ -62,9 +62,9 @@ class AuthService:
             print(f"Error authenticating user: {e}")
             return None
 
-    async def _find_user_by_email(self, email: str) -> User | None:
-        """Find user by email. This method can be overridden in tests."""
-        return await User.find_one(User.email == email)
+    async def _find_user_by_phone(self, phone: str) -> User | None:
+        """Find user by phone. This method can be overridden in tests."""
+        return await User.find_one(User.phone == phone)
 
     async def _find_user_by_id(self, user_id: str) -> User | None:
         """Find user by ID. This method can be overridden in tests."""
@@ -84,10 +84,10 @@ class AuthService:
             UnauthorizedException: If authentication fails
         """
         # Authenticate user
-        user = await self.authenticate_user(login_request.email, login_request.password)
+        user = await self.authenticate_user(login_request.phone, login_request.password)
 
         if not user:
-            raise UnauthorizedException("Invalid email or password")
+            raise UnauthorizedException("Invalid phone or password")
 
         # Check if user is active
         if not user.isActive:

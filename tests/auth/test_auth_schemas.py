@@ -28,31 +28,29 @@ class TestLoginRequest:
 
     def test_valid_login_request(self):
         """Test valid login request creation."""
-        login_request = LoginRequest(email="test@example.com", password="password123")
+        login_request = LoginRequest(phone="+1234567890", password="password123")
 
-        assert login_request.email == "test@example.com"
+        assert login_request.phone == "+1234567890"
         assert login_request.password == "password123"
 
-    def test_login_request_invalid_email(self):
-        """Test login request with invalid email format."""
+    def test_login_request_invalid_phone(self):
+        """Test login request with invalid phone format."""
         with pytest.raises(ValidationError):
-            LoginRequest(email="invalid_email", password="password123")
+            LoginRequest(phone="123", password="password123")
 
     def test_login_request_empty_password(self):
         """Test login request with empty password."""
         with pytest.raises(ValidationError):
-            LoginRequest(email="test@example.com", password="")
+            LoginRequest(phone="+1234567890", password="")
 
     def test_login_request_whitespace_password(self):
         """Test login request with whitespace-only password."""
         with pytest.raises(ValidationError):
-            LoginRequest(email="test@example.com", password="   ")
+            LoginRequest(phone="+1234567890", password="   ")
 
     def test_login_request_password_stripped(self):
         """Test that password whitespace is stripped."""
-        login_request = LoginRequest(
-            email="test@example.com", password="  password123  "
-        )
+        login_request = LoginRequest(phone="+1234567890", password="  password123  ")
 
         assert login_request.password == "password123"
 

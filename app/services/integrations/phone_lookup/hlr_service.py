@@ -581,4 +581,8 @@ class HLRService:
                 }
             )
 
+        # Ensure type is consistently set to "hlr" for all items
+        for item in formatted_response:
+            item["type"] = "hlr"
+
         return formatted_response

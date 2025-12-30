@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.services.integrations.phone_lookup.aitan import AITANService
 from app.services.integrations.phone_lookup.callapp_service import CallAppService
 from app.services.integrations.phone_lookup.eyecon_service import EyeconService
 from app.services.integrations.phone_lookup.hlr_service import HLRService
@@ -33,8 +34,16 @@ class PhoneLookupOrchestrator:
         self.leakcheck_service = LeakCheckService()
         self.hlr_service = HLRService()
 
-    async def search_phone(self, country_code: str, phone: str) -> dict[str, Any]:
-        """Search phone number across all phone lookup services"""
+    async def search_phone(
+        self, country_code: str, phone: str, is_advance: bool = False
+    ) -> dict[str, Any]:
+        """Search phone number across all phone lookup services.
+
+        Args:
+            country_code: Country code (e.g., +91)
+            phone: Phone number (without country code)
+            is_advance: If True, also query AITAN advanced phone lookup.
+        """
         try:
             logger.info(f"PhoneLookupOrchestrator: Searching {country_code}{phone}")
 
@@ -53,19 +62,7 @@ class PhoneLookupOrchestrator:
 
             import asyncio
 
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Combine results
-            combined_data = {
-                "phone": f"{country_code}{phone}",
-                "lookup_results": {},
-                "summary": {
-                    "total_sources": len(tasks),
-                    "successful_sources": 0,
-                    "found_data": False,
-                },
-            }
-
+            # Optionally add AITAN advanced phone lookup
             service_names = [
                 "viewcaller",
                 "truecaller",
@@ -77,6 +74,34 @@ class PhoneLookupOrchestrator:
                 "leakcheck",
                 "hlr",
             ]
+
+            if is_advance:
+                logger.info(
+                    "PhoneLookupOrchestrator: is_advance=True, adding AITAN phone lookup"
+                )
+
+                async def _aitan_task() -> dict[str, Any]:
+                    async with AITANService() as service:
+                        return await service.search_phone(
+                            country_code, phone, "phone-lookup"
+                        )
+
+                tasks.append(_aitan_task())
+                service_names.append("aitan")
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Combine results
+            combined_data: dict[str, Any] = {
+                "phone": f"{country_code}{phone}",
+                "lookup_results": {},
+                "summary": {
+                    "total_sources": len(tasks),
+                    "successful_sources": 0,
+                    "found_data": False,
+                },
+            }
+
             for i, result in enumerate(results):
                 service_name = service_names[i]
                 if isinstance(result, Exception):

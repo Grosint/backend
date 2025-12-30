@@ -230,9 +230,9 @@ class TestUserService:
 
         # Mock the User model operations at the service level
         with patch("app.services.user_service.User") as mock_user_class:
-            # Setup the mock to handle the query pattern: User.email == user.email
-            mock_user_class.email = MagicMock()
-            mock_user_class.email.__eq__ = MagicMock(return_value="query")
+            # Setup the mock to handle the query pattern: User.phone == user.phone
+            mock_user_class.phone = MagicMock()
+            mock_user_class.phone.__eq__ = MagicMock(return_value="query")
             mock_user_class.find_one = AsyncMock(return_value=None)  # No existing user
             mock_user_class.return_value = mock_user
 
@@ -256,20 +256,20 @@ class TestUserService:
                 assert result.password == "hashed_password"
 
     @pytest.mark.asyncio
-    async def test_create_user_email_conflict(self, user_service, test_data_factory):
-        """Test user creation with existing email."""
+    async def test_create_user_phone_conflict(self, user_service, test_data_factory):
+        """Test user creation with existing phone number."""
         # Create test data using factory
         user_create_data = test_data_factory.create_user_create_request()
         user_create = UserCreate(**user_create_data)
 
         # Mock existing user found
         mock_existing_user = Mock(spec=User)
-        mock_existing_user.email = user_create_data["email"]
+        mock_existing_user.phone = user_create_data["phone"]
 
         with patch("app.services.user_service.User") as mock_user_class:
             # Setup mock to handle query pattern
-            mock_user_class.email = MagicMock()
-            mock_user_class.email.__eq__ = MagicMock(return_value="query")
+            mock_user_class.phone = MagicMock()
+            mock_user_class.phone.__eq__ = MagicMock(return_value="query")
             mock_user_class.find_one = AsyncMock(return_value=mock_existing_user)
 
             with pytest.raises(ConflictException) as exc_info:
@@ -278,8 +278,8 @@ class TestUserService:
             # Verify Beanie was queried for existing user
             mock_user_class.find_one.assert_called_once()
 
-            assert "User with this email already exists" in str(exc_info.value)
-            assert exc_info.value.details["email"] == user_create_data["email"]
+            assert "User with this phone number already exists" in str(exc_info.value)
+            assert exc_info.value.details["phone"] == user_create_data["phone"]
 
     @pytest.mark.asyncio
     async def test_get_user_by_id_success(self, user_service, test_data_factory):
@@ -658,16 +658,16 @@ class TestUserAPIEndpoints:
         assert data["error_code"] == "VALIDATION_ERROR"
         assert "validation_errors" in data
 
-    def test_create_user_email_conflict(self, client, test_data_factory):
-        """Test user creation with existing email."""
+    def test_create_user_phone_conflict(self, client, test_data_factory):
+        """Test user creation with existing phone number."""
         # Create test data using factory
         user_create_data = test_data_factory.create_user_create_request()
 
         with patch("app.api.endpoints.user.UserService") as mock_service:
             mock_service.return_value.create_user = AsyncMock(
                 side_effect=ConflictException(
-                    message="User with this email already exists",
-                    details={"email": user_create_data["email"]},
+                    message="User with this phone number already exists",
+                    details={"phone": user_create_data["phone"]},
                 )
             )
 
@@ -676,7 +676,7 @@ class TestUserAPIEndpoints:
             assert response.status_code == 409
             data = response.json()
             assert data["success"] is False
-            assert "User with this email already exists" in data["message"]
+            assert "User with this phone number already exists" in data["message"]
 
     def test_get_current_user_success(self, client, test_data_factory):
         """Test successful current user retrieval."""

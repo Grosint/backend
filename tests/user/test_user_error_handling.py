@@ -51,13 +51,13 @@ class TestUserAPIErrorHandling:
             for error in validation_errors
         )
 
-    def test_create_user_email_conflict_error(self, client):
-        """Test email conflict error response."""
+    def test_create_user_phone_conflict_error(self, client):
+        """Test phone conflict error response."""
         with patch("app.api.endpoints.user.UserService") as mock_service:
             mock_service.return_value.create_user = AsyncMock(
                 side_effect=ConflictException(
-                    message="User with this email already exists",
-                    details={"email": "test@example.com"},
+                    message="User with this phone number already exists",
+                    details={"phone": "+1234567890"},
                 )
             )
 
@@ -76,8 +76,8 @@ class TestUserAPIErrorHandling:
             # Verify error response structure
             assert data["success"] is False
             assert data["error_code"] == "CONFLICT"
-            assert "User with this email already exists" in data["message"]
-            assert data["details"]["email"] == "test@example.com"
+            assert "User with this phone number already exists" in data["message"]
+            assert data["details"]["phone"] == "+1234567890"
 
     def test_get_user_not_found_error(self, client):
         """Test user not found error response."""

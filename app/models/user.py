@@ -6,6 +6,7 @@ from enum import Enum
 from beanie import Document, Indexed, Insert, Replace, before_event
 from bson import ObjectId
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from pymongo import IndexModel
 
 from app.utils.validators import (
     PyObjectId,
@@ -109,8 +110,8 @@ class UserInDB(UserBase):
 
 
 class User(Document):
-    email: Indexed(EmailStr, unique=True)
-    phone: str
+    email: EmailStr
+    phone: Indexed(str, unique=True)
     password: str
     userType: UserType = UserType.USER
     features: list[str] = Field(
@@ -146,6 +147,13 @@ class User(Document):
     class Settings:
         name = "users"
         indexes = [
-            [("organizationId", 1)],  # Index for organization queries
-            [("userType", 1)],  # Index for user type queries
+            IndexModel(
+                [("email", 1)], name="email_idx"
+            ),  # Non-unique index for email queries
+            IndexModel(
+                [("organizationId", 1)], name="organizationId_idx"
+            ),  # Index for organization queries
+            IndexModel(
+                [("userType", 1)], name="userType_idx"
+            ),  # Index for user type queries
         ]

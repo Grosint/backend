@@ -205,16 +205,16 @@ class TestUserDatabaseOperations:
                 assert result.isVerified is False
 
     @pytest.mark.asyncio
-    async def test_create_user_email_uniqueness_check(self, user_service):
-        """Test that email uniqueness is checked before creation."""
+    async def test_create_user_phone_uniqueness_check(self, user_service):
+        """Test that phone uniqueness is checked before creation."""
         # Mock existing user found
         mock_existing_user = Mock(spec=User)
-        mock_existing_user.email = "test@example.com"
+        mock_existing_user.phone = "+1234567890"
 
         with patch("app.services.user_service.User") as mock_user_class:
             # Setup mock to handle query pattern
-            mock_user_class.email = MagicMock()
-            mock_user_class.email.__eq__ = MagicMock(return_value="query")
+            mock_user_class.phone = MagicMock()
+            mock_user_class.phone.__eq__ = MagicMock(return_value="query")
             mock_user_class.find_one = AsyncMock(return_value=mock_existing_user)
 
             user_create = UserCreate(
@@ -229,7 +229,7 @@ class TestUserDatabaseOperations:
             # Verify Beanie was queried for existing user
             mock_user_class.find_one.assert_called_once()
 
-            assert "User with this email already exists" in str(exc_info.value)
+            assert "User with this phone number already exists" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_get_user_by_id_database_interaction(self, user_service):
@@ -698,8 +698,8 @@ class TestUserDataIntegrity:
             # ID should be consistent
             assert user.id == user.id
 
-    def test_user_email_uniqueness_constraint(self):
-        """Test that email uniqueness is enforced."""
+    def test_user_phone_uniqueness_constraint(self):
+        """Test that phone uniqueness is enforced."""
         # This would be tested with actual database operations
         # For now, we verify the field is properly defined
         with patch("app.models.user.User.get_settings") as mock_get_settings:
@@ -712,7 +712,7 @@ class TestUserDataIntegrity:
                 phone="+1234567890",
                 password="hashed_password",
             )
-            assert user.email == "test@example.com"
+            assert user.phone == "+1234567890"
 
     def test_user_password_hashing(self):
         """Test that password is properly hashed."""

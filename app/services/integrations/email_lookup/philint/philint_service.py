@@ -442,85 +442,119 @@ class PhilINTService:
 
         try:
             if hasattr(person_obj, "email_addresses"):
-                email_addresses = getattr(person_obj, "email_addresses", None)
-                if email_addresses is not None:
-                    try:
-                        raw_data["person_data"]["email_addresses"] = list(
-                            email_addresses
-                        )
-                    except (TypeError, ValueError) as e:
-                        logger.warning(
-                            f"PhilINT: Error converting email_addresses to list: {e}"
-                        )
+                try:
+                    email_addresses = getattr(person_obj, "email_addresses", None)
+                    if email_addresses is not None:
+                        try:
+                            raw_data["person_data"]["email_addresses"] = list(
+                                email_addresses
+                            )
+                        except (TypeError, ValueError) as e:
+                            logger.warning(
+                                f"PhilINT: Error converting email_addresses to list: {e}"
+                            )
+                            raw_data["person_data"]["email_addresses"] = []
+                    else:
                         raw_data["person_data"]["email_addresses"] = []
-                else:
+                except Exception as e:
+                    logger.warning(
+                        f"PhilINT: Error accessing email_addresses attribute: {e}"
+                    )
                     raw_data["person_data"]["email_addresses"] = []
+            else:
+                raw_data["person_data"]["email_addresses"] = []
         except Exception as e:
             logger.warning(f"PhilINT: Error extracting email_addresses: {e}")
             raw_data["person_data"]["email_addresses"] = []
 
         try:
             if hasattr(person_obj, "usernames"):
-                usernames = getattr(person_obj, "usernames", None)
-                if usernames is not None:
-                    try:
-                        raw_data["person_data"]["usernames"] = list(usernames)
-                    except (TypeError, ValueError) as e:
-                        logger.warning(
-                            f"PhilINT: Error converting usernames to list: {e}"
-                        )
+                try:
+                    usernames = getattr(person_obj, "usernames", None)
+                    if usernames is not None:
+                        try:
+                            raw_data["person_data"]["usernames"] = list(usernames)
+                        except (TypeError, ValueError) as e:
+                            logger.warning(
+                                f"PhilINT: Error converting usernames to list: {e}"
+                            )
+                            raw_data["person_data"]["usernames"] = []
+                    else:
                         raw_data["person_data"]["usernames"] = []
-                else:
+                except Exception as e:
+                    logger.warning(f"PhilINT: Error accessing usernames attribute: {e}")
                     raw_data["person_data"]["usernames"] = []
+            else:
+                raw_data["person_data"]["usernames"] = []
         except Exception as e:
             logger.warning(f"PhilINT: Error extracting usernames: {e}")
             raw_data["person_data"]["usernames"] = []
 
         try:
             if hasattr(person_obj, "names"):
-                names = getattr(person_obj, "names", None)
-                if names is not None:
-                    try:
-                        raw_data["person_data"]["names"] = list(names)
-                    except (TypeError, ValueError) as e:
-                        logger.warning(f"PhilINT: Error converting names to list: {e}")
+                try:
+                    names = getattr(person_obj, "names", None)
+                    if names is not None:
+                        try:
+                            raw_data["person_data"]["names"] = list(names)
+                        except (TypeError, ValueError) as e:
+                            logger.warning(
+                                f"PhilINT: Error converting names to list: {e}"
+                            )
+                            raw_data["person_data"]["names"] = []
+                    else:
                         raw_data["person_data"]["names"] = []
-                else:
+                except Exception as e:
+                    logger.warning(f"PhilINT: Error accessing names attribute: {e}")
                     raw_data["person_data"]["names"] = []
+            else:
+                raw_data["person_data"]["names"] = []
         except Exception as e:
             logger.warning(f"PhilINT: Error extracting names: {e}")
             raw_data["person_data"]["names"] = []
 
         try:
             if hasattr(person_obj, "pictures"):
-                pictures = getattr(person_obj, "pictures", None)
-                if pictures is not None:
-                    try:
-                        raw_data["person_data"]["pictures"] = list(pictures)
-                    except (TypeError, ValueError) as e:
-                        logger.warning(
-                            f"PhilINT: Error converting pictures to list: {e}"
-                        )
+                try:
+                    pictures = getattr(person_obj, "pictures", None)
+                    if pictures is not None:
+                        try:
+                            raw_data["person_data"]["pictures"] = list(pictures)
+                        except (TypeError, ValueError) as e:
+                            logger.warning(
+                                f"PhilINT: Error converting pictures to list: {e}"
+                            )
+                            raw_data["person_data"]["pictures"] = []
+                    else:
                         raw_data["person_data"]["pictures"] = []
-                else:
+                except Exception as e:
+                    logger.warning(f"PhilINT: Error accessing pictures attribute: {e}")
                     raw_data["person_data"]["pictures"] = []
+            else:
+                raw_data["person_data"]["pictures"] = []
         except Exception as e:
             logger.warning(f"PhilINT: Error extracting pictures: {e}")
             raw_data["person_data"]["pictures"] = []
 
         try:
             if hasattr(person_obj, "accounts"):
-                accounts = getattr(person_obj, "accounts", None)
-                if accounts is not None:
-                    try:
-                        raw_data["person_data"]["accounts"] = list(accounts)
-                    except (TypeError, ValueError) as e:
-                        logger.warning(
-                            f"PhilINT: Error converting accounts to list: {e}"
-                        )
+                try:
+                    accounts = getattr(person_obj, "accounts", None)
+                    if accounts is not None:
+                        try:
+                            raw_data["person_data"]["accounts"] = list(accounts)
+                        except (TypeError, ValueError) as e:
+                            logger.warning(
+                                f"PhilINT: Error converting accounts to list: {e}"
+                            )
+                            raw_data["person_data"]["accounts"] = []
+                    else:
                         raw_data["person_data"]["accounts"] = []
-                else:
+                except Exception as e:
+                    logger.warning(f"PhilINT: Error accessing accounts attribute: {e}")
                     raw_data["person_data"]["accounts"] = []
+            else:
+                raw_data["person_data"]["accounts"] = []
         except Exception as e:
             logger.warning(f"PhilINT: Error extracting accounts: {e}")
             raw_data["person_data"]["accounts"] = []
