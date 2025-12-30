@@ -67,6 +67,9 @@ async def connect_to_mongo():
 
         logger.info(f"Connected to MongoDB at {masked_url}")
 
+        # Migrate indexes: Drop old unique email index if it exists
+        await migrate_user_indexes(db.database)
+
         # Initialize Beanie with document models
         from app.models.credit import Credit
         from app.models.credit_transaction import CreditTransaction
@@ -112,6 +115,41 @@ async def close_mongo_connection():
     if db.client:
         db.client.close()
         logger.info("Disconnected from MongoDB")
+
+
+async def migrate_user_indexes(database):
+    """
+    Migrate user collection indexes.
+
+    Drops the old unique email index if it exists to allow non-unique email index.
+    This is needed when migrating from email-unique to phone-unique schema.
+
+    Args:
+        database: MongoDB database instance
+    """
+    try:
+        users_collection = database.users
+        indexes = await users_collection.list_indexes().to_list(length=100)
+
+        # Find and drop the old unique email index if it exists
+        for index in indexes:
+            index_name = index.get("name", "")
+            index_key = index.get("key", {})
+            is_unique = index.get("unique", False)
+
+            # Check if this is the old unique email index
+            if index_name == "email_1" and is_unique and "email" in index_key:
+                try:
+                    await users_collection.drop_index(index_name)
+                    logger.info(f"Dropped old unique email index: {index_name}")
+                except Exception as e:
+                    logger.warning(f"Could not drop index {index_name}: {e}")
+                    # Continue - Beanie will handle the conflict or we can manually fix it
+
+    except Exception as e:
+        logger.warning(f"Error migrating user indexes: {e}")
+        # Don't raise - allow application to start even if migration fails
+        # The index conflict will be handled by Beanie or can be fixed manually
 
 
 async def initialize_collection_indexes(database):

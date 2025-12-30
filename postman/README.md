@@ -47,7 +47,7 @@ postman/
 ## 📋 Collection Structure
 
 ### Authentication
-- **Login** - Authenticate and get JWT tokens (auto-saves tokens)
+- **Login** - Authenticate with phone number and password, get JWT tokens (auto-saves tokens)
 - **Refresh Token** - Refresh access token
 - **Logout** - Invalidate tokens
 - **Change Password** - Update user password
@@ -106,7 +106,8 @@ postman/
 - `user_id`: Auto-populated from login
 - `search_id`: Manually set after creating a search
 - `history_id`: Manually set after listing histories (use from list response)
-- `user_email`: Default test email
+- `user_email`: Default test email (used for signup)
+- `user_phone`: Default test phone number (used for login, must be unique)
 - `user_password`: Default test password
 
 ### Production Environment
@@ -164,7 +165,9 @@ For detailed API documentation, visit:
 - Tokens are stored as environment variables (not in collection)
 - Use **secret** type for sensitive variables in environments
 - Never commit actual tokens or passwords to version control
-- Update `user_email` and `user_password` in environments with your test credentials
+- Update `user_email`, `user_phone`, and `user_password` in environments with your test credentials
+- **Note:** Login now uses `phone` + `password` instead of `email` + `password`
+- **Note:** Phone numbers must be unique, but emails can be shared across multiple accounts
 
 ## 🛠️ Maintenance
 

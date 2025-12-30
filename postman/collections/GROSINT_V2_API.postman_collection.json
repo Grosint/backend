@@ -41,14 +41,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+							"raw": "{\n  \"phone\": \"+1234567890\",\n  \"password\": \"password123\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/login",
 							"host": ["{{base_url}}"],
 							"path": ["auth", "login"]
 						},
-						"description": "Authenticate user and return JWT tokens. Tokens are automatically saved to environment variables."
+						"description": "Authenticate user with phone number and password. Returns JWT tokens. Tokens are automatically saved to environment variables."
 					},
 					"response": []
 				},
@@ -297,7 +297,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["user", ""]
 						},
-						"description": "Create a new user account. OTP is automatically sent to the user's email for verification. Required fields: email, phone, verifyByGovId, password."
+						"description": "Create a new user account. OTP is automatically sent to the user's email for verification. Required fields: email, phone, verifyByGovId, password. Note: Phone number must be unique, but email can be shared across multiple accounts with different phone numbers."
 					},
 					"response": []
 				},
@@ -650,14 +650,14 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}"
+									"raw": "{\n  \"phone\": \"{{user_phone}}\",\n  \"password\": \"{{user_password}}\"\n}"
 								},
 								"url": {
 									"raw": "{{base_url}}/auth/login",
 									"host": ["{{base_url}}"],
 									"path": ["auth", "login"]
 								},
-								"description": "Login to get access token. The token will be automatically saved to the 'admin_token' and 'access_token' environment variables."
+								"description": "Login with phone number and password to get access token. The token will be automatically saved to the 'admin_token' and 'access_token' environment variables."
 							},
 							"response": []
 						}

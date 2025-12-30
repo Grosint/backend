@@ -21,12 +21,12 @@ class UserService:
     async def create_user(self, user: UserCreate) -> UserInDB:
         """Create a new user"""
         try:
-            # Check if user already exists
-            existing_user = await User.find_one(User.email == user.email)
+            # Check if phone number already exists (phone must be unique)
+            existing_user = await User.find_one(User.phone == user.phone)
             if existing_user:
                 raise ConflictException(
-                    message="User with this email already exists",
-                    details={"email": user.email},
+                    message="User with this phone number already exists",
+                    details={"phone": user.phone},
                 )
 
             # Create new user document

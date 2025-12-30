@@ -126,14 +126,14 @@ class TestCreateUserEndpoint:
         assert data["data"]["phone"] == user_data["phone"]
 
     @patch("app.api.endpoints.user.UserService")
-    def test_create_user_email_already_exists(
+    def test_create_user_phone_already_exists(
         self, mock_user_service_class, client, valid_user_request, test_data_factory
     ):
-        """Test user creation with existing email."""
+        """Test user creation with existing phone number."""
         mock_user_service = AsyncMock()
         mock_user_service.create_user.side_effect = ConflictException(
-            message="User with this email already exists",
-            details={"email": valid_user_request.email},
+            message="User with this phone number already exists",
+            details={"phone": valid_user_request.phone},
         )
         mock_user_service_class.return_value = mock_user_service
 
@@ -142,7 +142,7 @@ class TestCreateUserEndpoint:
         assert response.status_code == 409
         data = response.json()
         assert data["success"] is False
-        assert "User with this email already exists" in data["message"]
+        assert "User with this phone number already exists" in data["message"]
 
     def test_create_user_invalid_email_format(self, client):
         """Test user creation with invalid email format."""

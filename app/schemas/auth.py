@@ -10,8 +10,16 @@ from app.utils.password import validate_password_strength
 class LoginRequest(BaseModel):
     """Login request schema."""
 
-    email: EmailStr = Field(..., description="User email address")
+    phone: str = Field(..., description="User phone number")
     password: str = Field(..., min_length=1, description="User password")
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        """Validate and normalize phone number."""
+        from app.utils.validators import validate_required_phone_number
+
+        return validate_required_phone_number(v)
 
     @field_validator("password")
     @classmethod
