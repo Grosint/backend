@@ -1,5 +1,8 @@
+# ruff: noqa: E402
+# Imports must come after load_dotenv() to ensure .env is loaded
+# This file-level ignore is necessary because load_dotenv() must run before imports
+
 import logging
-import os
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -17,21 +20,20 @@ from starlette.middleware.base import BaseHTTPMiddleware
 # This must happen before settings import to ensure ENV vars are loaded
 load_dotenv()
 
-# noqa: E402 - Imports must come after load_dotenv() to ensure .env is loaded
-from app.api.router import api_router  # noqa: E402
-from app.core.config import settings  # noqa: E402
-from app.core.credit_scheduler import credit_scheduler  # noqa: E402
-from app.core.database import close_mongo_connection, connect_to_mongo  # noqa: E402
-from app.core.error_handlers import (  # noqa: E402
+from app.api.router import api_router
+from app.core.config import settings
+from app.core.credit_scheduler import credit_scheduler
+from app.core.database import close_mongo_connection, connect_to_mongo
+from app.core.error_handlers import (
     base_api_exception_handler,
     general_exception_handler,
     http_exception_handler,
     validation_exception_handler,
 )
-from app.core.exceptions import BaseAPIException  # noqa: E402
-from app.core.logging import setup_logging  # noqa: E402
-from app.core.security import RateLimitMiddleware, add_security_headers  # noqa: E402
-from app.services.email_service import email_service  # noqa: E402
+from app.core.exceptions import BaseAPIException
+from app.core.logging import setup_logging
+from app.core.security import RateLimitMiddleware, add_security_headers
+from app.services.email_service import email_service
 
 
 # Lifespan event handler
@@ -41,8 +43,8 @@ async def lifespan(app: FastAPI):
     logger = logging.getLogger(__name__)
 
     # Validate ENCRYPTION_KEY is present - fail startup if missing
-    encryption_key = os.getenv("ENCRYPTION_KEY", "")
-    if not encryption_key:
+    # Use settings.ENCRYPTION_KEY for consistency with rest of codebase
+    if not settings.ENCRYPTION_KEY:
         # Check if .env file exists for better error message
         env_file = Path(".env")
         env_file_exists = env_file.exists()
