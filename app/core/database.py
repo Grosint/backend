@@ -44,18 +44,28 @@ async def get_database():
 
 async def connect_to_mongo():
     """Create database connection"""
+    # MONGODB_URL is validated at startup, but type checker needs assurance
+    if not settings.MONGODB_URL:
+        raise ValueError(
+            "MONGODB_URL is required but was not set. "
+            "This should have been caught at startup."
+        )
+
+    # Type narrowing: after the check above, MONGODB_URL is guaranteed to be str
+    mongodb_url: str = settings.MONGODB_URL
+
     try:
-        db.client = AsyncIOMotorClient(settings.MONGODB_URL)
+        db.client = AsyncIOMotorClient(mongodb_url)
 
         # Extract database name from URL or use default
-        database_name = extract_database_name_from_url(settings.MONGODB_URL)
+        database_name = extract_database_name_from_url(mongodb_url)
         db.database = db.client[database_name]
 
         # Test the connection
         await db.client.admin.command("ping")
 
         # Log connection with masked credentials
-        masked_url = settings.MONGODB_URL
+        masked_url = mongodb_url
         if "@" in masked_url:
             # Mask the password in the URL
             parts = masked_url.split("@")

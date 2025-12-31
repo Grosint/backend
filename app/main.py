@@ -61,6 +61,24 @@ async def lifespan(app: FastAPI):
         raise ValueError(error_msg)
     logger.info("✅ ENCRYPTION_KEY validated")
 
+    # Validate MONGODB_URL is present - fail startup if missing
+    if not settings.MONGODB_URL:
+        # Check if .env file exists for better error message
+        env_file = Path(".env")
+        env_file_exists = env_file.exists()
+
+        error_msg = (
+            "❌ APPLICATION STARTUP FAILED: MONGODB_URL environment variable is required.\n"
+            f"  - .env file exists: {env_file_exists}\n"
+            f"  - .env file path: {env_file.absolute()}\n"
+            "  - Add it to your .env file: MONGODB_URL=<your-mongodb-connection-string>\n"
+            "  - Example: MONGODB_URL=mongodb://localhost:27017\n"
+            "  - Ensure .env file is in the project root directory"
+        )
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    logger.info("✅ MONGODB_URL validated")
+
     await connect_to_mongo()
 
     # Validate email service configuration

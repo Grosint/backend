@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # Encryption key for history data (required)
     # Set via ENCRYPTION_KEY environment variable
     # Generate with: openssl rand -base64 32
-    ENCRYPTION_KEY: str | None = os.getenv("ENCRYPTION_KEY")
+    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
     # Token blocklist configuration (using MongoDB)
     # No additional configuration needed - uses existing MongoDB connection
 
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     TEST_PASSWORD: str = "password"
 
     # MongoDB configuration
-    MONGODB_URL: str = os.getenv("MONGODB_URL")
+    MONGODB_URL: str | None = os.getenv("MONGODB_URL")
     MONGODB_DATABASE: str = os.getenv("MONGODB_DATABASE", "osint_backend")
     MONGODB_COLLECTION_USERS: str = "user"
     MONGODB_COLLECTION_SEARCHES: str = "searches"
