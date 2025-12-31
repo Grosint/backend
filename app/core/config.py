@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # API configuration
     API_V1_STR: str = "/api"
-    PROJECT_NAME: str = "GROSINT V2"
+    PROJECT_NAME: str = "GROSINT"
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     DEBUG: bool = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
 
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # Encryption key for history data (required)
     # Set via ENCRYPTION_KEY environment variable
     # Generate with: openssl rand -base64 32
-
+    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
     # Token blocklist configuration (using MongoDB)
     # No additional configuration needed - uses existing MongoDB connection
 
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     TEST_PASSWORD: str = "password"
 
     # MongoDB configuration
-    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+    MONGODB_URL: str | None = os.getenv("MONGODB_URL")
     MONGODB_DATABASE: str = os.getenv("MONGODB_DATABASE", "osint_backend")
     MONGODB_COLLECTION_USERS: str = "user"
     MONGODB_COLLECTION_SEARCHES: str = "searches"

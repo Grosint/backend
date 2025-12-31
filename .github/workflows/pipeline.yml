@@ -516,6 +516,7 @@ jobs:
                       DEBUG=false
                       LOG_LEVEL=info
                       SECRET_KEY=${{ secrets.SECRET_KEY }}
+                      ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
                       ENVIRONMENT=production
 
                       # Azure Email Configuration
