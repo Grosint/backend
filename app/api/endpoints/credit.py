@@ -11,7 +11,7 @@ from app.core.database import get_database
 from app.schemas.credit import CreditBalance, CreditTransactionResponse
 from app.schemas.response import SuccessResponse
 from app.services.credit_service import CreditService
-from app.services.credit_transaction_service import CreditTransactionService
+from app.services.credit_txn_service import CreditTxnService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ async def get_credit_transactions(
 ):
     """Get credit transaction history for the current user."""
     try:
-        transaction_service = CreditTransactionService(db)
+        transaction_service = CreditTxnService(db)
         transactions = await transaction_service.get_user_transactions(
             user_id=current_user.user_id,
             skip=skip,

@@ -232,7 +232,7 @@ app/
 │   ├── result_service.py          # Result business logic
 │   ├── payment_service.py         # Payment business logic
 │   ├── credit_service.py          # Credit management business logic
-│   ├── credit_transaction_service.py  # Credit transaction tracking
+│   ├── credit_txn_service.py  # Credit transaction tracking
 │   ├── plan_service.py            # Plan management business logic
 │   ├── subscription_service.py    # Subscription management business logic
 │   ├── orchestrators/             # Business orchestrators

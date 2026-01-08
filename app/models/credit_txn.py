@@ -15,7 +15,7 @@ class TransactionType:
     DEBIT = "DEBIT"
 
 
-class CreditTransaction(Document):
+class CreditTxn(Document):
     """Credit transaction model for audit trail."""
 
     userId: PyObjectId

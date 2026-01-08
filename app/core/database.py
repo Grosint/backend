@@ -82,7 +82,7 @@ async def connect_to_mongo():
 
         # Initialize Beanie with document models
         from app.models.credit import Credit
-        from app.models.credit_transaction import CreditTransaction
+        from app.models.credit_txn import CreditTxn
         from app.models.history import History
         from app.models.organization import Organization
         from app.models.payment import Payment
@@ -104,7 +104,7 @@ async def connect_to_mongo():
                 Payment,
                 Subscription,
                 Credit,
-                CreditTransaction,
+                CreditTxn,
             ],
         )
         logger.info("Initialized Beanie")

@@ -7,8 +7,8 @@ from typing import Any
 from bson import ObjectId
 
 from app.models.credit import Credit, CreditStatus, CreditType
-from app.models.credit_transaction import TransactionType
-from app.services.credit_transaction_service import CreditTransactionService
+from app.models.credit_txn import TransactionType
+from app.services.credit_txn_service import CreditTxnService
 from app.utils.validators import PyObjectId
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ class CreditService:
 
     def __init__(self, db):
         self.db = db
-        self.transaction_service = CreditTransactionService(db)
+        self.transaction_service = CreditTxnService(db)
 
     async def create_credit(
         self,

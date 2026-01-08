@@ -20,7 +20,6 @@ class CashfreeService:
         self.name = "CashfreeService"
         self.client = ResilientHttpClient(
             timeout_seconds=30,
-            circuit_key="cashfree_api",
         )
         self.base_url = settings.CASHFREE_BASE_URL
         self.app_id = settings.CASHFREE_APP_ID
