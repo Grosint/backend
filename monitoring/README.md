@@ -2,6 +2,11 @@
 
 This directory contains a production-ready observability stack for the Grosint Backend using Grafana, Loki, Prometheus, and Promtail. It provides logs, metrics, dashboards, and alerting primitives with minimal operational overhead.
 
+## 📚 Documentation
+
+- **[Complete Monitoring Guide](./MONITORING_GUIDE.md)** - Comprehensive guide covering all tools, how to access them, usage examples, dashboards, and troubleshooting
+- **[This README](./README.md)** - Quick reference and architecture overview
+
 ## Architecture
 
 - **Grafana**: Visualization and dashboards (view both metrics and logs)

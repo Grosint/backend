@@ -130,7 +130,7 @@ class PlanService:
         """List all plans."""
         try:
             if active_only:
-                plans = await Plan.find(Plan.isActive).to_list()
+                plans = await Plan.find(Plan.isActive == True).to_list()  # noqa: E712
             else:
                 plans = await Plan.find().to_list()
 
