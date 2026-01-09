@@ -169,8 +169,8 @@
 
 			// Use strict path prefix matching to avoid false positives
 			// Declare and initialize boolean variables for later use in URL construction
-			var isPayment = currentPath.startsWith('/payments/redirect/');
-			var isSubscription = !isPayment && currentPath.startsWith('/subscriptions/redirect/');
+			var isPayment = currentPath.startsWith('/api/payments/redirect/');
+			var isSubscription = !isPayment && currentPath.startsWith('/api/subscriptions/redirect/');
 
 			// Update message based on flow type (mutually exclusive)
 			if (isPayment) {

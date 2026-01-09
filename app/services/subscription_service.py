@@ -347,7 +347,18 @@ class SubscriptionService:
                 return {"success": True, "message": "Already processed"}
 
             # Handle different event types
-            # SUBSCRIPTION_ACTIVATED, SUBSCRIPTION_CHARGED, SUBSCRIPTION_PAYMENT_SUCCESS, SUBSCRIPTION_STATUS_CHANGED (with active status)
+            # Supported Cashfree subscription webhook events:
+            # - SUBSCRIPTION_ACTIVATED: Subscription activated, set to ACTIVE and activate credits
+            # - SUBSCRIPTION_CHARGED: Recurring charge successful, set to ACTIVE and activate credits
+            # - SUBSCRIPTION_PAYMENT_SUCCESS: Payment successful, set to ACTIVE and activate credits
+            # - SUBSCRIPTION_STATUS_CHANGED: Status change notification, update status based on webhook data
+            # - SUBSCRIPTION_CANCELLED: Subscription cancelled, set to CANCELLED
+            # - SUBSCRIPTION_EXPIRED: Subscription expired, set to EXPIRED
+            # - SUBSCRIPTION_AUTH_STATUS: Authorization status update, activate if successful
+            # - SUBSCRIPTION_PAYMENT_NOTIFICATION_INITIATED: Payment notification (log only, no status change)
+            # - SUBSCRIPTION_PAYMENT_FAILED: Payment failed (log only, subscription remains active)
+            # - SUBSCRIPTION_PAYMENT_CANCELLED: Payment cancelled (log only, no status change)
+            # - SUBSCRIPTION_REFUND_STATUS: Refund status update (log only, no status change)
             if event_type_upper in [
                 "SUBSCRIPTION_ACTIVATED",
                 "SUBSCRIPTION_CHARGED",
@@ -415,6 +426,102 @@ class SubscriptionService:
                 subscription.status = SubscriptionStatus.CANCELLED
             elif event_type_upper == "SUBSCRIPTION_EXPIRED":
                 subscription.status = SubscriptionStatus.EXPIRED
+            elif event_type_upper == "SUBSCRIPTION_AUTH_STATUS":
+                # Handle authorization status updates
+                # This event indicates the authorization status of the subscription
+                auth_status = subscription_data.get("auth_status", "").upper()
+                if (
+                    auth_status == "SUCCESS"
+                    and subscription.status == SubscriptionStatus.INITIALIZED
+                ):
+                    # Authorization successful - subscription can be activated
+                    subscription.status = SubscriptionStatus.ACTIVE
+                    if not subscription.startDate:
+                        subscription.startDate = datetime.now(UTC)
+                    if not subscription.nextBillingDate:
+                        subscription.nextBillingDate = datetime.now(UTC) + timedelta(
+                            days=30
+                        )
+                    await self._activate_credits_for_subscription(subscription)
+                elif auth_status == "FAILED":
+                    # Authorization failed - keep subscription in INITIALIZED or mark as failed
+                    logger.warning(
+                        "Subscription authorization failed",
+                        extra={
+                            "subscription_id": str(subscription.id),
+                            "cf_subscription_id": cf_subscription_id,
+                            "auth_status": auth_status,
+                        },
+                    )
+                # Log auth status for monitoring
+                logger.info(
+                    "Subscription auth status received",
+                    extra={
+                        "subscription_id": str(subscription.id),
+                        "cf_subscription_id": cf_subscription_id,
+                        "auth_status": auth_status,
+                        "current_status": subscription.status,
+                    },
+                )
+            elif event_type_upper == "SUBSCRIPTION_PAYMENT_NOTIFICATION_INITIATED":
+                # Payment notification initiated - log for tracking, no status change needed
+                logger.info(
+                    "Subscription payment notification initiated",
+                    extra={
+                        "subscription_id": str(subscription.id),
+                        "cf_subscription_id": cf_subscription_id,
+                        "current_status": subscription.status,
+                    },
+                )
+                # No status change - this is just a notification that payment will be attempted
+            elif event_type_upper == "SUBSCRIPTION_PAYMENT_FAILED":
+                # Payment failed for subscription - log but don't change subscription status
+                # Subscription remains active, payment can be retried
+                logger.warning(
+                    "Subscription payment failed",
+                    extra={
+                        "subscription_id": str(subscription.id),
+                        "cf_subscription_id": cf_subscription_id,
+                        "current_status": subscription.status,
+                    },
+                )
+                # Note: Subscription status remains ACTIVE, Cashfree will retry payment
+            elif event_type_upper == "SUBSCRIPTION_PAYMENT_CANCELLED":
+                # Payment was cancelled - log for tracking
+                logger.info(
+                    "Subscription payment cancelled",
+                    extra={
+                        "subscription_id": str(subscription.id),
+                        "cf_subscription_id": cf_subscription_id,
+                        "current_status": subscription.status,
+                    },
+                )
+                # No status change - payment cancellation doesn't affect subscription status
+            elif event_type_upper == "SUBSCRIPTION_REFUND_STATUS":
+                # Refund status update - log for tracking
+                refund_status = subscription_data.get("refund_status", "").upper()
+                logger.info(
+                    "Subscription refund status received",
+                    extra={
+                        "subscription_id": str(subscription.id),
+                        "cf_subscription_id": cf_subscription_id,
+                        "refund_status": refund_status,
+                        "current_status": subscription.status,
+                    },
+                )
+                # No status change - refunds don't affect subscription status
+            else:
+                # Unhandled event type - log for monitoring and potential future implementation
+                logger.warning(
+                    "Unhandled subscription webhook event type",
+                    extra={
+                        "subscription_id": str(subscription.id),
+                        "cf_subscription_id": cf_subscription_id,
+                        "event_type": event_type,
+                        "current_status": subscription.status,
+                    },
+                )
+                # Continue processing - update timestamp even for unhandled events
 
             subscription.updatedAt = datetime.now(UTC)
             await subscription.save()

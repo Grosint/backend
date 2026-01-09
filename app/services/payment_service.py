@@ -200,18 +200,6 @@ class PaymentService:
             order_id = webhook_data.get("data", {}).get("order", {}).get("order_id")
 
             if not order_id:
-                # Check if this is a test webhook (has test_object in data)
-                is_test_webhook = "test_object" in webhook_data.get("data", {})
-                if is_test_webhook:
-                    logger.info(
-                        "Test webhook received (no order_id in test payload)",
-                        extra={"webhook_type": webhook_data.get("type")},
-                    )
-                    return {
-                        "success": True,
-                        "message": "Test webhook received and verified",
-                    }
-
                 logger.warning("Order ID not found in webhook data")
                 return {
                     "success": False,
@@ -311,8 +299,8 @@ class PaymentService:
                 ]
                 or payment_status == "failed"
             ) or event_type in [
-                "PAYMENT_FAILED_WEBHOOK",
-                "PAYMENT_USER_DROPPED_WEBHOOK",
+                "PAYMENT_FAILED",
+                "PAYMENT_USER_DROPPED",
             ]:
                 payment.status = PaymentStatus.FAILED
 

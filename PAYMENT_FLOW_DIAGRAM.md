@@ -469,7 +469,7 @@ flowchart TD
 ### Payments (Prepaid)
 - `POST /api/v1/payments/create` - Create payment order
 - `POST /api/v1/payments/verify/{order_id}` - Verify payment status
-- `GET /api/v1/payments/redirect/{order_id}` - Payment redirect page
+- `GET /api/payments/redirect/{order_id}` - Payment redirect page
 - `POST /api/v1/payments/webhook` - Cashfree payment webhook
 
 ### Subscriptions
