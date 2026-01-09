@@ -168,11 +168,15 @@
 			var currentPath = window.location.pathname;
 
 			// Use strict path prefix matching to avoid false positives
-			// Check payment redirect first (mutually exclusive)
-			if (currentPath.startsWith('/payments/redirect/')) {
+			// Declare and initialize boolean variables for later use in URL construction
+			var isPayment = currentPath.startsWith('/payments/redirect/');
+			var isSubscription = !isPayment && currentPath.startsWith('/subscriptions/redirect/');
+
+			// Update message based on flow type (mutually exclusive)
+			if (isPayment) {
 				document.getElementById('messageTitle').textContent = 'Payment Processing!';
 				document.getElementById('messageText').textContent = 'Your payment is being processed. Redirecting you to the payment status page...';
-			} else if (currentPath.startsWith('/subscriptions/redirect/')) {
+			} else if (isSubscription) {
 				document.getElementById('messageTitle').textContent = 'Subscription Processing!';
 				document.getElementById('messageText').textContent = 'Your subscription authorization is being processed. Redirecting you to the subscription status page...';
 			} else {

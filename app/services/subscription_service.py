@@ -361,6 +361,9 @@ class SubscriptionService:
                 # Activate credits on activation or payment success
                 await self._activate_credits_for_subscription(subscription)
             elif event_type_upper == "SUBSCRIPTION_STATUS_CHANGED":
+                # Capture previous status before any modifications to detect real transitions
+                previous_status = subscription.status
+
                 # Check subscription status from subscription_details
                 # subscription_data is already set to data.get("subscription_details", {}) above
                 subscription_status = subscription_data.get("status", "").upper()
@@ -395,8 +398,11 @@ class SubscriptionService:
                         )
                 # If status is empty or unknown, keep current status but still process the webhook
 
-                # Activate credits if status changed to ACTIVE
-                if subscription.status == SubscriptionStatus.ACTIVE:
+                # Activate credits only on real transition to ACTIVE (not if already ACTIVE)
+                if (
+                    subscription.status == SubscriptionStatus.ACTIVE
+                    and previous_status != SubscriptionStatus.ACTIVE
+                ):
                     await self._activate_credits_for_subscription(subscription)
             elif event_type_upper == "SUBSCRIPTION_CANCELLED":
                 subscription.status = SubscriptionStatus.CANCELLED
