@@ -155,8 +155,8 @@
 			<div class="success-icon"></div>
 			<div class="spinner"></div>
 			<div class="message">
-				<h2>Payment Successful!</h2>
-				<p>Your subscription has been processed successfully. Redirecting you to the payment status page...</p>
+				<h2 id="messageTitle">Processing...</h2>
+				<p id="messageText">Redirecting you to the status page...</p>
 			</div>
 			<a href="#" id="manualRedirect" class="redirect-link">Continue to Dashboard</a>
 			<div class="countdown" id="countdown">Redirecting in <span id="timer">2</span> seconds...</div>
@@ -164,6 +164,28 @@
 		</div>
 
 		<script>
+			// Detect if this is a payment or subscription redirect
+			var currentPath = window.location.pathname;
+
+			// Use strict path prefix matching to avoid false positives
+			// Declare and initialize boolean variables for later use in URL construction
+			var isPayment = currentPath.startsWith('/api/payments/redirect/');
+			var isSubscription = !isPayment && currentPath.startsWith('/api/subscriptions/redirect/');
+
+			// Update message based on flow type (mutually exclusive)
+			if (isPayment) {
+				document.getElementById('messageTitle').textContent = 'Payment Processing!';
+				document.getElementById('messageText').textContent = 'Your payment is being processed. Redirecting you to the payment status page...';
+			} else if (isSubscription) {
+				document.getElementById('messageTitle').textContent = 'Subscription Processing!';
+				document.getElementById('messageText').textContent = 'Your subscription authorization is being processed. Redirecting you to the subscription status page...';
+			} else {
+				// Fallback for unrecognized paths
+				console.warn('Unrecognized redirect path:', currentPath);
+				document.getElementById('messageTitle').textContent = 'Processing!';
+				document.getElementById('messageText').textContent = 'Your request is being processed. Redirecting you...';
+			}
+
 			// Function to get URL parameters
 			function getUrlParameter(name) {
 				name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
@@ -174,9 +196,31 @@
 
 			// Function to redirect to Angular app
 			function redirectToAngularApp() {
-				// Get subscription_id from the current URL path
-				var pathParts = window.location.pathname.split('/');
-				var subscriptionId = pathParts[pathParts.length - 1];
+				// Extract ID from URL path (last non-empty segment)
+				// Filter out empty strings to handle trailing slashes
+				var pathParts = window.location.pathname.split('/').filter(function(part) {
+					return part.length > 0;
+				});
+				var id = pathParts.length > 0 ? pathParts[pathParts.length - 1] : '';
+
+				// Validate that ID is non-empty before building redirect URL
+				if (!id) {
+					console.error('Unable to extract ID from URL path:', window.location.pathname);
+					// Fallback: redirect to payment status page without ID
+					var fallbackUrl;
+					var currentHost = window.location.hostname;
+					if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+						fallbackUrl = 'http://localhost:4200';
+					} else if (currentHost === 'grosint.org' || currentHost.includes('grosint.org')) {
+						fallbackUrl = 'https://www.grosint.in';
+					} else if (currentHost === 'grosint.net' || currentHost.includes('grosint.net')) {
+						fallbackUrl = 'https://www.grosint.com';
+					} else {
+						fallbackUrl = window.location.origin;
+					}
+					window.location.href = fallbackUrl + '/payment-status';
+					return;
+				}
 
 				// Determine the frontend URL based on the current environment
 				var frontendUrl;
@@ -196,8 +240,19 @@
 					frontendUrl = window.location.origin;
 				}
 
-				// Construct the Angular app URL
-				var angularUrl = frontendUrl + '/payment-status/subscription/' + subscriptionId;
+				// Construct the Angular app URL based on flow type
+				var angularUrl;
+				if (isPayment) {
+					// Payment flow: redirect to payment status with order_id
+					angularUrl = frontendUrl + '/payment-status/order/' + id;
+				} else if (isSubscription) {
+					// Subscription flow: redirect to subscription status with subscription_id
+					angularUrl = frontendUrl + '/payment-status/subscription/' + id;
+				} else {
+					// Fallback: try to determine from URL structure
+					angularUrl = frontendUrl + '/payment-status';
+				}
+
 				// Redirect to Angular application
 				window.location.href = angularUrl;
 			}

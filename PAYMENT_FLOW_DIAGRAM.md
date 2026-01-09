@@ -469,14 +469,14 @@ flowchart TD
 ### Payments (Prepaid)
 - `POST /api/v1/payments/create` - Create payment order
 - `POST /api/v1/payments/verify/{order_id}` - Verify payment status
-- `GET /api/v1/payments/redirect/{order_id}` - Payment redirect page
+- `GET /api/payments/redirect/{order_id}` - Payment redirect page
 - `POST /api/v1/payments/webhook` - Cashfree payment webhook
 
 ### Subscriptions
 - `POST /api/v1/subscriptions/create` - Create subscription
 - `GET /api/v1/subscriptions/me` - Get user subscriptions
 - `POST /api/v1/subscriptions/{id}/cancel` - Cancel subscription
-- `GET /api/v1/subscriptions/redirect/{id}` - Subscription redirect page
+- `GET /api/subscriptions/redirect/{id}` - Subscription redirect page
 - `POST /api/v1/subscriptions/webhook` - Cashfree subscription webhook
 
 ### Credits

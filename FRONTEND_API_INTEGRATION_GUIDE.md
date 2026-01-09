@@ -375,7 +375,7 @@ Content-Type: application/json
 2. Call this API with `planId` and `origin`
 3. Redirect user to Cashfree using `paymentSessionId`
 4. User completes payment on Cashfree
-5. Cashfree redirects back to `{origin}/api/v1/payments/redirect/{orderId}`
+5. Cashfree redirects back to `{origin}/api/payments/redirect/{order_id}`
 6. Poll or verify payment status using `/payments/verify/{orderId}`
 
 ### 2. Verify Payment
@@ -414,7 +414,7 @@ Authorization: Bearer <access_token>
 - Show error message for other statuses
 
 ### 3. Payment Redirect Page
-**Endpoint:** `GET /api/v1/payments/redirect/{order_id}`
+**Endpoint:** `GET /api/payments/redirect/{order_id}`
 
 **Note:** This is a server-side HTML page. Frontend should handle redirects differently.
 
@@ -501,7 +501,7 @@ Content-Type: application/json
 2. Call this API with `planId` and `origin`
 3. Redirect user to Cashfree using `subscriptionSessionId`
 4. User authorizes subscription on Cashfree
-5. Cashfree redirects back to `{origin}/api/v1/subscriptions/redirect/{subscription_id}`
+5. Cashfree redirects back to `{origin}/api/subscriptions/redirect/{subscription_id}`
 6. Subscription is activated via webhook (no polling needed)
 
 ### 2. Get User Subscriptions
@@ -820,7 +820,7 @@ PREPAID PAYMENT FLOW:
 2. POST /payments/create with {planId, origin: window.location.origin}
 3. Response: {paymentSessionId, orderId, redirectUrl}
 4. Redirect user to Cashfree using paymentSessionId
-5. After payment, user returns to {origin}/api/v1/payments/redirect/{orderId}
+5. After payment, user returns to {origin}/api/payments/redirect/{order_id}
 6. Poll payment status: POST /payments/verify/{orderId} every 2 seconds
 7. When status === "completed", show success and refresh credit balance
 8. If status !== "pending" && status !== "completed", show error
@@ -830,7 +830,7 @@ SUBSCRIPTION FLOW:
 2. POST /subscriptions/create with {planId, origin: window.location.origin}
 3. Response: {subscriptionSessionId, cashfreeSubscriptionId}
 4. Redirect user to Cashfree using subscriptionSessionId
-5. After authorization, user returns to {origin}/api/v1/subscriptions/redirect/{subscription_id}
+5. After authorization, user returns to {origin}/api/subscriptions/redirect/{subscription_id}
 6. Subscription activated via webhook (no polling needed)
 7. Show success message
 

@@ -123,9 +123,25 @@ async def verify_payment(
 
 
 @router.get("/redirect/{order_id}", response_class=HTMLResponse)
-async def payment_redirect(order_id: str):
+async def payment_redirect(order_id: str, db=Depends(get_database)):
     """Redirect page after payment completion."""
     try:
+        # Verify payment status when redirect page loads
+        # This ensures payment is verified even if webhook hasn't fired yet
+        try:
+            payment_service = PaymentService(db)
+            await payment_service.verify_payment(order_id)
+            logger.info(
+                "Payment verified on redirect page load",
+                extra={"order_id": order_id},
+            )
+        except Exception as verify_error:
+            # Log but don't fail - webhook will handle verification
+            logger.warning(
+                "Could not verify payment on redirect page load",
+                extra={"order_id": order_id, "error": str(verify_error)},
+            )
+
         # Read the redirect.html file
         # Path from app/api/endpoints/ to app/static/
         app_dir = Path(__file__).parent.parent.parent
@@ -160,20 +176,21 @@ async def payment_redirect(order_id: str):
 @router.post("/webhook")
 async def payment_webhook(
     request: Request,
-    x_cf_signature: str | None = Header(None, alias="x-cf-signature"),
+    x_webhook_signature: str | None = Header(None, alias="x-webhook-signature"),
+    x_webhook_timestamp: str | None = Header(None, alias="x-webhook-timestamp"),
     db=Depends(get_database),
 ):
     """Handle Cashfree payment webhook."""
     try:
         # Extract webhook data
         webhook_data, body_str, signature = await extract_webhook_data(
-            request, x_cf_signature
+            request, x_webhook_signature
         )
 
         # Verify signature
         payment_service = PaymentService(db)
         if not verify_webhook_signature(
-            body_str, signature, payment_service.cashfree_service
+            body_str, signature, payment_service.cashfree_service, x_webhook_timestamp
         ):
             logger.warning("Payment webhook signature verification failed")
             return create_webhook_response(success=False, message="Invalid signature")
