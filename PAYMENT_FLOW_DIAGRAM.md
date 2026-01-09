@@ -476,7 +476,7 @@ flowchart TD
 - `POST /api/v1/subscriptions/create` - Create subscription
 - `GET /api/v1/subscriptions/me` - Get user subscriptions
 - `POST /api/v1/subscriptions/{id}/cancel` - Cancel subscription
-- `GET /api/v1/subscriptions/redirect/{id}` - Subscription redirect page
+- `GET /api/subscriptions/redirect/{id}` - Subscription redirect page
 - `POST /api/v1/subscriptions/webhook` - Cashfree subscription webhook
 
 ### Credits

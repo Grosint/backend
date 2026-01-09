@@ -314,11 +314,15 @@ class SubscriptionService:
             )
 
             # Check if already processed (idempotency) - prevent duplicate credit creation
-            # Only skip if already ACTIVE and this is a renewal/charge event (not initial activation)
+            # Skip if already ACTIVE and this is a renewal/charge/activation event
             if (
                 subscription.status == SubscriptionStatus.ACTIVE
                 and event_type_upper
-                in ["SUBSCRIPTION_CHARGED", "SUBSCRIPTION_PAYMENT_SUCCESS"]
+                in [
+                    "SUBSCRIPTION_ACTIVATED",
+                    "SUBSCRIPTION_CHARGED",
+                    "SUBSCRIPTION_PAYMENT_SUCCESS",
+                ]
             ):
                 logger.info(
                     "Subscription already active, skipping credit activation for renewal",
@@ -383,20 +387,23 @@ class SubscriptionService:
                     subscription.status = SubscriptionStatus.CANCELLED
                 elif subscription_status == "EXPIRED":
                     subscription.status = SubscriptionStatus.EXPIRED
-                elif (
-                    not subscription_status
-                    and subscription.status == SubscriptionStatus.INITIALIZED
-                ):
-                    # If status is not in webhook but subscription is INITIALIZED and we got STATUS_CHANGED,
-                    # it likely means subscription is being activated - set to ACTIVE
-                    subscription.status = SubscriptionStatus.ACTIVE
-                    if not subscription.startDate:
-                        subscription.startDate = datetime.now(UTC)
-                    if not subscription.nextBillingDate:
-                        subscription.nextBillingDate = datetime.now(UTC) + timedelta(
-                            days=30
-                        )
-                # If status is empty or unknown, keep current status but still process the webhook
+                elif not subscription_status:
+                    # Empty status in SUBSCRIPTION_STATUS_CHANGED webhook - do not auto-activate
+                    # This could indicate malformed webhook, incomplete data, or initialization phase
+                    # Wait for explicit SUBSCRIPTION_ACTIVATED event or status="ACTIVE" in webhook
+                    logger.warning(
+                        "SUBSCRIPTION_STATUS_CHANGED received with empty status field",
+                        extra={
+                            "subscription_id": str(subscription.id),
+                            "cf_subscription_id": cf_subscription_id,
+                            "current_status": subscription.status,
+                            "event_type": event_type,
+                            "webhook_data": webhook_data,
+                        },
+                    )
+                    # Keep current status - do not auto-activate based on empty status
+                    # Subscription will be activated via explicit SUBSCRIPTION_ACTIVATED event
+                # If status is unknown/invalid, keep current status but still process the webhook
 
                 # Activate credits only on real transition to ACTIVE (not if already ACTIVE)
                 if (

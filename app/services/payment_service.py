@@ -302,13 +302,15 @@ class PaymentService:
                             "payment_completion_time"
                         ].replace("Z", "+00:00")
                     )
-            elif order_status in [
-                "failed",
-                "expired",
-                "cancelled",
-            ] or payment_status in ["failed", "FAILED"]:
-                payment.status = order_status if order_status else payment_status
-            elif event_type in [
+            elif (
+                order_status
+                in [
+                    "failed",
+                    "expired",
+                    "cancelled",
+                ]
+                or payment_status == "failed"
+            ) or event_type in [
                 "PAYMENT_FAILED_WEBHOOK",
                 "PAYMENT_USER_DROPPED_WEBHOOK",
             ]:

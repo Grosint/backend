@@ -196,9 +196,31 @@
 
 			// Function to redirect to Angular app
 			function redirectToAngularApp() {
-				// Extract ID from URL path (last segment)
-				var pathParts = window.location.pathname.split('/');
-				var id = pathParts[pathParts.length - 1];
+				// Extract ID from URL path (last non-empty segment)
+				// Filter out empty strings to handle trailing slashes
+				var pathParts = window.location.pathname.split('/').filter(function(part) {
+					return part.length > 0;
+				});
+				var id = pathParts.length > 0 ? pathParts[pathParts.length - 1] : '';
+
+				// Validate that ID is non-empty before building redirect URL
+				if (!id) {
+					console.error('Unable to extract ID from URL path:', window.location.pathname);
+					// Fallback: redirect to payment status page without ID
+					var fallbackUrl;
+					var currentHost = window.location.hostname;
+					if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+						fallbackUrl = 'http://localhost:4200';
+					} else if (currentHost === 'grosint.org' || currentHost.includes('grosint.org')) {
+						fallbackUrl = 'https://www.grosint.in';
+					} else if (currentHost === 'grosint.net' || currentHost.includes('grosint.net')) {
+						fallbackUrl = 'https://www.grosint.com';
+					} else {
+						fallbackUrl = window.location.origin;
+					}
+					window.location.href = fallbackUrl + '/payment-status';
+					return;
+				}
 
 				// Determine the frontend URL based on the current environment
 				var frontendUrl;

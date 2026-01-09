@@ -501,7 +501,7 @@ Content-Type: application/json
 2. Call this API with `planId` and `origin`
 3. Redirect user to Cashfree using `subscriptionSessionId`
 4. User authorizes subscription on Cashfree
-5. Cashfree redirects back to `{origin}/api/v1/subscriptions/redirect/{subscription_id}`
+5. Cashfree redirects back to `{origin}/api/subscriptions/redirect/{subscription_id}`
 6. Subscription is activated via webhook (no polling needed)
 
 ### 2. Get User Subscriptions
@@ -830,7 +830,7 @@ SUBSCRIPTION FLOW:
 2. POST /subscriptions/create with {planId, origin: window.location.origin}
 3. Response: {subscriptionSessionId, cashfreeSubscriptionId}
 4. Redirect user to Cashfree using subscriptionSessionId
-5. After authorization, user returns to {origin}/api/v1/subscriptions/redirect/{subscription_id}
+5. After authorization, user returns to {origin}/api/subscriptions/redirect/{subscription_id}
 6. Subscription activated via webhook (no polling needed)
 7. Show success message
 
