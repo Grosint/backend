@@ -59,7 +59,7 @@ class PaymentService:
 
             # Prepare order meta and tags
             order_meta = {
-                "return_url": f"{origin}/api/v1/payments/redirect/{order_id}",
+                "return_url": f"{origin}/api/payments/redirect/{order_id}",
             }
 
             order_tags = {
@@ -192,25 +192,35 @@ class PaymentService:
     ) -> dict[str, Any]:
         """Process Cashfree webhook."""
         try:
-            # Verify webhook signature if provided
-            if (
-                signature
-                and raw_body
-                and not self.cashfree_service.verify_webhook_signature(
-                    raw_body, signature
-                )
-            ):
-                logger.warning("Webhook signature verification failed")
-                return {"success": False, "message": "Invalid signature"}
+            # Note: Signature verification is already done in the endpoint before calling this method
+            # No need to verify again here to avoid duplicate verification
 
             # Extract order information
+            # Cashfree webhook structure: data.order.order_id for payment webhooks
             order_id = webhook_data.get("data", {}).get("order", {}).get("order_id")
+
             if not order_id:
+                # Check if this is a test webhook (has test_object in data)
+                is_test_webhook = "test_object" in webhook_data.get("data", {})
+                if is_test_webhook:
+                    logger.info(
+                        "Test webhook received (no order_id in test payload)",
+                        extra={"webhook_type": webhook_data.get("type")},
+                    )
+                    return {
+                        "success": True,
+                        "message": "Test webhook received and verified",
+                    }
+
                 logger.warning("Order ID not found in webhook data")
-                return {"success": False, "message": "Order ID not found"}
+                return {
+                    "success": False,
+                    "message": "Order ID not found in webhook payload",
+                }
 
             # Get payment from database
             payment = await Payment.find_one(Payment.cfOrderId == order_id)
+
             if not payment:
                 logger.warning(
                     "Payment not found for webhook", extra={"order_id": order_id}
@@ -226,19 +236,62 @@ class PaymentService:
                 return {"success": True, "message": "Already processed"}
 
             # Update payment status
+            # Cashfree webhook structure: order_status might be in data.order.order_status
+            # OR we need to check the event type (PAYMENT_SUCCESS_WEBHOOK = success)
+            # OR check data.payment.payment_status
+            event_type = webhook_data.get("type", "")
             order_status = (
                 webhook_data.get("data", {})
                 .get("order", {})
                 .get("order_status", "")
                 .lower()
             )
-            if order_status == "paid":
+            payment_status = (
+                webhook_data.get("data", {})
+                .get("payment", {})
+                .get("payment_status", "")
+                .lower()
+            )
+
+            # Determine if payment is successful:
+            # 1. Check order_status == "paid"
+            # 2. Check payment_status == "SUCCESS" or "success"
+            # 3. Check event_type indicates success (PAYMENT_SUCCESS_WEBHOOK, PAYMENT_CHARGES_WEBHOOK)
+            is_paid = (
+                order_status == "paid"
+                or payment_status in ["success", "SUCCESS"]
+                or event_type in ["PAYMENT_SUCCESS_WEBHOOK", "PAYMENT_CHARGES_WEBHOOK"]
+            )
+
+            if is_paid:
                 payment.status = PaymentStatus.COMPLETED
-                payment.paymentMethod = (
+
+                # Extract payment method - Cashfree sends it as nested object like {'upi': {...}} or {'card': {...}}
+                # We need to extract the key (payment method type) or a string value
+                payment_method_raw = (
                     webhook_data.get("data", {})
                     .get("payment", {})
                     .get("payment_method")
                 )
+
+                # Handle different payment_method formats:
+                # 1. If it's a string, use it directly
+                # 2. If it's a dict like {'upi': {...}}, extract the key
+                # 3. If it's a dict with nested structure, try to find a method field
+                if isinstance(payment_method_raw, str):
+                    payment.paymentMethod = payment_method_raw
+                elif isinstance(payment_method_raw, dict):
+                    # Extract the first key (e.g., 'upi', 'card', 'netbanking')
+                    payment_method_keys = list(payment_method_raw.keys())
+                    if payment_method_keys:
+                        payment.paymentMethod = payment_method_keys[
+                            0
+                        ].upper()  # e.g., 'UPI', 'CARD'
+                    else:
+                        payment.paymentMethod = None
+                else:
+                    payment.paymentMethod = None
+
                 if (
                     webhook_data.get("data", {})
                     .get("order", {})
@@ -249,8 +302,17 @@ class PaymentService:
                             "payment_completion_time"
                         ].replace("Z", "+00:00")
                     )
-            elif order_status in ["failed", "expired", "cancelled"]:
-                payment.status = order_status
+            elif order_status in [
+                "failed",
+                "expired",
+                "cancelled",
+            ] or payment_status in ["failed", "FAILED"]:
+                payment.status = order_status if order_status else payment_status
+            elif event_type in [
+                "PAYMENT_FAILED_WEBHOOK",
+                "PAYMENT_USER_DROPPED_WEBHOOK",
+            ]:
+                payment.status = PaymentStatus.FAILED
 
             payment.updatedAt = datetime.now(UTC)
             await payment.save()
@@ -290,6 +352,7 @@ class PaymentService:
                 return
 
             plan = await Plan.find_one(Plan.id == payment.planId)
+
             if not plan:
                 logger.warning(
                     "Plan not found",

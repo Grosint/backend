@@ -139,6 +139,22 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Strict-Transport-Security"] = (
         "max-age=31536000; includeSubDomains"
     )
-    response.headers["Content-Security-Policy"] = "default-src 'self'"
+
+    # Check if this is a redirect page (needs inline styles)
+    # Both payment and subscription redirects need inline CSS/JS
+    is_redirect_page = "/redirect/" in str(request.url.path)
+
+    if is_redirect_page:
+        # Allow inline styles for redirect pages
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "font-src 'self' data:"
+        )
+    else:
+        # Stricter policy for other pages
+        response.headers["Content-Security-Policy"] = "default-src 'self'"
 
     return response

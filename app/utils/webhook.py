@@ -50,7 +50,10 @@ async def extract_webhook_data(
 
 
 def verify_webhook_signature(
-    raw_body: str, signature: str | None, cashfree_service: CashfreeService
+    raw_body: str,
+    signature: str | None,
+    cashfree_service: CashfreeService,
+    timestamp: str | None = None,
 ) -> bool:
     """
     Verify webhook signature using Cashfree service.
@@ -59,6 +62,7 @@ def verify_webhook_signature(
         raw_body: Raw request body as string
         signature: Webhook signature from header
         cashfree_service: CashfreeService instance
+        timestamp: Webhook timestamp from x-webhook-timestamp header (optional)
 
     Returns:
         True if signature is valid, False otherwise
@@ -74,7 +78,7 @@ def verify_webhook_signature(
             return True
         return False  # Treat missing signature as invalid
 
-    return cashfree_service.verify_webhook_signature(raw_body, signature)
+    return cashfree_service.verify_webhook_signature(raw_body, signature, timestamp)
 
 
 def create_webhook_response(success: bool, message: str | None = None) -> JSONResponse:

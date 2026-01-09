@@ -95,7 +95,7 @@ class SubscriptionService:
 
             # Prepare subscription meta and tags
             subscription_meta = {
-                "return_url": f"{origin}/api/v1/subscriptions/redirect/{subscription_id}",
+                "return_url": f"https://2f191c6e2222.ngrok-free.app/api/subscriptions/redirect/{subscription_id}",
             }
 
             subscription_tags = {
@@ -245,28 +245,55 @@ class SubscriptionService:
     ) -> dict[str, Any]:
         """Process Cashfree subscription webhook."""
         try:
-            # Verify webhook signature if provided
-            if (
-                signature
-                and raw_body
-                and not self.cashfree_service.verify_webhook_signature(
-                    raw_body, signature
-                )
-            ):
-                logger.warning("Webhook signature verification failed")
-                return {"success": False, "message": "Invalid signature"}
+            # Note: Signature verification is already done in the endpoint before calling this method
+            # No need to verify again here to avoid duplicate verification
 
             # Extract subscription information
-            subscription_data = webhook_data.get("data", {}).get("subscription", {})
-            cf_subscription_id = subscription_data.get("subscription_id")
+            # Cashfree webhook structure varies by event type:
+            # - SUBSCRIPTION_AUTH_STATUS, SUBSCRIPTION_PAYMENT_SUCCESS: cf_subscription_id directly in data
+            # - SUBSCRIPTION_STATUS_CHANGED: subscription_details.subscription_id
+            # - SUBSCRIPTION_ACTIVATED, SUBSCRIPTION_CHARGED: data.subscription.subscription_id
+            data = webhook_data.get("data", {})
+            event_type = webhook_data.get("type", "")
+
+            # Try multiple locations for subscription ID
+            cf_subscription_id = (
+                data.get(
+                    "cf_subscription_id"
+                )  # Direct in data (AUTH_STATUS, PAYMENT_SUCCESS)
+                or data.get("subscription_id")  # Alternative direct field
+                or data.get("subscription_details", {}).get(
+                    "subscription_id"
+                )  # SUBSCRIPTION_STATUS_CHANGED
+                or data.get("subscription", {}).get(
+                    "subscription_id"
+                )  # SUBSCRIPTION_ACTIVATED, SUBSCRIPTION_CHARGED
+            )
+
             if not cf_subscription_id:
+                # Check if this is a test webhook (has test_object in data)
+                is_test_webhook = "test_object" in webhook_data.get("data", {})
+                if is_test_webhook:
+                    logger.info(
+                        "Test webhook received (no subscription_id in test payload)",
+                        extra={"webhook_type": webhook_data.get("type")},
+                    )
+                    return {
+                        "success": True,
+                        "message": "Test webhook received and verified",
+                    }
+
                 logger.warning("Subscription ID not found in webhook data")
-                return {"success": False, "message": "Subscription ID not found"}
+                return {
+                    "success": False,
+                    "message": "Subscription ID not found in webhook payload",
+                }
 
             # Get subscription from database
             subscription = await Subscription.find_one(
                 Subscription.cfSubscriptionId == cf_subscription_id
             )
+
             if not subscription:
                 logger.warning(
                     "Subscription not found for webhook",
@@ -275,23 +302,112 @@ class SubscriptionService:
                 return {"success": False, "message": "Subscription not found"}
 
             # Update subscription status based on event type
-            event_type = webhook_data.get("type", "").upper()
+            event_type_upper = event_type.upper()
 
-            if event_type in ["SUBSCRIPTION_ACTIVATED", "SUBSCRIPTION_CHARGED"]:
-                subscription.status = SubscriptionStatus.ACTIVE
-                if subscription_data.get("current_cycle"):
+            # Get subscription data from appropriate location based on event type
+            subscription_data = (
+                data.get("subscription_details", {})  # SUBSCRIPTION_STATUS_CHANGED
+                or data.get(
+                    "subscription", {}
+                )  # SUBSCRIPTION_ACTIVATED, SUBSCRIPTION_CHARGED
+                or data  # Fallback to data itself
+            )
+
+            # Check if already processed (idempotency) - prevent duplicate credit creation
+            # Only skip if already ACTIVE and this is a renewal/charge event (not initial activation)
+            if (
+                subscription.status == SubscriptionStatus.ACTIVE
+                and event_type_upper
+                in ["SUBSCRIPTION_CHARGED", "SUBSCRIPTION_PAYMENT_SUCCESS"]
+            ):
+                logger.info(
+                    "Subscription already active, skipping credit activation for renewal",
+                    extra={
+                        "subscription_id": str(subscription.id),
+                        "cf_subscription_id": cf_subscription_id,
+                        "event_type": event_type,
+                    },
+                )
+                # Still update metadata if needed, but don't activate credits again
+                if (
+                    subscription_data.get("current_cycle")
+                    and not subscription.startDate
+                ):
                     subscription.startDate = datetime.now(UTC)
-                    # Calculate next billing date (assuming monthly for now)
+                if not subscription.nextBillingDate:
+                    subscription.nextBillingDate = datetime.now(UTC) + timedelta(
+                        days=30
+                    )
+                subscription.updatedAt = datetime.now(UTC)
+                await subscription.save()
+                return {"success": True, "message": "Already processed"}
+
+            # Handle different event types
+            # SUBSCRIPTION_ACTIVATED, SUBSCRIPTION_CHARGED, SUBSCRIPTION_PAYMENT_SUCCESS, SUBSCRIPTION_STATUS_CHANGED (with active status)
+            if event_type_upper in [
+                "SUBSCRIPTION_ACTIVATED",
+                "SUBSCRIPTION_CHARGED",
+                "SUBSCRIPTION_PAYMENT_SUCCESS",
+            ]:
+                subscription.status = SubscriptionStatus.ACTIVE
+                if not subscription.startDate:
+                    subscription.startDate = datetime.now(UTC)
+                # Calculate next billing date (assuming monthly for now)
+                if not subscription.nextBillingDate:
                     subscription.nextBillingDate = datetime.now(UTC) + timedelta(
                         days=30
                     )
 
-                # Activate credits on activation or renewal
+                # Activate credits on activation or payment success
+                await self._activate_credits_for_subscription(subscription)
+            elif event_type_upper == "SUBSCRIPTION_STATUS_CHANGED":
+                # Check subscription status from subscription_details
+                # subscription_data is already set to data.get("subscription_details", {}) above
+                subscription_status = subscription_data.get("status", "").upper()
+
+                # If status is not found in subscription_details, check if subscription is being activated
+                # For SUBSCRIPTION_STATUS_CHANGED, if status is empty but we're processing it,
+                # it might mean the subscription is being activated (transitioning from initialized to active)
+                if subscription_status == "ACTIVE":
+                    subscription.status = SubscriptionStatus.ACTIVE
+                    if not subscription.startDate:
+                        subscription.startDate = datetime.now(UTC)
+                    if not subscription.nextBillingDate:
+                        subscription.nextBillingDate = datetime.now(UTC) + timedelta(
+                            days=30
+                        )
+                elif subscription_status == "CANCELLED":
+                    subscription.status = SubscriptionStatus.CANCELLED
+                elif subscription_status == "EXPIRED":
+                    subscription.status = SubscriptionStatus.EXPIRED
+                elif (
+                    not subscription_status
+                    and subscription.status == SubscriptionStatus.INITIALIZED
+                ):
+                    # If status is not in webhook but subscription is INITIALIZED and we got STATUS_CHANGED,
+                    # it likely means subscription is being activated - set to ACTIVE
+                    subscription.status = SubscriptionStatus.ACTIVE
+                    if not subscription.startDate:
+                        subscription.startDate = datetime.now(UTC)
+                    if not subscription.nextBillingDate:
+                        subscription.nextBillingDate = datetime.now(UTC) + timedelta(
+                            days=30
+                        )
+                # If status is empty or unknown, keep current status but still process the webhook
+
+                # Activate credits if status changed to ACTIVE
+                if subscription.status == SubscriptionStatus.ACTIVE:
+                    await self._activate_credits_for_subscription(subscription)
+            elif (
+                event_type_upper == "SUBSCRIPTION_STATUS_CHANGED"
+                and subscription.status == SubscriptionStatus.ACTIVE
+            ):
+                # If status changed to ACTIVE, also activate credits
                 await self._activate_credits_for_subscription(subscription)
 
-            elif event_type == "SUBSCRIPTION_CANCELLED":
+            elif event_type_upper == "SUBSCRIPTION_CANCELLED":
                 subscription.status = SubscriptionStatus.CANCELLED
-            elif event_type == "SUBSCRIPTION_EXPIRED":
+            elif event_type_upper == "SUBSCRIPTION_EXPIRED":
                 subscription.status = SubscriptionStatus.EXPIRED
 
             subscription.updatedAt = datetime.now(UTC)
@@ -324,6 +440,7 @@ class SubscriptionService:
         try:
             # Get plan
             plan = await Plan.find_one(Plan.id == subscription.planId)
+
             if not plan:
                 logger.warning(
                     "Plan not found for subscription",

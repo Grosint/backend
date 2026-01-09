@@ -210,3 +210,10 @@ app.add_exception_handler(BaseAPIException, base_api_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
+
+
+# Root endpoint for basic connectivity test
+@app.get("/")
+async def root():
+    """Root endpoint for basic connectivity test"""
+    return {"message": "GROSINT Backend API", "status": "running"}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import logging
@@ -21,11 +22,36 @@ class CashfreeService:
         self.client = ResilientHttpClient(
             timeout_seconds=30,
         )
-        self.base_url = settings.CASHFREE_BASE_URL
         self.app_id = settings.CASHFREE_APP_ID
         self.secret_key = settings.CASHFREE_SECRET_KEY
         self.api_version = settings.CASHFREE_API_VERSION
         self.webhook_secret = settings.CASHFREE_WEBHOOK_SECRET
+
+        # Auto-detect sandbox vs production based on credentials
+        # TEST credentials should use sandbox URL
+        if self.app_id and self.app_id.startswith("TEST"):
+            self.base_url = "https://sandbox.cashfree.com/pg"
+            logger.info(
+                "Using Cashfree sandbox environment (TEST credentials detected)"
+            )
+        else:
+            # Use configured base URL or default to production
+            self.base_url = settings.CASHFREE_BASE_URL or "https://api.cashfree.com/pg"
+
+        # Validate required credentials
+        if not self.app_id or not self.secret_key:
+            missing = []
+            if not self.app_id:
+                missing.append("CASHFREE_APP_ID")
+            if not self.secret_key:
+                missing.append("CASHFREE_SECRET_KEY")
+
+            error_msg = (
+                f"Cashfree credentials are missing: {', '.join(missing)}. "
+                "Please set CASHFREE_PAYMENT_APP_ID and CASHFREE_PAYMENT_SECRET in your .env file."
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
     def _get_headers(self) -> dict[str, str]:
         """Get Cashfree API headers."""
@@ -50,6 +76,15 @@ class CashfreeService:
         order_note: str,
     ) -> dict[str, Any]:
         """Create a payment order in Cashfree."""
+        # Validate credentials before making API call
+        if not self.app_id or not self.secret_key:
+            error_msg = (
+                "Cashfree credentials are not configured. "
+                "Please set CASHFREE_PAYMENT_APP_ID and CASHFREE_PAYMENT_SECRET environment variables."
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
         try:
             amount_with_gst = self._get_price_with_gst(amount)
 
@@ -363,8 +398,17 @@ class CashfreeService:
             )
             raise
 
-    def verify_webhook_signature(self, payload: str, signature: str) -> bool:
-        """Verify Cashfree webhook signature using HMAC-SHA256."""
+    def verify_webhook_signature(
+        self, payload: str, signature: str, timestamp: str | None = None
+    ) -> bool:
+        """Verify Cashfree webhook signature using HMAC-SHA256 with Base64 encoding.
+
+        Cashfree signature format:
+        1. Concatenate timestamp + payload: signedPayload = timestamp + payload
+        2. Calculate HMAC-SHA256: hash = HMAC-SHA256(signedPayload, webhook_secret)
+        3. Base64 encode: computedSignature = Base64Encode(hash)
+        4. Compare with x-webhook-signature header
+        """
         try:
             if not self.webhook_secret:
                 logger.warning(
@@ -379,12 +423,35 @@ class CashfreeService:
                     return True
                 return False  # Treat missing secret as invalid
 
-            # Calculate expected signature
-            expected_signature = hmac.new(
-                self.webhook_secret.encode("utf-8"),
-                payload.encode("utf-8"),
-                hashlib.sha256,
-            ).hexdigest()
+            # Cashfree signature format: timestamp + payload, then HMAC-SHA256, then Base64
+            # Following Cashfree's exact specification:
+            # 1. Get raw body as bytes and decode to UTF-8 string
+            # 2. Concatenate timestamp + payload (as strings)
+            # 3. Convert concatenated string back to bytes
+            # 4. Calculate HMAC-SHA256 with secret key (as bytes)
+            # 5. Base64 encode the digest
+            # 6. Convert to string for comparison
+
+            # Concatenate timestamp and payload (if timestamp provided)
+            # If no timestamp, use payload only (for backward compatibility)
+            signature_data = timestamp + payload if timestamp else payload
+
+            # Convert concatenated string to bytes (matching reference implementation)
+            message = bytes(signature_data, "utf-8")
+
+            # Convert secret key to bytes
+            secret_key = bytes(self.webhook_secret, "utf-8")
+
+            # Calculate HMAC-SHA256 hash
+            hash_bytes = hmac.new(
+                secret_key, message, digestmod=hashlib.sha256
+            ).digest()
+
+            # Base64 encode the hash (Cashfree uses base64, not hex)
+            signature_bytes = base64.b64encode(hash_bytes)
+
+            # Convert to string for comparison (matching reference implementation)
+            expected_signature = str(signature_bytes, encoding="utf-8")
 
             # Use constant-time comparison to prevent timing attacks
             is_valid = hmac.compare_digest(expected_signature, signature)

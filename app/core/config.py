@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -104,13 +104,20 @@ class Settings(BaseSettings):
     SKYPE_MAX_ACCOUNTS: int = int(os.getenv("SKYPE_MAX_ACCOUNTS", "3"))
 
     # Cashfree Payment Gateway configuration
-    CASHFREE_APP_ID: str = os.getenv("CASHFREE_APP_ID", "")
-    CASHFREE_SECRET_KEY: str = os.getenv("CASHFREE_SECRET_KEY", "")
-    CASHFREE_BASE_URL: str = os.getenv(
-        "CASHFREE_BASE_URL", "https://api.cashfree.com/pg"
+    # Use validation_alias to map field names to environment variable names
+    CASHFREE_APP_ID: str = Field(default="", validation_alias="CASHFREE_PAYMENT_APP_ID")
+    CASHFREE_SECRET_KEY: str = Field(
+        default="", validation_alias="CASHFREE_PAYMENT_SECRET"
     )
-    CASHFREE_WEBHOOK_SECRET: str = os.getenv("CASHFREE_WEBHOOK_SECRET", "")
-    CASHFREE_API_VERSION: str = os.getenv("CASHFREE_API_VERSION", "2023-08-01")
+    CASHFREE_BASE_URL: str = Field(
+        default="https://api.cashfree.com/pg", validation_alias="CASHFREE_BASE_URL"
+    )
+    CASHFREE_WEBHOOK_SECRET: str = Field(
+        default="", validation_alias="CASHFREE_WEBHOOK_SECRET"
+    )
+    CASHFREE_API_VERSION: str = Field(
+        default="2023-08-01", validation_alias="CASHFREE_API_VERSION"
+    )
 
     # Payment configuration
     GST_RATE: float = float(os.getenv("GST_RATE", "0.18"))  # 18% GST
