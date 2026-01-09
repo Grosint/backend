@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 
 from bson import ObjectId
+from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 
@@ -256,11 +257,20 @@ async def subscription_redirect(subscription_id: str, db=Depends(get_database)):
         # Optionally verify subscription status when page loads (for eventual consistency)
         try:
             # Try to find subscription by ID or cfSubscriptionId
-            subscription = await Subscription.find_one(
-                Subscription.id == ObjectId(subscription_id)
-            ) or await Subscription.find_one(
-                Subscription.cfSubscriptionId == subscription_id
-            )
+            subscription = None
+            # First, try to query by ObjectId if subscription_id is a valid ObjectId
+            try:
+                object_id = ObjectId(subscription_id)
+                subscription = await Subscription.find_one(Subscription.id == object_id)
+            except InvalidId:
+                # If not a valid ObjectId, skip to cfSubscriptionId query
+                pass
+
+            # If not found by ID, try by cfSubscriptionId
+            if not subscription:
+                subscription = await Subscription.find_one(
+                    Subscription.cfSubscriptionId == subscription_id
+                )
             if subscription:
                 logger.info(
                     "Subscription found on redirect page load",

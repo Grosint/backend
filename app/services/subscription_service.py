@@ -95,7 +95,7 @@ class SubscriptionService:
 
             # Prepare subscription meta and tags
             subscription_meta = {
-                "return_url": f"https://2f191c6e2222.ngrok-free.app/api/subscriptions/redirect/{subscription_id}",
+                "return_url": f"{origin}/api/subscriptions/redirect/{subscription_id}",
             }
 
             subscription_tags = {
@@ -398,13 +398,6 @@ class SubscriptionService:
                 # Activate credits if status changed to ACTIVE
                 if subscription.status == SubscriptionStatus.ACTIVE:
                     await self._activate_credits_for_subscription(subscription)
-            elif (
-                event_type_upper == "SUBSCRIPTION_STATUS_CHANGED"
-                and subscription.status == SubscriptionStatus.ACTIVE
-            ):
-                # If status changed to ACTIVE, also activate credits
-                await self._activate_credits_for_subscription(subscription)
-
             elif event_type_upper == "SUBSCRIPTION_CANCELLED":
                 subscription.status = SubscriptionStatus.CANCELLED
             elif event_type_upper == "SUBSCRIPTION_EXPIRED":

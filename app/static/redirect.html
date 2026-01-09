@@ -166,16 +166,20 @@
 		<script>
 			// Detect if this is a payment or subscription redirect
 			var currentPath = window.location.pathname;
-			var isPayment = currentPath.indexOf('/payments/redirect/') !== -1;
-			var isSubscription = currentPath.indexOf('/subscriptions/redirect/') !== -1;
 
-			// Update message based on flow type
-			if (isPayment) {
+			// Use strict path prefix matching to avoid false positives
+			// Check payment redirect first (mutually exclusive)
+			if (currentPath.startsWith('/payments/redirect/')) {
 				document.getElementById('messageTitle').textContent = 'Payment Processing!';
 				document.getElementById('messageText').textContent = 'Your payment is being processed. Redirecting you to the payment status page...';
-			} else if (isSubscription) {
+			} else if (currentPath.startsWith('/subscriptions/redirect/')) {
 				document.getElementById('messageTitle').textContent = 'Subscription Processing!';
 				document.getElementById('messageText').textContent = 'Your subscription authorization is being processed. Redirecting you to the subscription status page...';
+			} else {
+				// Fallback for unrecognized paths
+				console.warn('Unrecognized redirect path:', currentPath);
+				document.getElementById('messageTitle').textContent = 'Processing!';
+				document.getElementById('messageText').textContent = 'Your request is being processed. Redirecting you...';
 			}
 
 			// Function to get URL parameters

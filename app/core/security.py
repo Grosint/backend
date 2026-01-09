@@ -142,7 +142,14 @@ async def add_security_headers(request: Request, call_next):
 
     # Check if this is a redirect page (needs inline styles)
     # Both payment and subscription redirects need inline CSS/JS
-    is_redirect_page = "/redirect/" in str(request.url.path)
+    # Use allow-list of explicit redirect path prefixes for security
+    redirect_path_prefixes = [
+        "/payments/redirect/",
+        "/subscriptions/redirect/",
+    ]
+    is_redirect_page = any(
+        request.url.path.startswith(prefix) for prefix in redirect_path_prefixes
+    )
 
     if is_redirect_page:
         # Allow inline styles for redirect pages

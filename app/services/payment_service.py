@@ -237,7 +237,7 @@ class PaymentService:
 
             # Update payment status
             # Cashfree webhook structure: order_status might be in data.order.order_status
-            # OR we need to check the event type (PAYMENT_SUCCESS_WEBHOOK = success)
+            # OR we need to check the event type (PAYMENT_SUCCESS = success)
             # OR check data.payment.payment_status
             event_type = webhook_data.get("type", "")
             order_status = (
@@ -255,12 +255,12 @@ class PaymentService:
 
             # Determine if payment is successful:
             # 1. Check order_status == "paid"
-            # 2. Check payment_status == "SUCCESS" or "success"
-            # 3. Check event_type indicates success (PAYMENT_SUCCESS_WEBHOOK, PAYMENT_CHARGES_WEBHOOK)
+            # 2. Check payment_status == "success" (already lowercased)
+            # 3. Check event_type indicates success (PAYMENT_SUCCESS)
             is_paid = (
                 order_status == "paid"
-                or payment_status in ["success", "SUCCESS"]
-                or event_type in ["PAYMENT_SUCCESS_WEBHOOK", "PAYMENT_CHARGES_WEBHOOK"]
+                or payment_status == "success"
+                or event_type == "PAYMENT_SUCCESS"
             )
 
             if is_paid:
