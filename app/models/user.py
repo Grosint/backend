@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import Enum
 
-from beanie import Document, Indexed, Insert, Replace, before_event
+from beanie import Document, Insert, Replace, before_event
 from bson import ObjectId
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from pymongo import IndexModel
@@ -11,7 +11,6 @@ from pymongo import IndexModel
 from app.utils.validators import (
     PyObjectId,
     validate_phone_number,
-    validate_required_phone_number,
 )
 
 
@@ -26,8 +25,8 @@ class UserType(str, Enum):
 
 class UserBase(BaseModel):
     email: EmailStr
-    phone: str
-    password: str
+    phone: str | None = None
+    password: str | None = None
     userType: UserType = UserType.USER
     features: list[str] = Field(
         default_factory=list, description="List of feature access permissions"
@@ -44,21 +43,26 @@ class UserBase(BaseModel):
     orgName: str | None = Field(None, description="Organization name for org_admin")
     isActive: bool = True
     isVerified: bool = False
+    # Whether signup used a government email ID (auto-set based on email domain)
+    isGovId: bool = False
+    # Whether the user's email OTP has been verified (independent of admin verification)
+    isEmailOtpVerified: bool = False
     createdAt: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updatedAt: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v):
-        return validate_required_phone_number(v)
+        # Phone is optional for pre-OTP signup users
+        return validate_phone_number(v)
 
 
 class UserCreate(BaseModel):
     """Model for user creation - only required fields"""
 
     email: EmailStr
-    phone: str
-    password: str
+    phone: str | None = None
+    password: str | None = None
     userType: UserType = UserType.USER
     firstName: str | None = None
     lastName: str | None = None
@@ -68,11 +72,13 @@ class UserCreate(BaseModel):
     state: str | None = None
     organizationId: PyObjectId | None = None
     orgName: str | None = None
+    isGovId: bool = False
+    isEmailOtpVerified: bool = False
 
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v):
-        return validate_required_phone_number(v)
+        return validate_phone_number(v)
 
 
 class UserUpdate(BaseModel):
@@ -80,6 +86,7 @@ class UserUpdate(BaseModel):
 
     email: EmailStr | None = None
     phone: str | None = None
+    password: str | None = None
     userType: UserType | None = None
     features: list[str] | None = None
     firstName: str | None = None
@@ -92,6 +99,8 @@ class UserUpdate(BaseModel):
     orgName: str | None = None
     isActive: bool | None = None
     isVerified: bool | None = None
+    isGovId: bool | None = None
+    isEmailOtpVerified: bool | None = None
 
     @field_validator("phone")
     @classmethod
@@ -101,7 +110,7 @@ class UserUpdate(BaseModel):
 
 class UserInDB(UserBase):
     id: PyObjectId = None
-    password: str
+    password: str | None = None
 
     class Config:
         populate_by_name = True
@@ -111,8 +120,8 @@ class UserInDB(UserBase):
 
 class User(Document):
     email: EmailStr
-    phone: Indexed(str, unique=True)
-    password: str
+    phone: str | None = None
+    password: str | None = None
     userType: UserType = UserType.USER
     features: list[str] = Field(
         default_factory=list, description="List of feature access permissions"
@@ -129,6 +138,8 @@ class User(Document):
     orgName: str | None = Field(None, description="Organization name for org_admin")
     isActive: bool = True
     isVerified: bool = False
+    isGovId: bool = False
+    isEmailOtpVerified: bool = False
     createdAt: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updatedAt: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -147,6 +158,13 @@ class User(Document):
     class Settings:
         name = "users"
         indexes = [
+            # Phone must be unique when present, but allows multiple nulls during pre-OTP signup.
+            IndexModel(
+                [("phone", 1)],
+                name="phone_unique_when_present",
+                unique=True,
+                partialFilterExpression={"phone": {"$type": "string"}},
+            ),
             IndexModel(
                 [("email", 1)], name="email_idx"
             ),  # Non-unique index for email queries

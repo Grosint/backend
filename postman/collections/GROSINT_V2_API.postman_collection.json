@@ -245,7 +245,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["auth", "verify-otp"]
 						},
-						"description": "Verify OTP and activate user account. For users with verifyByGovId=true, account is immediately activated. For others, admin approval is required."
+						"description": "Verify OTP for the given email. OTP verification always sets isEmailOtpVerified=true. If email is detected as a government email (isGovId=true), isVerified is set to true immediately; otherwise, admin approval is required."
 					},
 					"response": []
 				},
@@ -279,7 +279,7 @@
 			"name": "User Management",
 			"item": [
 				{
-					"name": "Create User",
+					"name": "Signup Init (Create Minimal User + Send OTP)",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -290,14 +290,37 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"email\": \"newuser@example.com\",\n  \"phone\": \"+1234567890\",\n  \"verifyByGovId\": false,\n  \"password\": \"Password123!\",\n  \"userType\": \"USER\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"address\": \"123 Main St\",\n  \"city\": \"New York\",\n  \"pinCode\": \"10001\",\n  \"state\": \"NY\",\n  \"organizationId\": null,\n  \"orgName\": null\n}"
+							"raw": "{\n  \"email\": \"newuser@example.com\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/user/",
 							"host": ["{{base_url}}"],
 							"path": ["user", ""]
 						},
-						"description": "Create a new user account. OTP is automatically sent to the user's email for verification. Required fields: email, phone, verifyByGovId, password. Note: Phone number must be unique, but email can be shared across multiple accounts with different phone numbers."
+						"description": "Initiate signup by creating (or reusing) a minimal user with email + isGovId (derived from email domain) and sending an email OTP. After OTP is verified, complete signup using the Complete Signup endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Complete Signup (Update Profile by Email [+Phone])",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"newuser@example.com\",\n  \"phone\": \"+1234567890\",\n  \"password\": \"Password123!\",\n  \"userType\": \"USER\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"address\": \"123 Main St\",\n  \"city\": \"New York\",\n  \"pinCode\": \"10001\",\n  \"state\": \"NY\",\n  \"organizationId\": null,\n  \"orgName\": null\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/user/signup/complete",
+							"host": ["{{base_url}}"],
+							"path": ["user", "signup", "complete"]
+						},
+						"description": "Complete signup after OTP verification by updating the user's details. Uses email to identify the user; if multiple users exist for the same email, phone is required to uniquely identify (or bind) the user. Requires isEmailOtpVerified=true."
 					},
 					"response": []
 				},
@@ -617,7 +640,7 @@
 					"name": "🔐 Authentication",
 					"item": [
 						{
-							"name": "Create User (if needed)",
+							"name": "Signup Init (Admin) - Step 1",
 							"request": {
 								"method": "POST",
 								"header": [
@@ -628,14 +651,37 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n  \"email\": \"admin@example.com\",\n  \"phone\": \"+1234567890\",\n  \"password\": \"YourSecurePassword123!\",\n  \"verifyByGovId\": false,\n  \"userType\": \"ADMIN\"\n}"
+									"raw": "{\n  \"email\": \"admin@example.com\"\n}"
 								},
 								"url": {
-									"raw": "{{base_url}}/user/",
+									"raw": "{{base_url}}/user/signup/init",
 									"host": ["{{base_url}}"],
-									"path": ["user", ""]
+									"path": ["user", "signup", "init"]
 								},
-								"description": "Create a new admin user account. Use this if you don't have an account yet."
+								"description": "Initiate signup for an admin email (creates minimal user + sends OTP). Note: Actual admin privileges cannot be self-assigned; an existing admin must grant role via admin processes."
+							},
+							"response": []
+						},
+						{
+							"name": "Complete Signup (Admin) - Step 3",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"admin@example.com\",\n  \"phone\": \"+1234567890\",\n  \"password\": \"YourSecurePassword123!\",\n  \"firstName\": \"Admin\",\n  \"lastName\": \"User\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/user/signup/complete",
+									"host": ["{{base_url}}"],
+									"path": ["user", "signup", "complete"]
+								},
+								"description": "Complete signup by adding phone/password/profile after OTP verification. Admin role assignment is not done here."
 							},
 							"response": []
 						},

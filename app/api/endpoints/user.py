@@ -6,31 +6,30 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.core.auth_dependencies import TokenData, get_current_user_token
 from app.core.database import get_database
 from app.core.exceptions import NotFoundException
-from app.models.user import UserCreate, UserUpdate
+from app.models.user import UserUpdate
 from app.schemas.response import PaginatedResponse, SuccessResponse
-from app.schemas.user import UserCreateRequest, UserResponse, UserUpdateRequest
+from app.schemas.user import (
+    UserCompleteSignupRequest,
+    UserResponse,
+    UserSignupInitRequest,
+    UserSignupInitResponse,
+    UserUpdateRequest,
+)
 from app.services.user_service import UserService
 from app.utils.email_otp import generate_otp, mask_email, send_otp_email, store_otp
+from app.utils.validators import is_gov_email
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
 @router.post("/", response_model=SuccessResponse[UserResponse])
-async def create_user(user_request: UserCreateRequest, db=Depends(get_database)):
-    """Create a new user and send OTP for verification"""
+async def create_user(user_request: UserSignupInitRequest, db=Depends(get_database)):
+    """Initialize signup (create minimal user) and send OTP for verification."""
     try:
         user_service = UserService(db)
 
-        # Convert organizationId from string to ObjectId if provided
-        user_data = user_request.model_dump()
-        if user_data.get("organizationId"):
-            user_data["organizationId"] = ObjectId(user_data["organizationId"])
-
-        # Create user - convert request to service model
-        user_create = UserCreate.model_validate(user_data)
-
-        user = await user_service.create_user(user_create)
+        user = await user_service.create_signup_user(user_request.email)
 
         # Generate and send OTP - wrap in error handling to rollback user creation on failure
         masked_email = mask_email(user.email)
@@ -110,18 +109,118 @@ async def create_user(user_request: UserCreateRequest, db=Depends(get_database))
             orgName=user.orgName,
             isActive=user.isActive,
             isVerified=user.isVerified,
+            isGovId=(
+                user.isGovId if user.isGovId is not None else is_gov_email(user.email)
+            ),
+            isEmailOtpVerified=(
+                user.isEmailOtpVerified
+                if user.isEmailOtpVerified is not None
+                else False
+            ),
             createdAt=user.createdAt,
             updatedAt=user.updatedAt,
         )
 
         return SuccessResponse(
-            message="User created successfully. Please verify your email with the OTP sent.",
+            message="Signup initiated successfully. Please verify your email with the OTP sent.",
             data=user_response,
         )
 
     except Exception:
         # Let the global exception handler deal with it
         raise
+
+
+@router.post("/signup/init", response_model=SuccessResponse[UserSignupInitResponse])
+async def signup_init(user_request: UserSignupInitRequest, db=Depends(get_database)):
+    """Alias endpoint for signup init (same behavior as POST /)."""
+    user_service = UserService(db)
+    user = await user_service.create_signup_user(user_request.email)
+
+    otp = generate_otp()
+    store_result = await store_otp(db, user.email, otp)
+    if not store_result:
+        logger.error(f"Failed to store OTP for email: {mask_email(user.email)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to store OTP. Please try again.",
+        )
+
+    send_result = await send_otp_email(user.email, otp)
+    if not send_result:
+        logger.error(f"Failed to send OTP email to: {mask_email(user.email)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send OTP email. Please try again.",
+        )
+
+    return SuccessResponse(
+        message="Signup initiated successfully. Please verify your email with the OTP sent.",
+        data=UserSignupInitResponse(
+            user_id=str(user.id),
+            email=user.email,
+            isGovId=(
+                user.isGovId if user.isGovId is not None else is_gov_email(user.email)
+            ),
+            otp_expires_in=600,
+        ),
+    )
+
+
+@router.put("/signup/complete", response_model=SuccessResponse[UserResponse])
+async def complete_signup(request: UserCompleteSignupRequest, db=Depends(get_database)):
+    """Complete signup after OTP by updating user using email (+phone when needed)."""
+    user_service = UserService(db)
+
+    update_dict = request.model_dump(exclude_unset=True)
+    email = update_dict.pop("email")
+    phone = update_dict.pop("phone", None)
+
+    # Convert organizationId from string to ObjectId if provided
+    if update_dict.get("organizationId"):
+        update_dict["organizationId"] = ObjectId(update_dict["organizationId"])
+
+    update_model = UserUpdate(**update_dict)
+    updated_user = await user_service.update_user_by_email_and_optional_phone(
+        email=email,
+        phone=phone,
+        user_update=update_model,
+        require_email_otp_verified=True,
+    )
+
+    user_response = UserResponse(
+        id=str(updated_user.id),
+        email=updated_user.email,
+        phone=updated_user.phone,
+        userType=updated_user.userType,
+        features=updated_user.features,
+        firstName=updated_user.firstName,
+        lastName=updated_user.lastName,
+        address=updated_user.address,
+        city=updated_user.city,
+        pinCode=updated_user.pinCode,
+        state=updated_user.state,
+        organizationId=(
+            str(updated_user.organizationId) if updated_user.organizationId else None
+        ),
+        orgName=updated_user.orgName,
+        isActive=updated_user.isActive,
+        isVerified=updated_user.isVerified,
+        isGovId=(
+            updated_user.isGovId
+            if updated_user.isGovId is not None
+            else is_gov_email(updated_user.email)
+        ),
+        isEmailOtpVerified=(
+            updated_user.isEmailOtpVerified
+            if updated_user.isEmailOtpVerified is not None
+            else False
+        ),
+        createdAt=updated_user.createdAt,
+        updatedAt=updated_user.updatedAt,
+    )
+
+    return SuccessResponse(message="Signup completed successfully", data=user_response)
 
 
 @router.get("/me", response_model=SuccessResponse[UserResponse])

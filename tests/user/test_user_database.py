@@ -661,18 +661,16 @@ class TestUserModelSettings:
             # All required fields present
             user = User(
                 email="test@example.com",
-                phone="+1234567890",
-                password="hashed_password",
+                phone=None,
+                password=None,
             )
             assert user.email is not None
-            assert user.phone is not None
-            assert user.password is not None
 
             # Missing required field should raise validation error
             with pytest.raises(ValueError):
                 User(
-                    email="test@example.com",
-                    # phone missing
+                    # email missing
+                    phone="+1234567890",
                     password="hashed_password",
                 )
 

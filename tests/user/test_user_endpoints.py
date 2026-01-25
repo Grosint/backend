@@ -19,7 +19,7 @@ from app.core.error_handlers import (
 )
 from app.core.exceptions import BaseAPIException, ConflictException
 from app.models.user import User, UserInDB
-from app.schemas.user import UserCreateRequest, UserUpdateRequest
+from app.schemas.user import UserSignupInitRequest, UserUpdateRequest
 
 
 def create_test_app():
@@ -61,18 +61,17 @@ class TestCreateUserEndpoint:
 
     @pytest.fixture
     def valid_user_request(self, test_data_factory):
-        """Create valid user creation request."""
-        user_data = test_data_factory.create_user_create_request()
-        return UserCreateRequest(**user_data)
+        """Create valid signup init request."""
+        return UserSignupInitRequest(email="test@example.com")
 
     @pytest.fixture
     def mock_user(self, test_data_factory):
         """Create mock user using Mock(spec=User)."""
-        user_data = test_data_factory.create_user_data(id=str(ObjectId()))
+        user_data = test_data_factory.create_user_data(id=str(ObjectId()), phone=None)
         user = Mock(spec=User)
         user.id = ObjectId(user_data["id"])
         user.email = user_data["email"]
-        user.phone = user_data["phone"]
+        user.phone = None
         user.userType = user_data.get("userType", "user")
         user.features = user_data.get("features", [])
         user.firstName = user_data["firstName"]
@@ -96,11 +95,11 @@ class TestCreateUserEndpoint:
     ):
         """Test successful user creation."""
         # Create UserInDB object for return value
-        user_data = test_data_factory.create_user_data(id=str(mock_user.id))
+        user_data = test_data_factory.create_user_data(id=str(mock_user.id), phone=None)
         user_in_db = UserInDB(**user_data)
 
         mock_user_service = AsyncMock()
-        mock_user_service.create_user.return_value = user_in_db
+        mock_user_service.create_signup_user.return_value = user_in_db
         mock_user_service_class.return_value = mock_user_service
 
         with (
@@ -121,19 +120,19 @@ class TestCreateUserEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert "User created successfully" in data["message"]
+        assert "Signup initiated successfully" in data["message"]
         assert data["data"]["email"] == user_data["email"]
-        assert data["data"]["phone"] == user_data["phone"]
+        assert data["data"]["phone"] is None
 
     @patch("app.api.endpoints.user.UserService")
     def test_create_user_phone_already_exists(
         self, mock_user_service_class, client, valid_user_request, test_data_factory
     ):
-        """Test user creation with existing phone number."""
+        """Test signup init with conflict error."""
         mock_user_service = AsyncMock()
-        mock_user_service.create_user.side_effect = ConflictException(
-            message="User with this phone number already exists",
-            details={"phone": valid_user_request.phone},
+        mock_user_service.create_signup_user.side_effect = ConflictException(
+            message="User conflict",
+            details={"email": valid_user_request.email},
         )
         mock_user_service_class.return_value = mock_user_service
 
@@ -142,14 +141,12 @@ class TestCreateUserEndpoint:
         assert response.status_code == 409
         data = response.json()
         assert data["success"] is False
-        assert "User with this phone number already exists" in data["message"]
+        assert "User conflict" in data["message"]
 
     def test_create_user_invalid_email_format(self, client):
         """Test user creation with invalid email format."""
         user_request = {
             "email": "invalid_email",
-            "phone": "+1234567890",
-            "password": "password123",
         }
 
         response = client.post("/", json=user_request)
@@ -157,34 +154,103 @@ class TestCreateUserEndpoint:
         assert response.status_code == 422
 
     def test_create_user_invalid_phone_format(self, client):
-        """Test user creation with invalid phone format."""
+        """Signup init ignores extra fields like phone."""
         user_request = {
             "email": "test@example.com",
             "phone": "invalid_phone",
-            "password": "password123",
         }
 
-        response = client.post("/", json=user_request)
+        with (
+            patch("app.api.endpoints.user.UserService") as mock_user_service_class,
+            patch("app.api.endpoints.user.generate_otp", return_value="123456"),
+            patch(
+                "app.api.endpoints.user.store_otp",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "app.api.endpoints.user.send_otp_email",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+        ):
+            mock_user_service = AsyncMock()
+            mock_user_service.create_signup_user.return_value = UserInDB(
+                **{
+                    **{"id": ObjectId(), "email": "test@example.com"},
+                    **{
+                        "phone": None,
+                        "password": None,
+                        "userType": "user",
+                        "features": [],
+                        "firstName": None,
+                        "lastName": None,
+                        "pinCode": None,
+                        "state": None,
+                        "isActive": True,
+                        "isVerified": False,
+                        "createdAt": datetime.now(UTC),
+                        "updatedAt": datetime.now(UTC),
+                    },
+                }
+            )
+            mock_user_service_class.return_value = mock_user_service
 
-        assert response.status_code == 422
+            response = client.post("/", json=user_request)
+
+        assert response.status_code == 200
 
     def test_create_user_weak_password(self, client):
-        """Test user creation with weak password."""
+        """Signup init ignores extra fields like password."""
         user_request = {
             "email": "test@example.com",
-            "phone": "+1234567890",
             "password": "123",  # Too weak
         }
 
-        response = client.post("/", json=user_request)
+        with (
+            patch("app.api.endpoints.user.UserService") as mock_user_service_class,
+            patch("app.api.endpoints.user.generate_otp", return_value="123456"),
+            patch(
+                "app.api.endpoints.user.store_otp",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch(
+                "app.api.endpoints.user.send_otp_email",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+        ):
+            mock_user_service = AsyncMock()
+            mock_user_service.create_signup_user.return_value = UserInDB(
+                **{
+                    **{"id": ObjectId(), "email": "test@example.com"},
+                    **{
+                        "phone": None,
+                        "password": None,
+                        "userType": "user",
+                        "features": [],
+                        "firstName": None,
+                        "lastName": None,
+                        "pinCode": None,
+                        "state": None,
+                        "isActive": True,
+                        "isVerified": False,
+                        "createdAt": datetime.now(UTC),
+                        "updatedAt": datetime.now(UTC),
+                    },
+                }
+            )
+            mock_user_service_class.return_value = mock_user_service
 
-        assert response.status_code == 422
+            response = client.post("/", json=user_request)
+
+        assert response.status_code == 200
 
     def test_create_user_missing_required_fields(self, client):
         """Test user creation with missing required fields."""
         user_request = {
-            "email": "test@example.com",
-            # Missing phone, password
+            # Missing email
         }
 
         response = client.post("/", json=user_request)

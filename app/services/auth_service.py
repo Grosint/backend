@@ -52,6 +52,10 @@ class AuthService:
             if not user.isActive:
                 return None
 
+            # Users created in the pre-OTP signup flow may not have a password yet
+            if not user.password:
+                return None
+
             # Verify password
             if not verify_password(password, user.password):
                 return None
@@ -244,6 +248,9 @@ class AuthService:
             user = await self._find_user_by_id(user_id)
             if not user:
                 raise NotFoundException("User not found")
+
+            if not user.password:
+                raise UnauthorizedException("Current password is incorrect")
 
             # Verify current password
             if not verify_password(current_password, user.password):
