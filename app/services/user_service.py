@@ -334,8 +334,35 @@ class UserService:
                 details={"email": normalized_email},
             )
 
-        # If caller provided phone and target doesn't have phone yet, set it (unique constraint will be enforced)
         update_data = user_update.dict(exclude_unset=True)
+        restricted_fields = {
+            "isActive",
+            "isVerified",
+            "isGovId",
+            "isEmailOtpVerified",
+            "userType",
+        }
+        restricted_in_request = restricted_fields.intersection(update_data.keys())
+        if restricted_in_request:
+            raise ConflictException(
+                message="Updating restricted user fields is not allowed.",
+                details={"fields": sorted(restricted_in_request)},
+            )
+
+        allowed_fields = {
+            "password",
+            "firstName",
+            "lastName",
+            "address",
+            "city",
+            "pinCode",
+            "state",
+            "organizationId",
+            "orgName",
+        }
+        update_data = {k: v for k, v in update_data.items() if k in allowed_fields}
+
+        # If caller provided phone and target doesn't have phone yet, set it (unique constraint will be enforced)
         if phone and not target.phone:
             # Enforce phone uniqueness across all users
             existing_user = await User.find_one(User.phone == phone)

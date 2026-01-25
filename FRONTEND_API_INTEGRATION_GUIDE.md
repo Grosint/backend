@@ -181,7 +181,7 @@ interface ErrorResponse {
 - `phone` must be **globally unique** when set.
 - This endpoint requires **email OTP already verified** (`isEmailOtpVerified=true`), otherwise it will reject.
 
-### 4. Login
+### 5. Login
 **Endpoint:** `POST /api/v1/auth/login`
 
 **Request:**
@@ -212,7 +212,7 @@ interface ErrorResponse {
 - `422` - Validation error
 - `500` - Server error
 
-### 5. Refresh Token
+### 6. Refresh Token
 **Endpoint:** `POST /api/v1/auth/refresh`
 
 **Request:**
@@ -240,7 +240,7 @@ interface ErrorResponse {
 - `401` - Invalid or expired refresh token
 - `500` - Server error
 
-### 6. Logout
+### 7. Logout
 **Endpoint:** `POST /api/v1/auth/logout`
 
 **Headers:**
@@ -267,7 +267,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-### 7. Get Auth Status
+### 8. Get Auth Status
 **Endpoint:** `GET /api/v1/auth/me`
 
 **Headers:**

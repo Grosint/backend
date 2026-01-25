@@ -136,11 +136,30 @@ async def signup_init(user_request: UserSignupInitRequest, db=Depends(get_databa
     """Alias endpoint for signup init (same behavior as POST /)."""
     user_service = UserService(db)
     user = await user_service.create_signup_user(user_request.email)
+    masked_email = mask_email(user.email)
+
+    async def rollback_signup_user(reason: str) -> None:
+        try:
+            deleted = await user_service.delete_user(str(user.id))
+            if deleted:
+                logger.info(
+                    f"Rolled back signup user {masked_email} (ID: {user.id}) after {reason}."
+                )
+            else:
+                logger.warning(
+                    f"Failed to rollback signup user {masked_email} (ID: {user.id}) after {reason}."
+                )
+        except Exception as rollback_error:
+            logger.error(
+                f"Error rolling back signup user {masked_email} (ID: {user.id}) after {reason}: {rollback_error}",
+                exc_info=True,
+            )
 
     otp = generate_otp()
     store_result = await store_otp(db, user.email, otp)
     if not store_result:
-        logger.error(f"Failed to store OTP for email: {mask_email(user.email)}")
+        logger.error(f"Failed to store OTP for email: {masked_email}")
+        await rollback_signup_user("OTP store failure")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to store OTP. Please try again.",
@@ -148,7 +167,8 @@ async def signup_init(user_request: UserSignupInitRequest, db=Depends(get_databa
 
     send_result = await send_otp_email(user.email, otp)
     if not send_result:
-        logger.error(f"Failed to send OTP email to: {mask_email(user.email)}")
+        logger.error(f"Failed to send OTP email to: {masked_email}")
+        await rollback_signup_user("OTP email send failure")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send OTP email. Please try again.",
@@ -173,6 +193,9 @@ async def complete_signup(request: UserCompleteSignupRequest, db=Depends(get_dat
     user_service = UserService(db)
 
     update_dict = request.model_dump(exclude_unset=True)
+    restricted_fields = {"userType", "features", "isActive", "isVerified"}
+    for field in restricted_fields:
+        update_dict.pop(field, None)
     email = update_dict.pop("email")
     phone = update_dict.pop("phone", None)
 
