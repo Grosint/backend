@@ -26,8 +26,6 @@ class TestUserAPIErrorHandling:
             "/api/user/",
             json={
                 "email": "invalid-email",
-                "phone": "",
-                "password": "short",
             },
         )
 
@@ -46,18 +44,14 @@ class TestUserAPIErrorHandling:
         # Verify validation error details
         validation_errors = data["validation_errors"]
         assert any(error["field"] == "body.email" for error in validation_errors)
-        assert any(
-            "Phone number cannot be empty" in error["message"]
-            for error in validation_errors
-        )
 
     def test_create_user_phone_conflict_error(self, client):
-        """Test phone conflict error response."""
+        """Test signup init conflict error response."""
         with patch("app.api.endpoints.user.UserService") as mock_service:
-            mock_service.return_value.create_user = AsyncMock(
+            mock_service.return_value.create_signup_user = AsyncMock(
                 side_effect=ConflictException(
-                    message="User with this phone number already exists",
-                    details={"phone": "+1234567890"},
+                    message="User conflict",
+                    details={"email": "test@example.com"},
                 )
             )
 
@@ -65,8 +59,6 @@ class TestUserAPIErrorHandling:
                 "/api/user/",
                 json={
                     "email": "test@example.com",
-                    "phone": "+1234567890",
-                    "password": "password123",
                 },
             )
 
@@ -76,8 +68,8 @@ class TestUserAPIErrorHandling:
             # Verify error response structure
             assert data["success"] is False
             assert data["error_code"] == "CONFLICT"
-            assert "User with this phone number already exists" in data["message"]
-            assert data["details"]["phone"] == "+1234567890"
+            assert "User conflict" in data["message"]
+            assert data["details"]["email"] == "test@example.com"
 
     def test_get_user_not_found_error(self, client):
         """Test user not found error response."""
@@ -204,7 +196,7 @@ class TestUserAPIErrorHandling:
     def test_internal_server_error(self, client):
         """Test internal server error response."""
         with patch("app.api.endpoints.user.UserService") as mock_service:
-            mock_service.return_value.create_user = AsyncMock(
+            mock_service.return_value.create_signup_user = AsyncMock(
                 side_effect=Exception("Unexpected error")
             )
 
@@ -214,8 +206,6 @@ class TestUserAPIErrorHandling:
                     "/api/user/",
                     json={
                         "email": "test@example.com",
-                        "phone": "+1234567890",
-                        "password": "password123",
                     },
                 )
 
@@ -225,8 +215,6 @@ class TestUserAPIErrorHandling:
             "/api/user/",
             json={
                 "email": "invalid-email",
-                "phone": "",
-                "password": "short",
             },
         )
 
@@ -238,9 +226,6 @@ class TestUserAPIErrorHandling:
 
         # Verify that all expected fields have validation errors
         assert "body.email" in field_names
-        assert "body.phone" in field_names
-        assert "body.password" in field_names
-        # verifyByGovId field no longer exists
 
     def test_validation_error_message_clarity(self, client):
         """Test that validation error messages are clear and helpful."""
@@ -248,8 +233,6 @@ class TestUserAPIErrorHandling:
             "/api/user/",
             json={
                 "email": "invalid-email",
-                "phone": "",
-                "password": "short",
             },
         )
 
@@ -260,11 +243,7 @@ class TestUserAPIErrorHandling:
         messages = [error["message"] for error in validation_errors]
 
         # Verify that error messages are clear
-        assert any("Phone number cannot be empty" in msg for msg in messages)
-        assert any(
-            "String should have at least 8 characters" in msg for msg in messages
-        )
-        # Boolean validation no longer needed for verifyByGovId
+        assert any("email" in msg.lower() for msg in messages)
 
     def test_error_response_timestamp_format(self, client):
         """Test that error response timestamps are properly formatted."""
@@ -272,8 +251,6 @@ class TestUserAPIErrorHandling:
             "/api/user/",
             json={
                 "email": "invalid-email",
-                "phone": "",
-                "password": "short",
             },
         )
 
@@ -293,8 +270,6 @@ class TestUserAPIErrorHandling:
             "/api/user/",
             json={
                 "email": "invalid-email",
-                "phone": "",
-                "password": "short",
             },
         )
 
@@ -309,12 +284,12 @@ class TestUserAPIErrorHandling:
         with patch("app.api.endpoints.user.UserService") as mock_service:
             from app.models.user import UserInDB, UserType
 
-            mock_service.return_value.create_user = AsyncMock(
+            mock_service.return_value.create_signup_user = AsyncMock(
                 return_value=UserInDB(
                     id=ObjectId(),
                     email="test@example.com",
-                    phone="+1234567890",
-                    password="hashed_password",
+                    phone=None,
+                    password=None,
                     userType=UserType.USER,
                     features=[],
                     isActive=True,
@@ -341,8 +316,6 @@ class TestUserAPIErrorHandling:
                     "/api/user/",
                     json={
                         "email": "test@example.com",
-                        "phone": "+1234567890",
-                        "password": "password123",
                     },
                 )
 

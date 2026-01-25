@@ -44,9 +44,10 @@ The test suite uses **Docker containers** for isolated testing:
 
 ### ✅ **User Creation Tests** (`test_user_creation.py`)
 
-- **Validation**: Email, phone, password, verifyByGovId validation
+- **Validation**: Email format, phone format (when provided), password rules
+- **Signup Flow**: Signup init supports email-only (no phone/password required); signup completion requires missing fields (phone/password) and verification
 - **Database Operations**: User creation with proper timestamps
-- **Default Values**: isActive=True, isVerified=False
+- **Default Values**: isActive=True, isVerified=False, isGovId defaulting to False and derived from email domain during signup init
 - **Error Handling**: Email conflicts, validation errors
 - **API Endpoints**: Complete CRUD operations
 
@@ -55,7 +56,7 @@ The test suite uses **Docker containers** for isolated testing:
 - **Phone Validation**: Required vs optional field validation
 - **Email Validation**: Format validation and error messages
 - **Password Validation**: Length and format requirements
-- **Boolean Validation**: verifyByGovId type checking
+- **Email OTP / Gov ID**: OTP verification sets isEmailOtpVerified=True; gov emails are not auto-verified on creation (isVerified defaults to False) unless verification is performed
 - **Edge Cases**: Boundary conditions, unicode, special characters
 
 ### ✅ **User Database Tests** (`test_user_database.py`)

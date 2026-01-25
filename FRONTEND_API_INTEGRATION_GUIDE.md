@@ -59,33 +59,32 @@ interface ErrorResponse {
 
 ## Authentication Flow
 
-### 1. User Registration
-**Endpoint:** `POST /api/v1/auth/register` (if exists) or `POST /api/v1/user`
+### 1. Signup Init (New Flow)
+**Goal:** User selects **gov** vs **personal** email in UI, but backend derives `isGovId` from email domain patterns.
+
+**Endpoint:** `POST /api/v1/user/signup/init` (preferred) or `POST /api/v1/user/` (alias)
 
 **Request:**
 ```typescript
 {
   email: string;
-  password: string;
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
 }
 ```
 
-**Success Response (201):**
+**Success Response (200):**
 ```typescript
 {
   success: true;
-  message: "User created successfully";
+  message: "Signup initiated successfully. Please verify your email with the OTP sent.";
   timestamp: "2024-01-01T00:00:00Z";
   data: {
     id: string;
     email: string;
-    firstName?: string;
-    lastName?: string;
+    phone: null;
     isActive: boolean;
     isVerified: boolean;
+    isGovId: boolean;
+    isEmailOtpVerified: boolean; // false at this stage
     createdAt: string;
   };
 }
@@ -93,7 +92,7 @@ interface ErrorResponse {
 
 **Error Responses:**
 - `400` - Validation error
-- `409` - User already exists
+- `409` - Conflict (e.g., ambiguous user state)
 - `500` - Server error
 
 ### 2. Send OTP
@@ -143,7 +142,7 @@ interface ErrorResponse {
   data: {
     message: "OTP verified successfully";
     verified_at: string; // ISO 8601
-    is_verified: boolean; // true for gov emails, false for others
+    is_verified: boolean; // true for gov emails, false for others (admin must verify)
   };
 }
 ```
@@ -153,7 +152,36 @@ interface ErrorResponse {
 - `404` - User not found
 - `500` - Server error
 
-### 4. Login
+### 4. Complete Signup (New Flow)
+**Goal:** Collect remaining fields (phone, password, profile info) **after OTP**.
+
+**Endpoint:** `PUT /api/v1/user/signup/complete`
+
+**Request:**
+```typescript
+{
+  email: string;
+  phone?: string;      // required if multiple users exist with same email
+  password?: string;   // required before login (backend will hash it)
+  userType?: "user" | "org_user"; // elevated roles cannot be self-assigned
+  firstName?: string;
+  lastName?: string;
+  address?: string;
+  city?: string;
+  pinCode?: string;
+  state?: string;
+  organizationId?: string | null;
+  orgName?: string | null;
+}
+```
+
+**Rules / Edge Cases:**
+- If **exactly one** user exists for `email`, backend updates that user.
+- If **multiple** users exist for `email`, frontend must also send **`phone`** so backend can update the correct user.
+- `phone` must be **globally unique** when set.
+- This endpoint requires **email OTP already verified** (`isEmailOtpVerified=true`), otherwise it will reject.
+
+### 5. Login
 **Endpoint:** `POST /api/v1/auth/login`
 
 **Request:**
@@ -184,7 +212,7 @@ interface ErrorResponse {
 - `422` - Validation error
 - `500` - Server error
 
-### 5. Refresh Token
+### 6. Refresh Token
 **Endpoint:** `POST /api/v1/auth/refresh`
 
 **Request:**
@@ -212,7 +240,7 @@ interface ErrorResponse {
 - `401` - Invalid or expired refresh token
 - `500` - Server error
 
-### 6. Logout
+### 7. Logout
 **Endpoint:** `POST /api/v1/auth/logout`
 
 **Headers:**
@@ -239,7 +267,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-### 7. Get Auth Status
+### 8. Get Auth Status
 **Endpoint:** `GET /api/v1/auth/me`
 
 **Headers:**

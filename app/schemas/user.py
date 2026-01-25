@@ -82,7 +82,7 @@ class UserResponse(BaseModel):
 
     id: str
     email: str
-    phone: str
+    phone: str | None = None
     userType: UserType | None = None
     features: list[str] | None = None
     firstName: str | None = None
@@ -95,6 +95,8 @@ class UserResponse(BaseModel):
     orgName: str | None = None
     isActive: bool
     isVerified: bool
+    isGovId: bool = False
+    isEmailOtpVerified: bool = False
     createdAt: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updatedAt: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -114,3 +116,47 @@ class UserCreateResponse(BaseModel):
     message: str
     user_id: str
     user: UserResponse
+
+
+class UserSignupInitRequest(BaseModel):
+    """Pre-OTP signup init request (new signup flow)."""
+
+    email: EmailStr = Field(..., description="User email address (gov or personal)")
+
+
+class UserSignupInitResponse(BaseModel):
+    """Pre-OTP signup init response."""
+
+    user_id: str = Field(..., description="Created (or reused) user ID for signup")
+    email: str = Field(..., description="Normalized email")
+    isGovId: bool = Field(..., description="Whether email is detected as government ID")
+    otp_expires_in: int = Field(..., description="OTP expiration time in seconds")
+
+
+class UserCompleteSignupRequest(BaseModel):
+    """
+    Complete signup after OTP verification by updating the user profile.
+
+    If multiple users exist for the same email, phone is required to uniquely
+    identify (or bind) the correct user.
+    """
+
+    email: EmailStr
+    phone: str | None = Field(None, description="Phone number in E.164 format")
+    password: str | None = Field(None, min_length=8, max_length=100)
+    userType: UserType | None = None
+    firstName: str | None = Field(None, max_length=100)
+    lastName: str | None = Field(None, max_length=100)
+    address: str | None = Field(None, max_length=200)
+    city: str | None = Field(None, max_length=100)
+    pinCode: str | None = Field(None, max_length=10)
+    state: str | None = Field(None, max_length=100)
+    organizationId: str | None = Field(None, description="Organization ID for org_user")
+    orgName: str | None = Field(
+        None, max_length=200, description="Organization name for org_admin"
+    )
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v):
+        return validate_phone_number(v)

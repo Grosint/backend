@@ -606,10 +606,12 @@ class TestUserAPIEndpoints:
         """Test successful user creation via API."""
         # Create test data using factory
         user_create_data = test_data_factory.create_user_create_request()
+        signup_init_payload = {"email": user_create_data["email"]}
         user_in_db_data = test_data_factory.create_user_data(
             id=str(ObjectId()),
             email=user_create_data["email"],
-            phone=user_create_data["phone"],
+            phone=None,
+            password=None,
         )
 
         with (
@@ -626,16 +628,16 @@ class TestUserAPIEndpoints:
                 return_value=True,
             ),
         ):
-            mock_service.return_value.create_user = AsyncMock(
+            mock_service.return_value.create_signup_user = AsyncMock(
                 return_value=UserInDB(**user_in_db_data)
             )
 
-            response = client.post("/api/user/", json=user_create_data)
+            response = client.post("/api/user/", json=signup_init_payload)
 
             assert response.status_code == 200
             data = response.json()
             assert data["success"] is True
-            assert "User created successfully" in data["message"]
+            assert "Signup initiated successfully" in data["message"]
             assert data["data"]["email"] == user_create_data["email"]
             assert data["data"]["isActive"] is True
             assert data["data"]["isVerified"] is False
@@ -647,8 +649,6 @@ class TestUserAPIEndpoints:
             "/api/user/",
             json={
                 "email": "invalid-email",
-                "phone": "+1234567890",
-                "password": "password123",
             },
         )
 
@@ -659,24 +659,25 @@ class TestUserAPIEndpoints:
         assert "validation_errors" in data
 
     def test_create_user_phone_conflict(self, client, test_data_factory):
-        """Test user creation with existing phone number."""
+        """Test signup init with conflict error."""
         # Create test data using factory
         user_create_data = test_data_factory.create_user_create_request()
+        signup_init_payload = {"email": user_create_data["email"]}
 
         with patch("app.api.endpoints.user.UserService") as mock_service:
-            mock_service.return_value.create_user = AsyncMock(
+            mock_service.return_value.create_signup_user = AsyncMock(
                 side_effect=ConflictException(
-                    message="User with this phone number already exists",
-                    details={"phone": user_create_data["phone"]},
+                    message="User conflict",
+                    details={"email": user_create_data["email"]},
                 )
             )
 
-            response = client.post("/api/user/", json=user_create_data)
+            response = client.post("/api/user/", json=signup_init_payload)
 
             assert response.status_code == 409
             data = response.json()
             assert data["success"] is False
-            assert "User with this phone number already exists" in data["message"]
+            assert "User conflict" in data["message"]
 
     def test_get_current_user_success(self, client, test_data_factory):
         """Test successful current user retrieval."""

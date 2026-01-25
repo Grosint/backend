@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.exceptions import ConflictException
 from app.models.user import User, UserCreate, UserInDB, UserUpdate
 from app.utils.password import hash_password, verify_password
+from app.utils.validators import is_gov_email
 
 logger = logging.getLogger(__name__)
 
@@ -18,22 +19,73 @@ class UserService:
         self.db = db
         self.collection = db[settings.MONGODB_COLLECTION_USERS]
 
+    async def create_signup_user(self, email: str) -> UserInDB:
+        """
+        Create (or reuse) a minimal pre-OTP signup user.
+
+        This supports the new signup flow where the user is created with only:
+        - email
+        - isGovId (derived from email domain)
+        - required metadata (createdAt/updatedAt, isActive, etc.)
+
+        A pending signup user is identified as one with:
+        - matching email
+        - phone is None
+        - isEmailOtpVerified is False
+        """
+        normalized_email = email.lower().strip()
+
+        # Reuse an existing pending user for this email to avoid multiple "pending" rows
+        # and to keep OTP verification deterministic.
+        pending_users = (
+            await User.find(
+                User.email == normalized_email,
+                User.phone == None,  # noqa: E711 (Beanie query)
+                User.isEmailOtpVerified == False,  # noqa: E712 (Beanie query)
+            )
+            .sort("-createdAt")
+            .limit(1)
+            .to_list()
+        )
+
+        if pending_users:
+            user = pending_users[0]
+            # Keep isGovId in sync with email domain patterns
+            user.isGovId = is_gov_email(user.email)
+            await user.save()
+            return await self.get_user_by_id(str(user.id))
+
+        new_user = User(
+            email=normalized_email,
+            phone=None,
+            password=None,
+            isGovId=is_gov_email(normalized_email),
+            isEmailOtpVerified=False,
+            isActive=True,
+            isVerified=False,
+        )
+        await new_user.insert()
+
+        logger.info(f"Pre-OTP signup user created: {normalized_email}")
+        return await self.get_user_by_id(str(new_user.id))
+
     async def create_user(self, user: UserCreate) -> UserInDB:
         """Create a new user"""
         try:
-            # Check if phone number already exists (phone must be unique)
-            existing_user = await User.find_one(User.phone == user.phone)
-            if existing_user:
-                raise ConflictException(
-                    message="User with this phone number already exists",
-                    details={"phone": user.phone},
-                )
+            # Check if phone number already exists (phone must be unique when present)
+            if user.phone is not None:
+                existing_user = await User.find_one(User.phone == user.phone)
+                if existing_user:
+                    raise ConflictException(
+                        message="User with this phone number already exists",
+                        details={"phone": user.phone},
+                    )
 
             # Create new user document
             new_user = User(
                 email=user.email,
                 phone=user.phone,
-                password=hash_password(user.password),
+                password=hash_password(user.password) if user.password else None,
                 userType=user.userType,
                 features=[],
                 firstName=user.firstName,
@@ -50,7 +102,17 @@ class UserService:
                 ),
                 orgName=user.orgName,
                 isActive=True,
-                isVerified=False,  # Will be set to True after OTP verification
+                isVerified=False,  # Will be set to True after OTP verification (gov IDs only)
+                isGovId=(
+                    user.isGovId
+                    if user.isGovId is not None
+                    else is_gov_email(user.email)
+                ),
+                isEmailOtpVerified=(
+                    user.isEmailOtpVerified
+                    if user.isEmailOtpVerified is not None
+                    else False
+                ),
             )
             await new_user.insert()
 
@@ -186,7 +248,10 @@ class UserService:
             # Update user fields
             for field, value in update_data.items():
                 if hasattr(user, field):
-                    setattr(user, field, value)
+                    if field == "password":
+                        setattr(user, field, hash_password(value) if value else None)
+                    else:
+                        setattr(user, field, value)
 
             user.updatedAt = datetime.now(UTC)
             await user.save()
@@ -195,6 +260,129 @@ class UserService:
         except Exception as e:
             logger.error(f"Error updating user: {e}")
             raise
+
+    async def update_user_by_email_and_optional_phone(
+        self,
+        email: str,
+        phone: str | None,
+        user_update: UserUpdate,
+        *,
+        require_email_otp_verified: bool = True,
+    ) -> UserInDB:
+        """
+        Update a user during "complete signup" flow using email (and phone when needed).
+
+        Rules:
+        - If exactly one user exists for email -> update that user.
+        - If multiple users exist for email -> require phone to disambiguate.
+          - If a user with (email, phone) exists -> update that one.
+          - Otherwise, update the most recent "pending" user for email (phone is None),
+            and set its phone to the provided value.
+        - If require_email_otp_verified -> only allow update when isEmailOtpVerified is True.
+        """
+        normalized_email = email.lower().strip()
+        users = await User.find(User.email == normalized_email).to_list()
+
+        if not users:
+            raise ConflictException(
+                message="User not found for this email. Please start signup first.",
+                details={"email": normalized_email},
+            )
+
+        target: User | None = None
+        if len(users) == 1:
+            target = users[0]
+        else:
+            if not phone:
+                raise ConflictException(
+                    message=(
+                        "Multiple users found with this email. "
+                        "Please provide phone number to update the correct user."
+                    ),
+                    details={"email": normalized_email, "user_count": len(users)},
+                )
+
+            normalized_phone = phone
+            # Prefer exact match on email+phone
+            target = await User.find_one(
+                User.email == normalized_email, User.phone == normalized_phone
+            )
+
+            # If no exact match, fall back to most recent pending user (phone is None)
+            if target is None:
+                pending = (
+                    await User.find(
+                        User.email == normalized_email,
+                        User.phone == None,  # noqa: E711
+                    )
+                    .sort("-createdAt")
+                    .limit(1)
+                    .to_list()
+                )
+                if pending:
+                    target = pending[0]
+
+        if target is None:
+            raise ConflictException(
+                message="Could not uniquely identify user to update.",
+                details={"email": normalized_email},
+            )
+
+        if require_email_otp_verified and not target.isEmailOtpVerified:
+            raise ConflictException(
+                message="Email OTP not verified. Please verify OTP before completing signup.",
+                details={"email": normalized_email},
+            )
+
+        update_data = user_update.dict(exclude_unset=True)
+        restricted_fields = {
+            "isActive",
+            "isVerified",
+            "isGovId",
+            "isEmailOtpVerified",
+            "userType",
+        }
+        restricted_in_request = restricted_fields.intersection(update_data.keys())
+        if restricted_in_request:
+            raise ConflictException(
+                message="Updating restricted user fields is not allowed.",
+                details={"fields": sorted(restricted_in_request)},
+            )
+
+        allowed_fields = {
+            "password",
+            "firstName",
+            "lastName",
+            "address",
+            "city",
+            "pinCode",
+            "state",
+            "organizationId",
+            "orgName",
+        }
+        update_data = {k: v for k, v in update_data.items() if k in allowed_fields}
+
+        # If caller provided phone and target doesn't have phone yet, set it (unique constraint will be enforced)
+        if phone and not target.phone:
+            # Enforce phone uniqueness across all users
+            existing_user = await User.find_one(User.phone == phone)
+            if existing_user and str(existing_user.id) != str(target.id):
+                raise ConflictException(
+                    message="User with this phone number already exists",
+                    details={"phone": phone},
+                )
+            update_data["phone"] = phone
+
+        for field, value in update_data.items():
+            if hasattr(target, field):
+                if field == "password":
+                    setattr(target, field, hash_password(value) if value else None)
+                else:
+                    setattr(target, field, value)
+
+        target.updatedAt = datetime.now(UTC)
+        await target.save()
+        return await self.get_user_by_id(str(target.id))
 
     async def delete_user(self, user_id: str) -> bool:
         """Delete user"""

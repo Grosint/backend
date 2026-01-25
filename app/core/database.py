@@ -141,7 +141,7 @@ async def migrate_user_indexes(database):
         users_collection = database.users
         indexes = await users_collection.list_indexes().to_list(length=100)
 
-        # Find and drop the old unique email index if it exists
+        # Find and drop old unique indexes if they exist
         for index in indexes:
             index_name = index.get("name", "")
             index_key = index.get("key", {})
@@ -152,6 +152,15 @@ async def migrate_user_indexes(database):
                 try:
                     await users_collection.drop_index(index_name)
                     logger.info(f"Dropped old unique email index: {index_name}")
+                except Exception as e:
+                    logger.warning(f"Could not drop index {index_name}: {e}")
+                    # Continue - Beanie will handle the conflict or we can manually fix it
+
+            # Check if this is the old unique phone index
+            if index_name == "phone_1" and is_unique and "phone" in index_key:
+                try:
+                    await users_collection.drop_index(index_name)
+                    logger.info(f"Dropped old unique phone index: {index_name}")
                 except Exception as e:
                     logger.warning(f"Could not drop index {index_name}: {e}")
                     # Continue - Beanie will handle the conflict or we can manually fix it
