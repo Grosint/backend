@@ -2,13 +2,22 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
+from urllib.parse import parse_qs
 
 from beanie import PydanticObjectId
 from bson import ObjectId
 
+from app.adapters.bank_lookup_adapter import BankLookupAdapter
 from app.adapters.domain_adapter import DomainAdapter
 from app.adapters.email_adapter import EmailAdapter
+from app.adapters.imei_lookup_adapter import IMEILookupAdapter
+from app.adapters.ip_lookup_adapter import IPLookupAdapter
 from app.adapters.phone_lookup_adapter import PhoneLookupAdapter
+from app.adapters.vehicle_lookup_adapter import VehicleLookupAdapter
+from app.adapters.verify_id_adapter import VerifyIdAdapter
+from app.adapters.virtual_email_adapter import VirtualEmailAdapter
+from app.adapters.virtual_number_adapter import VirtualNumberAdapter
+from app.core.response_utils import normalize_source_or_type
 from app.models.history import HistorySourceResult
 from app.models.result import ResultCreate
 from app.models.search import SearchStatus, SearchType, SearchUpdate
@@ -32,13 +41,30 @@ class SearchOrchestrator:
         self.email_adapter = EmailAdapter()
         self.domain_adapter = DomainAdapter()
         self.phone_lookup_adapter = PhoneLookupAdapter()
+        self.vehicle_lookup_adapter = VehicleLookupAdapter()
+        self.bank_lookup_adapter = BankLookupAdapter()
+        self.verify_id_adapter = VerifyIdAdapter()
+        self.ip_lookup_adapter = IPLookupAdapter()
+        self.imei_lookup_adapter = IMEILookupAdapter()
+        self.virtual_number_adapter = VirtualNumberAdapter()
+        self.virtual_email_adapter = VirtualEmailAdapter()
 
         # Adapter mapping
         self.adapters = {
             SearchType.EMAIL: [self.email_adapter],
             SearchType.DOMAIN: [self.domain_adapter],
             SearchType.PHONE: [self.phone_lookup_adapter],
+            SearchType.VEHICLE_RC: [self.vehicle_lookup_adapter],
+            SearchType.VEHICLE_FAST_TAG: [self.vehicle_lookup_adapter],
+            SearchType.VEHICLE_ALL: [self.vehicle_lookup_adapter],
+            SearchType.VEHICLE_CHASIS: [self.vehicle_lookup_adapter],
             SearchType.USERNAME: [],  # Add username adapters here
+            SearchType.IP_LOOKUP: [self.ip_lookup_adapter],
+            SearchType.IMEI_LOOKUP: [self.imei_lookup_adapter],
+            SearchType.VIRTUAL_NUMBER: [self.virtual_number_adapter],
+            SearchType.VIRTUAL_EMAIL: [self.virtual_email_adapter],
+            SearchType.BANK_ACCOUNT: [self.bank_lookup_adapter],
+            SearchType.VERIFY_ID: [self.verify_id_adapter],
         }
 
         # Map search type to adapter method
@@ -46,7 +72,17 @@ class SearchOrchestrator:
             SearchType.EMAIL: self._get_email_search_method,
             SearchType.DOMAIN: self._get_domain_search_method,
             SearchType.PHONE: self._get_phone_search_method,
+            SearchType.VEHICLE_RC: self._get_vehicle_search_method,
+            SearchType.VEHICLE_FAST_TAG: self._get_vehicle_search_method,
+            SearchType.VEHICLE_ALL: self._get_vehicle_search_method,
+            SearchType.VEHICLE_CHASIS: self._get_vehicle_search_method,
             SearchType.USERNAME: self._get_username_search_method,
+            SearchType.IP_LOOKUP: self._get_ip_search_method,
+            SearchType.IMEI_LOOKUP: self._get_imei_search_method,
+            SearchType.VIRTUAL_NUMBER: self._get_virtual_number_search_method,
+            SearchType.VIRTUAL_EMAIL: self._get_virtual_email_search_method,
+            SearchType.BANK_ACCOUNT: self._get_bank_search_method,
+            SearchType.VERIFY_ID: self._get_verify_id_search_method,
         }
 
     async def execute_search(self, search_id: str) -> dict[str, Any]:
@@ -83,7 +119,17 @@ class SearchOrchestrator:
                         SearchType.PHONE: "phone-lookup",
                         SearchType.EMAIL: "email-lookup",
                         SearchType.DOMAIN: "domain-lookup",
+                        SearchType.VEHICLE_RC: "vehicle-rc",
+                        SearchType.VEHICLE_FAST_TAG: "vehicle-fast-tag",
+                        SearchType.VEHICLE_ALL: "vehicle-all",
+                        SearchType.VEHICLE_CHASIS: "vehicle-chasis",
                         SearchType.USERNAME: "username-lookup",
+                        SearchType.IP_LOOKUP: "ip-lookup",
+                        SearchType.IMEI_LOOKUP: "imei-lookup",
+                        SearchType.VIRTUAL_NUMBER: "virtual-number",
+                        SearchType.VIRTUAL_EMAIL: "virtual-email",
+                        SearchType.BANK_ACCOUNT: "bank-account",
+                        SearchType.VERIFY_ID: "verify-id",
                     }
                     query_type = query_type_map.get(search.search_type, "search")
 
@@ -281,7 +327,15 @@ class SearchOrchestrator:
             return {"successful_count": 0, "failed_count": 1}
 
         data = result.get("data", {})
-        lookup_results = data.get("lookup_results", {})
+        normalized_data = normalize_source_or_type(data)
+        lookup_results = normalized_data.get("lookup_results", {})
+
+        logger.debug(
+            "Storing adapter lookup results: adapter=%s, lookup_results_keys=%s, has_lookup_results=%s",
+            getattr(adapter, "name", None),
+            list(lookup_results.keys()) if isinstance(lookup_results, dict) else [],
+            bool(lookup_results),
+        )
 
         # For phone and email, store each source result separately
         if lookup_results:
@@ -300,7 +354,7 @@ class SearchOrchestrator:
                     result_create = ResultCreate(
                         search_id=ObjectId(search_id),
                         source=source_name,
-                        data=source_result,
+                        data=normalize_source_or_type(source_result),
                         confidence_score=(
                             source_result.get("confidence", 0.0)
                             if isinstance(source_result, dict)
@@ -308,6 +362,20 @@ class SearchOrchestrator:
                         ),
                     )
                     await self.result_service.create_result(result_create)
+
+                    logger.debug(
+                        "Stored source result summary: source=%s, is_success=%s, has_error=%s, found=%s, has_data=%s",
+                        source_name,
+                        is_success,
+                        isinstance(source_result, dict) and "error" in source_result,
+                        (
+                            source_result.get("found", False)
+                            if isinstance(source_result, dict)
+                            else False
+                        ),
+                        isinstance(source_result, dict)
+                        and source_result.get("data") is not None,
+                    )
 
                     # Add result to history if history exists
                     if history:
@@ -472,6 +540,19 @@ class SearchOrchestrator:
 
         return fn
 
+    def _get_vehicle_search_method(
+        self, adapter: VehicleLookupAdapter, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        """Get vehicle search method for adapter"""
+
+        vehicle_number, chassis_number, lookup_type = self._parse_vehicle_query(query)
+
+        async def fn(a=adapter, v=vehicle_number, c=chassis_number, t=lookup_type):
+            raw = await a.search_vehicle(v, chassis_number=c, lookup_type=t)
+            return raw
+
+        return fn
+
     def _get_username_search_method(
         self, adapter: Any, query: str
     ) -> Callable[[], Awaitable[dict[str, Any]]]:
@@ -482,6 +563,105 @@ class SearchOrchestrator:
             raise NotImplementedError("Username search not yet implemented")
 
         return fn
+
+    def _get_ip_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        async def fn(a=adapter, q=query):
+            return await a.search_ip(q)
+
+        return fn
+
+    def _get_imei_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        async def fn(a=adapter, q=query):
+            return await a.search_imei(q)
+
+        return fn
+
+    def _get_virtual_number_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        phone_number, country_code = self._parse_virtual_number_query(query)
+
+        async def fn(a=adapter, ph=phone_number, cc=country_code):
+            return await a.search_virtual_number(ph, cc)
+
+        return fn
+
+    def _parse_virtual_number_query(self, query: str) -> tuple[str, str]:
+        """Parse virtual number query: ph=X|cc=Y or raw phone (default cc=+91)"""
+        phone_number, country_code = query, "+91"
+        for part in query.split("|"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                k, v = k.strip(), v.strip()
+                if k == "ph":
+                    phone_number = v
+                elif k == "cc":
+                    country_code = v if v.startswith("+") else "+" + v
+        return phone_number, country_code
+
+    def _get_virtual_email_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        async def fn(a=adapter, q=query):
+            return await a.search_virtual_email(q)
+
+        return fn
+
+    def _get_bank_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        account_no, ifsc_code, upi = self._parse_bank_query(query)
+
+        async def fn(a=adapter, acc=account_no, ifsc=ifsc_code, u=upi):
+            return await a.search_bank(account_no=acc, ifsc_code=ifsc, upi=u)
+
+        return fn
+
+    def _get_verify_id_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        id_type, value, dob = self._parse_verify_id_query(query)
+
+        async def fn(a=adapter, it=id_type, v=value, d=dob):
+            return await a.search_verify_id(id_type=it, value=v, dob=d)
+
+        return fn
+
+    def _parse_bank_query(
+        self, query: str
+    ) -> tuple[str | None, str | None, str | None]:
+        """Parse bank query: acc=X|ifsc=Y or upi=Z"""
+        account_no, ifsc_code, upi = None, None, None
+        for part in query.split("|"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                k, v = k.strip(), v.strip()
+                if k == "acc":
+                    account_no = v or None
+                elif k == "ifsc":
+                    ifsc_code = v or None
+                elif k == "upi":
+                    upi = v or None
+        return account_no, ifsc_code, upi
+
+    def _parse_verify_id_query(self, query: str) -> tuple[str, str, str | None]:
+        """Parse verify ID query: type=pan|value=X or type=dl|value=X|dob=DD-MM-YYYY"""
+        id_type, value, dob = "pan", "", None
+        for part in query.split("|"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                k, v = k.strip(), v.strip()
+                if k == "type":
+                    id_type = v or "pan"
+                elif k == "value":
+                    value = v
+                elif k == "dob":
+                    dob = v or None
+        return id_type, value, dob
 
     def _parse_phone_query(self, query: str) -> tuple[str, str]:
         """Parse phone query into country_code and phone"""
@@ -531,6 +711,49 @@ class SearchOrchestrator:
 
         return country_code, phone
 
+    def _parse_vehicle_query(self, query: str) -> tuple[str | None, str | None, str]:
+        """Parse vehicle query into vehicle_number, chassis_number, lookup_type.
+
+        Supports URL-encoded format (veh=...&ch=...&type=...) and legacy
+        pipe-delimited format for backward compatibility.
+        """
+        vehicle_number = query
+        chassis_number = None
+        lookup_type = "all"
+
+        # URL-encoded format (e.g. veh=ABC&ch=XYZ&type=rc)
+        if "&" in query and "veh=" in query:
+            parsed = parse_qs(query)
+
+            def _first(key: str, default: str | None = None) -> str | None:
+                vals = parsed.get(key)
+                if vals and vals[0]:
+                    v = vals[0].strip()
+                    return v or None
+                return default
+
+            vehicle_number = _first("veh")
+            chassis_number = _first("ch")
+            lookup_type = _first("type") or "all"
+        elif "veh=" in query or "type=" in query:
+            # Legacy pipe-delimited format
+            parts = [p for p in query.split("|") if p]
+            for part in parts:
+                if part.startswith("veh="):
+                    value = part.split("=", 1)[1]
+                    vehicle_number = value or None
+                elif part.startswith("ch="):
+                    value = part.split("=", 1)[1]
+                    chassis_number = value or None
+                elif part.startswith("type="):
+                    value = part.split("=", 1)[1]
+                    lookup_type = value or "all"
+        elif "|" in query:
+            vehicle_number, chassis_number = query.split("|", 1)
+            chassis_number = chassis_number or None
+
+        return vehicle_number, chassis_number, lookup_type
+
     def _remove_raw_response(self, data: dict[str, Any]) -> dict[str, Any]:
         """Recursively remove _raw_response from data dictionary"""
         if not isinstance(data, dict):
@@ -570,14 +793,20 @@ class SearchOrchestrator:
             return []
 
         if "error" in result_data:
+            logger.debug(
+                "Flatten skipped due to error in result_data: source=%s",
+                source,
+            )
             return []
 
         # Remove _raw_response first
         cleaned_data = self._remove_raw_response(result_data)
 
         # If this is a phone/email lookup result with nested data structure
-        if isinstance(cleaned_data, dict) and "data" in cleaned_data:
-            inner_data = cleaned_data.get("data")
+        normalized_cleaned = normalize_source_or_type(cleaned_data)
+
+        if isinstance(normalized_cleaned, dict) and "data" in normalized_cleaned:
+            inner_data = normalized_cleaned.get("data")
 
             # If inner data is a list, extract those items
             if isinstance(inner_data, list):
@@ -609,8 +838,8 @@ class SearchOrchestrator:
                 return [item_copy]
 
         # If data doesn't have nested structure, return as single item
-        if isinstance(cleaned_data, dict):
-            item_copy = cleaned_data.copy()
+        if isinstance(normalized_cleaned, dict):
+            item_copy = normalized_cleaned.copy()
             if "source" not in item_copy:
                 item_copy["source"] = source
             return [item_copy]
@@ -620,7 +849,7 @@ class SearchOrchestrator:
             {
                 "source": source,
                 "type": "unknown",
-                "value": str(cleaned_data),
+                "value": str(normalized_cleaned),
                 "category": "TEXT",
             }
         ]

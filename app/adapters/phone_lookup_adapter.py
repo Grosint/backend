@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from app.adapters.base import OSINTAdapter
+from app.core.logging import mask_phone_number
 from app.services.orchestrators.phone_lookup_orchestrator import (
     PhoneLookupOrchestrator,
 )
@@ -30,7 +31,8 @@ class PhoneLookupAdapter(OSINTAdapter):
             is_advance: If True, also query AITAN advanced phone lookup.
         """
         try:
-            logger.info(f"PhoneLookupAdapter: Searching {country_code}{phone}")
+            masked = f"{country_code}{mask_phone_number(phone)}"
+            logger.debug("PhoneLookupAdapter: Searching %s", masked)
 
             # Use the orchestrator to handle all phone lookup services
             result = await self.orchestrator.search_phone(

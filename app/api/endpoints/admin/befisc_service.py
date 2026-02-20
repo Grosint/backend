@@ -37,6 +37,19 @@ BEFISC_LOOKUP_TYPES = [
 ]
 
 
+def _strip_raw_from_data(data: Any) -> Any:
+    """Recursively remove _raw_response and _raw_data from data (exposed at raw_response level)."""
+    if isinstance(data, dict):
+        return {
+            k: _strip_raw_from_data(v)
+            for k, v in data.items()
+            if k not in ("_raw_response", "_raw_data")
+        }
+    if isinstance(data, list):
+        return [_strip_raw_from_data(item) for item in data]
+    return data
+
+
 def _validate_befisc_request(request: BefiscLookupRequest) -> None:
     """Validate that required parameters are provided for the lookup type"""
     if request.lookup_type == "phone-lookup":
@@ -142,9 +155,9 @@ async def _call_befisc_service(
     elif request.lookup_type == "bank-lookup":
         # For bank lookup, try account/IFSC first, then UPI
         if request.account_no and request.ifsc_code:
-            return await service._bank_search(request.account_no, request.ifsc_code)
+            return await service.bank_search(request.account_no, request.ifsc_code)
         elif request.upi:
-            return await service._upi_search(request.upi)
+            return await service.upi_search(request.upi)
         else:
             return {
                 "found": False,
@@ -228,17 +241,18 @@ async def test_befisc_service(
             and not result.get("error")
         )
 
-        # Extract raw response from service result
+        # Extract raw response from service result (strip from data to avoid duplication)
         raw_response = None
         if request.include_raw_response and isinstance(result, dict):
             raw_response = result.get("_raw_response")
+        data_clean = _strip_raw_from_data(result) if isinstance(result, dict) else None
 
         response_data = ServiceTestResponse(
             service_name=f"befisc-{lookup_type_lower}",
             success=is_success,
             execution_time_ms=round(execution_time, 2),
             found=result.get("found") if isinstance(result, dict) else None,
-            data=result if isinstance(result, dict) else None,
+            data=data_clean,
             error=str(result) if isinstance(result, Exception) else result.get("error"),
             raw_response=raw_response,
         )

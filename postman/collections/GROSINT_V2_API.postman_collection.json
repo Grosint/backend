@@ -481,6 +481,195 @@
 					"response": []
 				},
 				{
+					"name": "Vehicle Lookup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vehicle_number\": \"MH12AB1234\",\n  \"chassis_number\": \"\",\n  \"lookup_type\": \"all\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/search/vehicle-lookup",
+							"host": ["{{base_url}}"],
+							"path": ["search", "vehicle-lookup"]
+						},
+						"description": "Create and execute a vehicle lookup search. lookup_type: rc | fast-tag | chasis | chassis | all. For chassis-only, omit vehicle_number and provide chassis_number."
+					},
+					"response": []
+				},
+				{
+					"name": "Bank Lookup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"account_no\": \"1234567890\",\n  \"ifsc_code\": \"HDFC0001234\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/search/bank-lookup",
+							"host": ["{{base_url}}"],
+							"path": ["search", "bank-lookup"]
+						},
+						"description": "Bank account lookup by account_no + ifsc_code. Alternatively use upi for UPI lookup."
+					},
+					"response": []
+				},
+				{
+					"name": "Verify ID",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"id_type\": \"pan\",\n  \"value\": \"ABCDE1234F\",\n  \"dob\": null\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/search/verify-id",
+							"host": ["{{base_url}}"],
+							"path": ["search", "verify-id"]
+						},
+						"description": "Verify ID: id_type = pan | dl | voter | passport. For dl, dob (DD-MM-YYYY) is required."
+					},
+					"response": []
+				},
+				{
+					"name": "IP Lookup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ip\": \"8.8.8.8\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/search/ip-lookup",
+							"host": ["{{base_url}}"],
+							"path": ["search", "ip-lookup"]
+						},
+						"description": "IP geolocation and security lookup via VPNAPI.io"
+					},
+					"response": []
+				},
+				{
+					"name": "IMEI Lookup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"imei\": \"354505080001234\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/search/imei-lookup",
+							"host": ["{{base_url}}"],
+							"path": ["search", "imei-lookup"]
+						},
+						"description": "IMEI device lookup via Kelpom RapidAPI"
+					},
+					"response": []
+				},
+				{
+					"name": "Virtual Number",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phone_number\": \"9997260627\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/search/virtual-number",
+							"host": ["{{base_url}}"],
+							"path": ["search", "virtual-number"]
+						},
+						"description": "Check if phone number is virtual/throwaway via NumCheckr"
+					},
+					"response": []
+				},
+				{
+					"name": "Virtual Email",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"test@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/search/virtual-email",
+							"host": ["{{base_url}}"],
+							"path": ["search", "virtual-email"]
+						},
+						"description": "Check if email is virtual/disposable via Email Intelligence RapidAPI"
+					},
+					"response": []
+				},
+				{
 					"name": "Get Search Results",
 					"request": {
 						"method": "GET",
@@ -1256,12 +1445,41 @@
 									"host": ["{{base_url}}"],
 									"path": ["admin", "debug", "email-lookup", "philint"]
 								},
-								"description": "Test PhilInt email lookup service directly."
+						"description": "Test PhilInt email lookup service directly."
+						},
+						"response": []
+					},
+					{
+						"name": "Test Holehe",
+						"request": {
+							"method": "POST",
+							"header": [
+								{
+									"key": "Authorization",
+									"value": "Bearer {{admin_token}}",
+									"type": "text"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json",
+									"type": "text"
+								}
+							],
+							"body": {
+								"mode": "raw",
+								"raw": "{\n  \"email\": \"user@example.com\",\n  \"include_raw_response\": true\n}"
 							},
-							"response": []
-						}
-					],
-					"description": "Test individual email lookup services"
+							"url": {
+								"raw": "{{base_url}}/admin/debug/email-lookup/holehe",
+								"host": ["{{base_url}}"],
+								"path": ["admin", "debug", "email-lookup", "holehe"]
+							},
+							"description": "Test Holehe email lookup service directly. Checks if an email exists on various websites and platforms."
+						},
+						"response": []
+					}
+				],
+				"description": "Test individual email lookup services"
 				},
 				{
 					"name": "Test Befisc Service",
@@ -1633,6 +1851,236 @@
 						}
 					],
 					"description": "Test Befisc service with different lookup types: phone, vehicle, bank, PAN, driving license, and voter ID"
+				},
+				{
+					"name": "Test Simple Lookups",
+					"item": [
+						{
+							"name": "IP Lookup",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"ip\": \"8.8.8.8\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/ip-lookup",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "ip-lookup"]
+								},
+								"description": "Test IP lookup (VPNAPI.io). Bypasses orchestration."
+							},
+							"response": []
+						},
+						{
+							"name": "IP Lookup Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/ip-lookup/health?test_ip=8.8.8.8",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "ip-lookup", "health"],
+									"query": [
+										{
+											"key": "test_ip",
+											"value": "8.8.8.8",
+											"description": "Test IP address"
+										}
+									]
+								},
+								"description": "Quick health check for IP lookup."
+							},
+							"response": []
+						},
+						{
+							"name": "IMEI Lookup",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"imei\": \"354505080001234\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/imei-lookup",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "imei-lookup"]
+								},
+								"description": "Test IMEI lookup (Kelpom RapidAPI). Bypasses orchestration."
+							},
+							"response": []
+						},
+						{
+							"name": "IMEI Lookup Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/imei-lookup/health?test_imei=354505080001234",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "imei-lookup", "health"],
+									"query": [
+										{
+											"key": "test_imei",
+											"value": "354505080001234",
+											"description": "Test IMEI (15 digits)"
+										}
+									]
+								},
+								"description": "Quick health check for IMEI lookup."
+							},
+							"response": []
+						},
+						{
+							"name": "Virtual Number",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"phone_number\": \"9997260627\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/virtual-number",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "virtual-number"]
+								},
+								"description": "Test virtual number check (NumCheckr). Bypasses orchestration."
+							},
+							"response": []
+						},
+						{
+							"name": "Virtual Number Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/virtual-number/health?test_phone=9997260627",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "virtual-number", "health"],
+									"query": [
+										{
+											"key": "test_phone",
+											"value": "9997260627",
+											"description": "Test phone number"
+										}
+									]
+								},
+								"description": "Quick health check for virtual number."
+							},
+							"response": []
+						},
+						{
+							"name": "Virtual Email",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"test@example.com\",\n  \"include_raw_response\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/debug/virtual-email",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "virtual-email"]
+								},
+								"description": "Test virtual email check (Email Intelligence RapidAPI). Bypasses orchestration."
+							},
+							"response": []
+						},
+						{
+							"name": "Virtual Email Health",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/debug/virtual-email/health?test_email=test@example.com",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "virtual-email", "health"],
+									"query": [
+										{
+											"key": "test_email",
+											"value": "test@example.com",
+											"description": "Test email"
+										}
+									]
+								},
+								"description": "Quick health check for virtual email."
+							},
+							"response": []
+						}
+					],
+					"description": "Test IP, IMEI, Virtual Number, Virtual Email lookups. Bank and Verify ID use Befisc - see Test Befisc Service."
 				},
 				{
 					"name": "Test AITAN Service",

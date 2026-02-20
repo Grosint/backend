@@ -208,23 +208,45 @@ class HoleheService:
 
                 timeout = 10
 
-                # Launching the modules using trio
+                # Limit concurrency to reduce rate limiting (118/121 were rate-limited with all-at-once)
+                max_concurrent = 5
+                semaphore = trio.Semaphore(max_concurrent)
+
+                # Launching the modules using trio (throttled to avoid rate limits)
                 async def run_modules():
                     client = httpx.AsyncClient(timeout=timeout)
                     out = []
                     instrument = TrioProgress(len(websites))
 
+                    async def run_with_limit(website):
+                        async with semaphore:
+                            try:
+                                await launch_module(website, email, client, out)
+                            except trio.Cancelled:
+                                raise  # Never swallow cancellation
+                            except BaseException:
+                                # Catch module/launch_module errors so one failing module
+                                # doesn't cancel the nursery (ExceptionGroup from 6+ raises)
+                                name = getattr(website, "__name__", "unknown")
+                                out.append(
+                                    {
+                                        "name": name,
+                                        "domain": f"{name}.com",
+                                        "rateLimit": True,
+                                        "exists": False,
+                                        "emailrecovery": None,
+                                        "phoneNumber": None,
+                                        "others": None,
+                                    }
+                                )
+
                     trio.lowlevel.add_instrument(instrument)
                     try:
                         async with trio.open_nursery() as nursery:
                             for website in websites:
-                                nursery.start_soon(
-                                    launch_module, website, email, client, out
-                                )
-                    except Exception as nursery_error:
-                        # Handle Trio MultiError to extract individual exceptions
+                                nursery.start_soon(run_with_limit, website)
+                    except BaseException as nursery_error:
                         if hasattr(nursery_error, "exceptions"):
-                            # Log individual exceptions for debugging
                             for exc in nursery_error.exceptions:
                                 logger.debug(
                                     f"Holehe: Exception in module: {type(exc).__name__}: {exc}"

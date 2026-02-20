@@ -89,6 +89,13 @@ class PhoneLookupOrchestrator:
                 tasks.append(_aitan_task())
                 service_names.append("aitan")
 
+            logger.debug(
+                "Phone lookup service list built: service_names=%s, task_count=%s, is_advance=%s",
+                service_names,
+                len(tasks),
+                is_advance,
+            )
+
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             # Combine results
@@ -102,6 +109,7 @@ class PhoneLookupOrchestrator:
                 },
             }
 
+            service_summaries = []
             for i, result in enumerate(results):
                 service_name = service_names[i]
                 if isinstance(result, Exception):
@@ -111,11 +119,42 @@ class PhoneLookupOrchestrator:
                     logger.error(
                         f"Phone lookup service {service_name} failed: {result}"
                     )
+                    service_summaries.append(
+                        {
+                            "service": service_name,
+                            "is_exception": True,
+                            "has_error": True,
+                            "found": False,
+                        }
+                    )
                 else:
                     combined_data["lookup_results"][service_name] = result
                     if result.get("found", False):
                         combined_data["summary"]["successful_sources"] += 1
                         combined_data["summary"]["found_data"] = True
+                    service_summaries.append(
+                        {
+                            "service": service_name,
+                            "is_exception": False,
+                            "has_error": (
+                                "error" in result if isinstance(result, dict) else False
+                            ),
+                            "found": (
+                                result.get("found", False)
+                                if isinstance(result, dict)
+                                else False
+                            ),
+                            "keys": (
+                                list(result.keys()) if isinstance(result, dict) else []
+                            ),
+                        }
+                    )
+
+            logger.debug(
+                "Phone lookup service summaries: summary=%s, service_summaries=%s",
+                combined_data["summary"],
+                service_summaries,
+            )
 
             # Extract emails from results and search Skype
             emails = self._extract_emails_from_results(results, service_names)

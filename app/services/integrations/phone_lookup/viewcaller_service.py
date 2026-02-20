@@ -4,6 +4,8 @@ import logging
 from typing import Any
 
 from app.core.config import settings
+from app.core.lookup_extractor import extract_items
+from app.core.lookup_specs import PHONE_LOOKUP_SPECS
 from app.core.resilience import ResilientHttpClient
 
 logger = logging.getLogger(__name__)
@@ -44,7 +46,9 @@ class ViewCallerService:
 
             if "data" in data and len(data["data"]) > 0:
                 # Format ViewCaller response
-                formatted_data = self._format_response(data["data"])
+                formatted_data = extract_items(
+                    data["data"][0], PHONE_LOOKUP_SPECS["viewcaller"]
+                )
                 return {
                     "found": True,
                     "source": "viewcaller",
@@ -68,35 +72,3 @@ class ViewCallerService:
                 "error": str(e),
                 "_raw_response": raw_response,
             }
-
-    def _format_response(self, data: list) -> list[dict]:
-        """Format ViewCaller response to standard format"""
-        formatted_response = []
-
-        if len(data) > 0 and isinstance(data, list):
-            # Extract names from the first item
-            if "names" in data[0]:
-                for item in data[0]["names"]:
-                    formatted_response.append(
-                        {
-                            "source": "viewcaller",
-                            "type": "name",
-                            "value": item["name"],
-                            "showSource": False,
-                            "category": "TEXT",
-                        }
-                    )
-
-            # Extract main name if available
-            if "name" in data[0]:
-                formatted_response.append(
-                    {
-                        "source": "viewcaller",
-                        "type": "name",
-                        "value": data[0]["name"],
-                        "showSource": False,
-                        "category": "TEXT",
-                    }
-                )
-
-        return formatted_response

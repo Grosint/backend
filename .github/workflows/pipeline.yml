@@ -518,6 +518,7 @@ jobs:
                       SECRET_KEY=${{ secrets.SECRET_KEY }}
                       ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
                       ENVIRONMENT=production
+                      FRONTEND_URL=${{ secrets.FRONTEND_URL }}
 
                       # Azure Email Configuration
                       AZURE_EMAIL_ENDPOINT=${{ secrets.AZURE_EMAIL_ENDPOINT }}
@@ -529,12 +530,19 @@ jobs:
                       AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
                       AZURE_STORAGE_CONTAINER_NAME=${{ secrets.AZURE_STORAGE_CONTAINER_NAME }}
 
+                      # Cashfree Payment Gateway Configuration
+                      CASHFREE_PAYMENT_APP_ID=${{ secrets.CASHFREE_PAYMENT_APP_ID }}
+                      CASHFREE_PAYMENT_SECRET=${{ secrets.CASHFREE_PAYMENT_SECRET }}
+                      CASHFREE_WEBHOOK_SECRET=${{ secrets.CASHFREE_WEBHOOK_SECRET }}
+
                       # External API Keys
                       RAPIDAPI_KEY=${{ secrets.RAPIDAPI_KEY }}
                       LEAK_CHECK_API_KEY=${{ secrets.LEAK_CHECK_API_KEY }}
                       HLR_API_KEY=${{ secrets.HLR_API_KEY }}
                       AITAN_API_KEY=${{ secrets.AITAN_API_KEY }}
                       BEFISC_API_KEY=${{ secrets.BEFISC_API_KEY }}
+                      NUMCHECKR_API_KEY=${{ secrets.NUMCHECKR_API_KEY }}
+                      VPNAPI_IO_API_KEY=${{ secrets.VPNAPI_IO_API_KEY }}
 
                       # Telegram Configuration (Account 1)
                       TELEGRAM_API_ID_1=${{ secrets.TELEGRAM_API_ID_1 }}

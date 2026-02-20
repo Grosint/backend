@@ -20,6 +20,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.core.response_utils import normalize_source_or_type
 from app.schemas.admin import PhoneLookupDebugRequest, ServiceTestResponse
 from app.schemas.response import SuccessResponse
 from app.services.integrations.phone_lookup.aitan import AITANService
@@ -125,6 +126,24 @@ async def test_phone_lookup_service(
         if request.include_raw_response and isinstance(result, dict):
             raw_response = result.get("_raw_response")
 
+        if service_name_lower in [
+            "truecaller",
+            "viewcaller",
+            "eyecon",
+            "callapp",
+            "whatsapp",
+            "hlr",
+            "ignorant",
+            "leakcheck",
+            "aitan",
+            "befisc",
+        ] and isinstance(result, dict):
+            result = dict(result)
+            result.pop("_raw_response", None)
+
+        if isinstance(result, dict):
+            result = normalize_source_or_type(result)
+
         response_data = ServiceTestResponse(
             service_name=service_name_lower,
             success=is_success,
@@ -210,15 +229,20 @@ async def test_all_phone_lookup_services(
                 }
             else:
                 is_success = isinstance(result, dict) and not result.get("error")
-                # Extract raw response if requested
-                raw_response = None
-                if request.include_raw_response and isinstance(result, dict):
-                    raw_response = result.get("_raw_response")
-
+                data = (
+                    normalize_source_or_type(result)
+                    if isinstance(result, dict)
+                    else None
+                )
+                raw_response = (
+                    result.get("_raw_response")
+                    if request.include_raw_response and isinstance(result, dict)
+                    else None
+                )
                 service_results[service_name] = {
                     "success": is_success,
                     "found": result.get("found") if isinstance(result, dict) else None,
-                    "data": result if request.include_raw_response else None,
+                    "data": data,
                     "error": result.get("error") if isinstance(result, dict) else None,
                     "raw_response": raw_response,
                 }

@@ -6,6 +6,8 @@ from typing import Any
 from phone_iso3166.country import phone_country
 
 from app.core.config import settings
+from app.core.lookup_extractor import extract_items
+from app.core.lookup_specs import PHONE_LOOKUP_SPECS
 from app.core.resilience import ResilientHttpClient
 
 logger = logging.getLogger(__name__)
@@ -89,7 +91,9 @@ class TrueCallerService:
 
             if "data" in data and len(data["data"]) > 0:
                 # Format TrueCaller response
-                formatted_data = self._format_response(data["data"][0])
+                formatted_data = extract_items(
+                    data["data"][0], PHONE_LOOKUP_SPECS["truecaller"]
+                )
                 return {
                     "found": True,
                     "source": "truecaller",
@@ -108,88 +112,3 @@ class TrueCallerService:
         except Exception as e:
             logger.error(f"TrueCaller search failed: {e}")
             return {"found": False, "error": str(e)}
-
-    def _format_response(self, data: dict) -> list[dict]:
-        """Format TrueCaller response to standard format"""
-        formatted_response = []
-
-        # Extract name
-        if "name" in data:
-            formatted_response.append(
-                {
-                    "source": "truecaller",
-                    "type": "name",
-                    "value": data["name"],
-                    "showSource": False,
-                    "category": "TEXT",
-                }
-            )
-
-        # Extract email from internet addresses
-        if "internetAddresses" in data and len(data["internetAddresses"]) > 0:
-            if "caption" in data["internetAddresses"][0]:
-                formatted_response.append(
-                    {
-                        "source": "truecaller",
-                        "type": "name",
-                        "value": data["internetAddresses"][0]["caption"],
-                        "showSource": False,
-                        "category": "TEXT",
-                    }
-                )
-            if "id" in data["internetAddresses"][0]:
-                formatted_response.append(
-                    {
-                        "source": "truecaller",
-                        "type": "email",
-                        "value": data["internetAddresses"][0]["id"],
-                        "showSource": False,
-                        "category": "TEXT",
-                    }
-                )
-            else:
-                formatted_response.append(
-                    {
-                        "source": "Email",
-                        "type": "email",
-                        "value": "Not Available",
-                        "showSource": True,
-                        "category": "TEXT",
-                    }
-                )
-        else:
-            formatted_response.append(
-                {
-                    "source": "Email",
-                    "type": "email",
-                    "value": "Not Available",
-                    "showSource": True,
-                    "category": "TEXT",
-                }
-            )
-
-        # Extract address
-        if "addresses" in data and len(data["addresses"]) > 0:
-            temp = data["addresses"][0]
-            address = f"{temp.get('street', '')}, {temp.get('city', '')}, {temp.get('address', '')}, {temp.get('countryCode', '')}, {temp.get('zipCode', '')}"
-            formatted_response.append(
-                {
-                    "source": "Mobile Activity",
-                    "type": "location",
-                    "value": address,
-                    "showSource": True,
-                    "category": "TEXT",
-                }
-            )
-        else:
-            formatted_response.append(
-                {
-                    "source": "Mobile Activity",
-                    "type": "location",
-                    "value": "Not Available",
-                    "showSource": False,
-                    "category": "TEXT",
-                }
-            )
-
-        return formatted_response

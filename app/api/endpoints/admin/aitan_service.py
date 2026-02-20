@@ -36,6 +36,19 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _strip_raw_from_data(data: Any) -> Any:
+    """Recursively remove _raw_response and _raw_data from data (exposed at raw_response level)."""
+    if isinstance(data, dict):
+        return {
+            k: _strip_raw_from_data(v)
+            for k, v in data.items()
+            if k not in ("_raw_response", "_raw_data")
+        }
+    if isinstance(data, list):
+        return [_strip_raw_from_data(item) for item in data]
+    return data
+
+
 # Phone Lookup Endpoints
 @router.post("/phone", response_model=SuccessResponse[ServiceTestResponse])
 async def test_aitan_phone_lookup(request: PhoneLookupDebugRequest):
@@ -73,17 +86,20 @@ async def test_aitan_phone_lookup(request: PhoneLookupDebugRequest):
                 and not result.get("error")
             )
 
-            # Extract raw response from service result
+            # Extract raw response from service result (strip from data to avoid duplication)
             raw_response = None
             if request.include_raw_response and isinstance(result, dict):
                 raw_response = result.get("_raw_response")
+            data_clean = (
+                _strip_raw_from_data(result) if isinstance(result, dict) else None
+            )
 
             response_data = ServiceTestResponse(
                 service_name="aitan-phone",
                 success=is_success,
                 execution_time_ms=round(execution_time, 2),
                 found=result.get("found") if isinstance(result, dict) else None,
-                data=result if isinstance(result, dict) else None,
+                data=data_clean,
                 error=(
                     str(result)
                     if isinstance(result, Exception)
@@ -201,17 +217,20 @@ async def test_aitan_vehicle_lookup(request: AITANVehicleLookupRequest):
                 and not result.get("error")
             )
 
-            # Extract raw response from service result
+            # Extract raw response from service result (strip from data to avoid duplication)
             raw_response = None
             if request.include_raw_response and isinstance(result, dict):
                 raw_response = result.get("_raw_response")
+            data_clean = (
+                _strip_raw_from_data(result) if isinstance(result, dict) else None
+            )
 
             response_data = ServiceTestResponse(
                 service_name="aitan-vehicle",
                 success=is_success,
                 execution_time_ms=round(execution_time, 2),
                 found=result.get("found") if isinstance(result, dict) else None,
-                data=result if isinstance(result, dict) else None,
+                data=data_clean,
                 error=(
                     str(result)
                     if isinstance(result, Exception)
@@ -258,13 +277,16 @@ async def test_aitan_rc_advance(request: AITANVehicleLookupRequest):
             raw_response = None
             if request.include_raw_response and isinstance(result, dict):
                 raw_response = result.get("_raw_response")
+            data_clean = (
+                _strip_raw_from_data(result) if isinstance(result, dict) else None
+            )
 
             response_data = ServiceTestResponse(
                 service_name="aitan-rc-advance",
                 success=is_success,
                 execution_time_ms=round(execution_time, 2),
                 found=result.get("found") if isinstance(result, dict) else None,
-                data=result if isinstance(result, dict) else None,
+                data=data_clean,
                 error=result.get("error") if isinstance(result, dict) else None,
                 raw_response=raw_response,
             )
@@ -304,13 +326,16 @@ async def test_aitan_challan_advance(request: AITANVehicleLookupRequest):
             raw_response = None
             if request.include_raw_response and isinstance(result, dict):
                 raw_response = result.get("_raw_response")
+            data_clean = (
+                _strip_raw_from_data(result) if isinstance(result, dict) else None
+            )
 
             response_data = ServiceTestResponse(
                 service_name="aitan-challan-advance",
                 success=is_success,
                 execution_time_ms=round(execution_time, 2),
                 found=result.get("found") if isinstance(result, dict) else None,
-                data=result if isinstance(result, dict) else None,
+                data=data_clean,
                 error=result.get("error") if isinstance(result, dict) else None,
                 raw_response=raw_response,
             )
@@ -351,13 +376,16 @@ async def test_aitan_chassis_to_rc(request: AITANVehicleLookupRequest):
             raw_response = None
             if request.include_raw_response and isinstance(result, dict):
                 raw_response = result.get("_raw_response")
+            data_clean = (
+                _strip_raw_from_data(result) if isinstance(result, dict) else None
+            )
 
             response_data = ServiceTestResponse(
                 service_name="aitan-chassis-to-rc",
                 success=is_success,
                 execution_time_ms=round(execution_time, 2),
                 found=result.get("found") if isinstance(result, dict) else None,
-                data=result if isinstance(result, dict) else None,
+                data=data_clean,
                 error=result.get("error") if isinstance(result, dict) else None,
                 raw_response=raw_response,
             )
@@ -397,13 +425,16 @@ async def test_aitan_fasttag_history(request: AITANVehicleLookupRequest):
             raw_response = None
             if request.include_raw_response and isinstance(result, dict):
                 raw_response = result.get("_raw_response")
+            data_clean = (
+                _strip_raw_from_data(result) if isinstance(result, dict) else None
+            )
 
             response_data = ServiceTestResponse(
                 service_name="aitan-fasttag-history",
                 success=is_success,
                 execution_time_ms=round(execution_time, 2),
                 found=result.get("found") if isinstance(result, dict) else None,
-                data=result if isinstance(result, dict) else None,
+                data=data_clean,
                 error=result.get("error") if isinstance(result, dict) else None,
                 raw_response=raw_response,
             )

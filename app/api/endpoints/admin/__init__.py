@@ -12,6 +12,7 @@ from app.api.endpoints.admin import (
     email_lookup,
     phone_lookup,
     services,
+    simple_lookup,
     user_management,
 )
 
@@ -27,3 +28,4 @@ router.include_router(befisc_service.router, tags=["Admin Debug - Befisc Service
 router.include_router(
     aitan_service.router, prefix="/aitan", tags=["Admin Debug - AITAN Service"]
 )
+router.include_router(simple_lookup.router, tags=["Admin Debug - Simple Lookups"])

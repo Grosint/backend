@@ -564,6 +564,14 @@ class BefiscService:
                 "_raw_response": {"error": str(e)},
             }
 
+    async def bank_search(self, account_no: str, ifsc_code: str) -> dict[str, Any]:
+        """Bank account verification search (public API)."""
+        return await self._bank_search(account_no, ifsc_code)
+
+    async def upi_search(self, upi: str) -> dict[str, Any]:
+        """UPI search (public API)."""
+        return await self._upi_search(upi)
+
     async def _bank_search(self, account_no: str, ifsc_code: str) -> dict[str, Any]:
         """Bank account verification search"""
         try:
@@ -1015,51 +1023,18 @@ class BefiscService:
         return formatted_response
 
     def _process_pan_response(self, data: dict) -> dict:
-        """Process PAN response"""
-        formatted_response = {}
+        """Process PAN response - returns full result structure for rich data."""
         result = data.get("result", {})
-        if "result" in data:
-            for key, value in result.items():
-                if isinstance(value, str):
-                    formatted_response[key] = value
-                elif key == "address" and isinstance(value, dict):
-                    formatted_response["full_address"] = value.get("full", "")
-                elif key == "din_info" and isinstance(value, dict):
-                    company_list = value.get("company_list", [])
-                    for index, company in enumerate(company_list):
-                        for cl_key, cl_value in company.items():
-                            formatted_response[f"{cl_key}_{index + 1}"] = cl_value
-                    for din_key, din_value in value.items():
-                        if din_key != "company_list":
-                            formatted_response[din_key] = din_value
-        else:
-            formatted_response = {"Error": "Data Not Found for Given PAN"}
-
-        return formatted_response
+        if "result" in data and result:
+            return dict(result)
+        return {"Error": "Data Not Found for Given PAN"}
 
     def _process_license_data(self, data: dict) -> dict:
-        """Process driving license data"""
-        formatted_response = {}
+        """Process driving license data - returns full result structure for rich data."""
         result = data.get("result", {})
         if result:
-            for key, value in result.items():
-                if isinstance(value, str) and key != "user_image":
-                    formatted_response[key] = value
-                elif key == "user_address":
-                    for index, address in enumerate(value):
-                        formatted_response[f"complete_address_{index + 1}"] = (
-                            address.get("completeAddress", "Not Available")
-                        )
-                elif key == "vehicle_category_details":
-                    for index, category in enumerate(value):
-                        for k, v in category.items():
-                            formatted_response[f"vehicle_category_{k}_{index + 1}"] = (
-                                v if v is not None else "Not Available"
-                            )
-        else:
-            formatted_response = {"Error": "Data Not Found for Given DL Number"}
-
-        return formatted_response
+            return dict(result)
+        return {"Error": "Data Not Found for Given DL Number"}
 
     def _process_voter_id_data(self, data: dict) -> dict:
         """Process voter ID data"""

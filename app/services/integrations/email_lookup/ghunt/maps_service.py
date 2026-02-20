@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 from ghunt.helpers.gmaps import get_reviews
 
-# Ensure GHunt gmaps helpers are patched before importing get_reviews
+# Patch must be applied BEFORE importing get_reviews so the local binding captures the patched version
 from app.services.integrations.email_lookup.ghunt import gmaps_patch  # noqa: F401
 from app.services.integrations.email_lookup.ghunt.credentials_manager import (
     GHuntCredentialsManager,

@@ -13,7 +13,9 @@ from typing import Any
 from app.core.config import settings
 
 # Constants for vehicle RC processing
+# Supports both legacy and new AITAN API field names
 VEHICLE_INFO_AITAN = [
+    # Legacy names
     "vehicle_no",
     "registration_no",
     "chassis_no",
@@ -29,16 +31,70 @@ VEHICLE_INFO_AITAN = [
     "permit_upto",
     "permit_type",
     "financer",
-    "owner_name",
-    "owner_father_name",
-    "owner_address",
     "rc_status",
     "vehicle_color",
     "norms",
     "vehicle_category",
+    # New API field names (rc-advance v2)
+    "state_code",
+    "state",
+    "office_code",
+    "office_name",
+    "reg_no",
+    "reg_date",
+    "purchase_date",
+    "owner_count",
+    "vehicle_class_desc",
+    "vehicle_manufacturer_name",
+    "model_code",
+    "model",
+    "body_type",
+    "cylinders_no",
+    "vehicle_hp",
+    "vehicle_seat_capacity",
+    "vehicle_standing_capacity",
+    "vehicle_sleeper_capacity",
+    "unladen_weight",
+    "vehicle_gross_weight",
+    "vehicle_gross_comb_weight",
+    "fuel_descr",
+    "color",
+    "manufacturing_mon",
+    "manufacturing_yr",
+    "norms_descr",
+    "wheelbase",
+    "cubic_cap",
+    "floor_area",
+    "ac_fitted",
+    "audio_fitted",
+    "video_fitted",
+    "vehicle_catg",
+    "dealer_code",
+    "dealer_name",
+    "dealer_address_line1",
+    "dealer_address_line2",
+    "dealer_address_line3",
+    "dealer_district",
+    "dealer_pincode",
+    "dealer_full_address",
+    "sale_amount",
+    "length",
+    "width",
+    "height",
+    "reg_upto",
+    "fit_upto",
+    "tax_upto",
+    "annual_income",
+    "imported_vehicle",
+    "status",
+    "blacklist_status",
+    "blacklist_status_desc",
+    "vehicle_type",
+    "tax_mode",
 ]
 
 OWNER_INFO_AITAN = [
+    # Legacy names
     "owner_name",
     "owner_father_name",
     "owner_address",
@@ -46,14 +102,55 @@ OWNER_INFO_AITAN = [
     "split_present_address",
     "owner_mobile",
     "owner_email",
+    # New API field names
+    "current_address_line1",
+    "current_address_line2",
+    "current_address_line3",
+    "current_district_name",
+    "current_state",
+    "current_state_name",
+    "current_pincode",
+    "current_full_address",
+    "permanent_address_line1",
+    "permanent_address_line2",
+    "permanent_address_line3",
+    "permanent_district_name",
+    "permanent_state",
+    "permanent_state_name",
+    "permanent_pincode",
+    "permanent_full_address",
+    "owner_code_descr",
+    "reg_type_descr",
+    "mobile_no",
+    "email_id",
+    "pan_no",
+    "aadhar_no",
+    "passport_no",
+    "ration_card_no",
+    "voter_id",
+    "dl_no",
 ]
 
+# Identity fields that require explicit permission to include in output
+SENSITIVE_OWNER_FIELDS = frozenset(
+    {"pan_no", "aadhar_no", "passport_no", "ration_card_no", "voter_id", "dl_no"}
+)
+
+# Insurance: supports legacy and new API field names (from vehicle_insurance_details)
 INSURANCE_INFO_AITAN = [
     "insurance_company",
     "insurance_policy_no",
     "insurance_valid_from",
     "insurance_valid_to",
     "insurance_upto",
+    # New API field names
+    "insurance_from",
+    "insurance_company_code",
+    "insurance_company_name",
+    "policy_no",
+    "opdt",
+    "vahan_verify",
+    "reg_no",
 ]
 
 logger = logging.getLogger(__name__)
@@ -70,6 +167,11 @@ class AITANVehicleService:
             "chassis_to_rc",
             "mobile_to_fasttag_history",
         ],
+        # Narrowed lookups for production vehicle-lookup API
+        "rc": ["rc_advance"],
+        "fast-tag": ["mobile_to_fasttag_history"],
+        "chassis": ["chassis_to_rc", "rc_advance"],
+        "all": ["rc_advance", "chassis_to_rc", "mobile_to_fasttag_history"],
     }
 
     def __init__(self, parent_service):
@@ -246,9 +348,9 @@ class AITANVehicleService:
             }
 
     async def _challan_advance(self, vehicle_number: str) -> dict[str, Any]:
-        """Challan advance lookup"""
+        """Challan lookup via AITAN challan API (replaces deprecated challan-plus)"""
         try:
-            url = f"{self.base_url}/api/v1/challan-plus"
+            url = f"{self.base_url_com}/api/v1/challan"
             headers = {
                 "content-type": "application/json",
                 "apiKey": settings.AITAN_API_KEY,
@@ -256,7 +358,7 @@ class AITANVehicleService:
             payload = {
                 "reg_no": vehicle_number,
                 "consent": "yes",
-                "consent_text": "I give my consent to to check my challan details",
+                "consent_text": "I hear by declare my consent agreement for fetching my information via AITAN Labs API",
             }
 
             response = await self.client.request(
@@ -270,8 +372,14 @@ class AITANVehicleService:
             data = response.json()
             raw_response = data
 
-            if "result" in data and len(data["result"]):
-                formatted_response = self._process_challan_advance(data["result"])
+            result = data.get("result") if isinstance(data, dict) else None
+            has_challans = isinstance(result, dict) and (
+                len(result.get("pending_challan", []) or [])
+                + len(result.get("disposed_challan", []) or [])
+                > 0
+            )
+            if has_challans:
+                formatted_response = self._process_challan_advance(result)
                 return {
                     "found": True,
                     "data": formatted_response,
@@ -317,8 +425,9 @@ class AITANVehicleService:
             data = response.json()
             raw_response = data
 
-            if "result" in data:
-                formatted_response = self._process_chassis_to_rc(data["result"])
+            result = data.get("result")
+            if result is not None:
+                formatted_response = self._process_chassis_to_rc(result)
                 return {
                     "found": True,
                     "data": formatted_response,
@@ -407,24 +516,28 @@ class AITANVehicleService:
                 # Handle insurance details
                 insurance_info = value
                 for ins_key, ins_value in insurance_info.items():
+                    if ins_key not in INSURANCE_INFO_AITAN:
+                        continue
+                    if not self._is_valid_value_aitan(ins_value):
+                        ins_value = "Not Available"
                     ins_key_value = ins_key.replace("_", " ").upper()
-                    if ins_key in INSURANCE_INFO_AITAN:
-                        final_data.setdefault("Insurance Info", {})[
-                            ins_key_value
-                        ] = ins_value
+                    final_data.setdefault("Insurance Info", {})[
+                        ins_key_value
+                    ] = ins_value
 
         return final_data
 
     def _process_challan_advance(self, result: dict) -> dict:
-        """Process challan advance response"""
-        # Handle nested result structure
-        challan_data = (
-            result.get("data")
-            if "data" in result
-            else result.get("result", {}).get("data", [])
-        )
+        """Process challan API response (pending_challan + disposed_challan)"""
+        pending = result.get("pending_challan") or []
+        disposed = result.get("disposed_challan") or []
+        if not isinstance(pending, list):
+            pending = []
+        if not isinstance(disposed, list):
+            disposed = []
+        challan_data = pending + disposed
 
-        if not challan_data or not isinstance(challan_data, list):
+        if not challan_data:
             return {"Challan Info": {"Message": "Data Not Found"}}
 
         processed_data = []
@@ -443,9 +556,9 @@ class AITANVehicleService:
             )
         }
 
-    def _process_chassis_to_rc(self, result: dict) -> dict:
+    def _process_chassis_to_rc(self, result: dict | None) -> dict:
         """Process chassis to RC response"""
-        return {"Vehicle Info": result}
+        return {"Vehicle Info": result if result is not None else {}}
 
     def _process_fasttag_history(self, result: dict) -> dict:
         """Process FastTag history response"""
@@ -568,15 +681,40 @@ class AITANVehicleService:
         else:
             return data
 
+    def _is_authorized_for_sensitive_fields(
+        self, include_sensitive: bool = False
+    ) -> bool:
+        """Check whether the caller has permission to include sensitive identity fields.
+
+        Override or extend this hook to implement access control (e.g. role checks,
+        config flags). Default: False (omit sensitive fields).
+        """
+        return include_sensitive
+
+    def _mask_sensitive_value(self, value: str, visible_chars: int = 4) -> str:
+        """Partially redact a sensitive value for authorized access."""
+        if not value or len(str(value)) <= visible_chars:
+            return "****"
+        s = str(value).strip()
+        return "X" * (len(s) - visible_chars) + s[-visible_chars:]
+
     def _format_aitan_vehicle_response(
-        self, data: dict, func_name: str
+        self,
+        data: dict,
+        func_name: str,
+        include_sensitive: bool = False,
     ) -> list[dict[str, Any]]:
-        """Format AITAN vehicle response to standard format"""
+        """Format AITAN vehicle response to standard format.
+
+        Sensitive owner identity fields (pan_no, aadhar_no, etc.) are omitted
+        unless include_sensitive is True and is_authorized_for_sensitive_fields
+        permits. When permitted, values are masked (last 4 chars visible).
+        """
         formatted_response = []
 
         # Handle RC Advance response
         if "Vehicle Info" in data:
-            vehicle_info = data["Vehicle Info"]
+            vehicle_info = data["Vehicle Info"] or {}
             for key, value in vehicle_info.items():
                 if value and value != "Not Available" and value != "Data Not Found":
                     formatted_response.append(
@@ -590,12 +728,35 @@ class AITANVehicleService:
                     )
 
         if "Owner Info" in data:
-            owner_info = data["Owner Info"]
+            owner_info = data["Owner Info"] or {}
             for key, value in owner_info.items():
                 if value and value != "Not Available" and value != "Data Not Found":
+                    source_key = key.lower().replace(" ", "_")
+                    if source_key in SENSITIVE_OWNER_FIELDS:
+                        if not self._is_authorized_for_sensitive_fields(
+                            include_sensitive
+                        ):
+                            logger.info(
+                                "Sensitive owner field access denied (omitted): %s",
+                                source_key,
+                                extra={
+                                    "event": "sensitive_field_denied",
+                                    "field": source_key,
+                                },
+                            )
+                            continue
+                        value = self._mask_sensitive_value(str(value))
+                        logger.info(
+                            "Sensitive owner field access granted (masked): %s",
+                            source_key,
+                            extra={
+                                "event": "sensitive_field_masked",
+                                "field": source_key,
+                            },
+                        )
                     formatted_response.append(
                         {
-                            "source": key.lower().replace(" ", "_"),
+                            "source": source_key,
                             "type": "owner_details",
                             "value": str(value),
                             "showSource": True,
@@ -604,7 +765,7 @@ class AITANVehicleService:
                     )
 
         if "Insurance Info" in data:
-            insurance_info = data["Insurance Info"]
+            insurance_info = data["Insurance Info"] or {}
             for key, value in insurance_info.items():
                 if value and value != "Not Available" and value != "Data Not Found":
                     formatted_response.append(

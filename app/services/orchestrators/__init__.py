@@ -8,9 +8,13 @@ from app.services.orchestrators.phone_lookup_orchestrator import (
     PhoneLookupOrchestrator,
 )
 from app.services.orchestrators.search_orchestrator import SearchOrchestrator
+from app.services.orchestrators.vehicle_lookup_orchestrator import (
+    VehicleLookupOrchestrator,
+)
 
 __all__ = [
     "SearchOrchestrator",
     "EmailLookupOrchestrator",
     "PhoneLookupOrchestrator",
+    "VehicleLookupOrchestrator",
 ]
