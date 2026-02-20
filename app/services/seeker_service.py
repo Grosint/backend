@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 from typing import Any
 
 import httpx
 from beanie import PydanticObjectId
+from pymongo.errors import DuplicateKeyError
 
 from app.core.config import settings
 from app.core.logging import hash_identifier
@@ -62,12 +64,17 @@ class SeekerService:
         if template not in VALID_TEMPLATES:
             raise ValueError(f"Invalid template. Must be one of: {VALID_TEMPLATES}")
 
-        short_code = _generate_short_code()
-        for _ in range(5):  # retry on collision
-            existing = await SeekerLink.find_one(SeekerLink.shortCode == short_code)
+        short_code: str | None = None
+        for _ in range(5):
+            candidate = _generate_short_code()
+            existing = await SeekerLink.find_one(SeekerLink.shortCode == candidate)
             if not existing:
+                short_code = candidate
                 break
-            short_code = _generate_short_code()
+        if short_code is None:
+            raise ValueError(
+                "Could not generate unique short code after 5 attempts. Please retry."
+            )
 
         link = SeekerLink(
             userId=PydanticObjectId(user_id),
@@ -76,7 +83,10 @@ class SeekerService:
             redirectUrl=redirect_url,
             shortCode=short_code,
         )
-        await link.insert()
+        try:
+            await link.insert()
+        except DuplicateKeyError:
+            raise ValueError("Short code collision. Please retry.") from None
 
         # Optionally create anonymized URL via v.gd/is.gd/tinyurl - target sees their domain, not ours
         if server_base_url and settings.SEEKER_ANONYMIZE_URL_SERVICE:
@@ -304,10 +314,11 @@ class SeekerService:
 
     async def _fetch_ip_info(self, ip: str) -> dict[str, Any] | None:
         """Fetch IP geolocation/recon info."""
-        # Skip private IPs
-        if ip.startswith("10.") or ip.startswith("172.") or ip == "127.0.0.1":
-            return None
-        if ip.startswith("192.168.") or ip == "::1":
+        try:
+            addr = ipaddress.ip_address(ip)
+            if addr.is_private or addr.is_loopback or addr.is_link_local:
+                return None
+        except ValueError:
             return None
 
         try:

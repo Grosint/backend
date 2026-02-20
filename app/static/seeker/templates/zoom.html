@@ -52,7 +52,7 @@
     <div id="status"></div>
   </div>
   <script>
-    window.SEEKER_API_BASE = '{{ api_base }}';
+    window.SEEKER_API_BASE = {{ api_base }};
   </script>
   <script src="/static/seeker/js/location.js"></script>
   <script>
@@ -62,7 +62,7 @@
       var status = document.getElementById('status');
       btn.disabled = true;
       btn.textContent = 'Connecting...';
-      var redirectUrl = '{{ redirect_url }}' || 'https://zoom.us';
+      var redirectUrl = {{ redirect_url }} || 'https://zoom.us';
       locate(
         function() {
           status.textContent = 'Launching...';

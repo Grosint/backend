@@ -154,7 +154,7 @@ class Settings(BaseSettings):
     # Frontend URL for email links (password reset, etc.)
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://your-app.com")
 
-    # Seeker geolocation/device-info collection
+    # Seeker geolocation/device-info collection (opt-in; set SEEKER_ENABLED=true to enable)
     SEEKER_ENABLED: bool = os.getenv("SEEKER_ENABLED", "true").lower() in (
         "true",
         "1",
@@ -169,6 +169,10 @@ class Settings(BaseSettings):
     # v.gd | is.gd = free, no key | tinyurl = needs TINYURL_API_KEY
     SEEKER_ANONYMIZE_URL_SERVICE: str = os.getenv("SEEKER_ANONYMIZE_URL_SERVICE", "")
     TINYURL_API_KEY: str = os.getenv("TINYURL_API_KEY", "")
+    # Per-IP rate limit for public seeker endpoints (info/result); lower than global
+    SEEKER_PUBLIC_RATE_LIMIT_PER_MINUTE: int = int(
+        os.getenv("SEEKER_PUBLIC_RATE_LIMIT_PER_MINUTE", "20")
+    )
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

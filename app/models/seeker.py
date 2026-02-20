@@ -8,6 +8,7 @@ from typing import Any
 
 from beanie import Document, Indexed, Insert, Replace, before_event
 from pydantic import Field
+from pymongo import IndexModel
 
 from app.utils.validators import PyObjectId
 
@@ -30,6 +31,7 @@ class SeekerLink(Document):
         None  # anonymized URL from v.gd/is.gd/tinyurl - target sees this, not our server
     )
     createdAt: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updatedAt: datetime | None = None
     expiresAt: datetime | None = None
 
     @before_event([Insert, Replace])
@@ -37,16 +39,22 @@ class SeekerLink(Document):
         now = datetime.now(UTC)
         if self.createdAt is None:
             self.createdAt = now
+        self.updatedAt = now
 
     class Settings:
         name = "seeker_links"
         indexes = [
             "userId",
             "template",
-            "shortCode",
             [
                 ("createdAt", -1),
             ],
+            IndexModel(
+                [("shortCode", 1)],
+                name="shortCode_unique",
+                unique=True,
+                partialFilterExpression={"shortCode": {"$type": "string"}},
+            ),
         ]
 
 

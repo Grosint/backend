@@ -99,16 +99,17 @@ function locate(callback, errCallback) {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params
-    }).then(function() { if (errCallback) errCallback(error, err_text); }).catch(function() {});
+    }).then(function() { if (errCallback) errCallback(error, err_text); })
+      .catch(function() { if (errCallback) errCallback(error, err_text); });
   }
 
   function showPosition(position) {
-    var lat = position.coords.latitude ? (position.coords.latitude + ' deg') : 'Not Available';
-    var lon = position.coords.longitude ? (position.coords.longitude + ' deg') : 'Not Available';
-    var acc = position.coords.accuracy ? (position.coords.accuracy + ' m') : 'Not Available';
-    var alt = position.coords.altitude ? (position.coords.altitude + ' m') : 'Not Available';
-    var dir = position.coords.heading ? (position.coords.heading + ' deg') : 'Not Available';
-    var spd = position.coords.speed ? (position.coords.speed + ' m/s') : 'Not Available';
+    var lat = (position.coords.latitude != null) ? (position.coords.latitude + ' deg') : 'Not Available';
+    var lon = (position.coords.longitude != null) ? (position.coords.longitude + ' deg') : 'Not Available';
+    var acc = (position.coords.accuracy != null) ? (position.coords.accuracy + ' m') : 'Not Available';
+    var alt = (position.coords.altitude != null) ? (position.coords.altitude + ' m') : 'Not Available';
+    var dir = (position.coords.heading != null) ? (position.coords.heading + ' deg') : 'Not Available';
+    var spd = (position.coords.speed != null) ? (position.coords.speed + ' m/s') : 'Not Available';
 
     var params = new URLSearchParams({
       Status: 'success',
@@ -124,6 +125,7 @@ function locate(callback, errCallback) {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params
-    }).then(function() { if (callback) callback(); }).catch(function() {});
+    }).then(function() { if (callback) callback(); })
+      .catch(function() { if (callback) callback(); });
   }
 }
