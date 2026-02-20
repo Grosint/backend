@@ -445,6 +445,24 @@ jobs:
                   echo "Deployment URL: http://${{ secrets.DOMAIN_NAME }}:8000"
                   echo "DEPLOYMENT_URL=http://${{ secrets.DOMAIN_NAME }}:8000" >> $GITHUB_ENV
 
+            - name: Validate required secrets
+              run: |
+                  MISSING=""
+                  [ -z "${{ secrets.RAPIDAPI_KEY }}" ] && MISSING="${MISSING}RAPIDAPI_KEY "
+                  [ -z "${{ secrets.MONGODB_URL }}" ] && MISSING="${MISSING}MONGODB_URL "
+                  [ -z "${{ secrets.SECRET_KEY }}" ] && MISSING="${MISSING}SECRET_KEY "
+                  [ -z "${{ secrets.ENCRYPTION_KEY }}" ] && MISSING="${MISSING}ENCRYPTION_KEY "
+                  [ -z "${{ secrets.GRAFANA_ADMIN_PASSWORD }}" ] && MISSING="${MISSING}GRAFANA_ADMIN_PASSWORD "
+                  [ -z "${{ secrets.CASHFREE_PAYMENT_APP_ID }}" ] && MISSING="${MISSING}CASHFREE_PAYMENT_APP_ID "
+                  [ -z "${{ secrets.CASHFREE_PAYMENT_SECRET }}" ] && MISSING="${MISSING}CASHFREE_PAYMENT_SECRET "
+                  [ -z "${{ secrets.CASHFREE_WEBHOOK_SECRET }}" ] && MISSING="${MISSING}CASHFREE_WEBHOOK_SECRET "
+                  if [ -n "$MISSING" ]; then
+                    echo "::error::Missing or empty required secrets: $MISSING"
+                    echo "Please add these to GitHub Secrets (Settings → Secrets and variables → Actions)"
+                    exit 1
+                  fi
+                  echo "✅ All required secrets are present"
+
             - name: Download build artifacts
               uses: actions/download-artifact@v4
               with:
@@ -576,6 +594,17 @@ jobs:
                       EOF
                       echo "✅ .env file created with production secrets"
 
+                      # Validate critical env vars were written correctly
+                      echo "Validating .env file..."
+                      CRITICAL_VARS="RAPIDAPI_KEY MONGODB_URL SECRET_KEY ENCRYPTION_KEY CASHFREE_PAYMENT_APP_ID CASHFREE_PAYMENT_SECRET CASHFREE_WEBHOOK_SECRET"
+                      for var in $CRITICAL_VARS; do
+                        if ! grep -qE "^${var}=.+$" .env 2>/dev/null; then
+                          echo "ERROR: $var is missing or empty in .env - deployment aborted"
+                          exit 1
+                        fi
+                      done
+                      echo "✅ All critical env variables validated in .env"
+
                       # Create logs directory with proper permissions
                       sudo mkdir -p /opt/grosint-backend/logs
                       sudo chown $USER:$USER /opt/grosint-backend/logs
@@ -592,6 +621,7 @@ jobs:
                       # FastAPI runs as root, Nginx proxies to it (no direct file access needed)
                       sudo chown -R root:root /opt/grosint-backend
                       sudo chmod -R 755 /opt/grosint-backend
+                      sudo chmod 600 /opt/grosint-backend/.env
 
                       # Only give www-data access to logs (if Nginx needs to write logs)
                       sudo chown -R www-data:www-data /opt/grosint-backend/logs
