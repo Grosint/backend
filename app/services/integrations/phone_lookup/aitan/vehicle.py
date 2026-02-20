@@ -131,6 +131,11 @@ OWNER_INFO_AITAN = [
     "dl_no",
 ]
 
+# Identity fields that require explicit permission to include in output
+SENSITIVE_OWNER_FIELDS = frozenset(
+    {"pan_no", "aadhar_no", "passport_no", "ration_card_no", "voter_id", "dl_no"}
+)
+
 # Insurance: supports legacy and new API field names (from vehicle_insurance_details)
 INSURANCE_INFO_AITAN = [
     "insurance_company",
@@ -676,10 +681,35 @@ class AITANVehicleService:
         else:
             return data
 
+    def _is_authorized_for_sensitive_fields(
+        self, include_sensitive: bool = False
+    ) -> bool:
+        """Check whether the caller has permission to include sensitive identity fields.
+
+        Override or extend this hook to implement access control (e.g. role checks,
+        config flags). Default: False (omit sensitive fields).
+        """
+        return include_sensitive
+
+    def _mask_sensitive_value(self, value: str, visible_chars: int = 4) -> str:
+        """Partially redact a sensitive value for authorized access."""
+        if not value or len(str(value)) <= visible_chars:
+            return "****"
+        s = str(value).strip()
+        return "X" * (len(s) - visible_chars) + s[-visible_chars:]
+
     def _format_aitan_vehicle_response(
-        self, data: dict, func_name: str
+        self,
+        data: dict,
+        func_name: str,
+        include_sensitive: bool = False,
     ) -> list[dict[str, Any]]:
-        """Format AITAN vehicle response to standard format"""
+        """Format AITAN vehicle response to standard format.
+
+        Sensitive owner identity fields (pan_no, aadhar_no, etc.) are omitted
+        unless include_sensitive is True and is_authorized_for_sensitive_fields
+        permits. When permitted, values are masked (last 4 chars visible).
+        """
         formatted_response = []
 
         # Handle RC Advance response
@@ -701,9 +731,32 @@ class AITANVehicleService:
             owner_info = data["Owner Info"] or {}
             for key, value in owner_info.items():
                 if value and value != "Not Available" and value != "Data Not Found":
+                    source_key = key.lower().replace(" ", "_")
+                    if source_key in SENSITIVE_OWNER_FIELDS:
+                        if not self._is_authorized_for_sensitive_fields(
+                            include_sensitive
+                        ):
+                            logger.info(
+                                "Sensitive owner field access denied (omitted): %s",
+                                source_key,
+                                extra={
+                                    "event": "sensitive_field_denied",
+                                    "field": source_key,
+                                },
+                            )
+                            continue
+                        value = self._mask_sensitive_value(str(value))
+                        logger.info(
+                            "Sensitive owner field access granted (masked): %s",
+                            source_key,
+                            extra={
+                                "event": "sensitive_field_masked",
+                                "field": source_key,
+                            },
+                        )
                     formatted_response.append(
                         {
-                            "source": key.lower().replace(" ", "_"),
+                            "source": source_key,
                             "type": "owner_details",
                             "value": str(value),
                             "showSource": True,

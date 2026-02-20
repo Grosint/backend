@@ -155,9 +155,9 @@ async def _call_befisc_service(
     elif request.lookup_type == "bank-lookup":
         # For bank lookup, try account/IFSC first, then UPI
         if request.account_no and request.ifsc_code:
-            return await service._bank_search(request.account_no, request.ifsc_code)
+            return await service.bank_search(request.account_no, request.ifsc_code)
         elif request.upi:
-            return await service._upi_search(request.upi)
+            return await service.upi_search(request.upi)
         else:
             return {
                 "found": False,

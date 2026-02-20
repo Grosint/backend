@@ -30,9 +30,9 @@ class BankLookupAdapter(OSINTAdapter):
             logger.info("BankLookupAdapter: Searching bank info")
 
             if account_no and ifsc_code:
-                result = await self.befisc._bank_search(account_no, ifsc_code)
+                result = await self.befisc.bank_search(account_no, ifsc_code)
             elif upi:
-                result = await self.befisc._upi_search(upi)
+                result = await self.befisc.upi_search(upi)
             else:
                 result = {
                     "found": False,

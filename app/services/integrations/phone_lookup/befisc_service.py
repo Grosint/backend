@@ -564,6 +564,14 @@ class BefiscService:
                 "_raw_response": {"error": str(e)},
             }
 
+    async def bank_search(self, account_no: str, ifsc_code: str) -> dict[str, Any]:
+        """Bank account verification search (public API)."""
+        return await self._bank_search(account_no, ifsc_code)
+
+    async def upi_search(self, upi: str) -> dict[str, Any]:
+        """UPI search (public API)."""
+        return await self._upi_search(upi)
+
     async def _bank_search(self, account_no: str, ifsc_code: str) -> dict[str, Any]:
         """Bank account verification search"""
         try:

@@ -260,12 +260,11 @@ async def test_all_email_lookup_services(
                 }
             else:
                 is_success = isinstance(result, dict) and not result.get("error")
-                # Extract raw response if requested (remove from data to avoid duplication)
-                raw_response = None
-                if request.include_raw_response and isinstance(result, dict):
-                    raw_response = result.pop("_raw_response", None)
                 data_clean = (
-                    _remove_raw_response(result)
+                    _remove_raw_response(result) if isinstance(result, dict) else None
+                )
+                raw_response = (
+                    result.get("_raw_response")
                     if request.include_raw_response and isinstance(result, dict)
                     else None
                 )

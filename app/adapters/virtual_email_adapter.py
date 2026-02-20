@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from app.adapters.base import OSINTAdapter
+from app.core.logging import sanitize_log_data
 from app.services.integrations.virtual_email.email_intelligence_service import (
     EmailIntelligenceService,
 )
@@ -24,7 +25,8 @@ class VirtualEmailAdapter(OSINTAdapter):
     async def search_virtual_email(self, email: str) -> dict[str, Any]:
         """Check if email is virtual/disposable."""
         try:
-            logger.info(f"VirtualEmailAdapter: Checking {email}")
+            sanitized = sanitize_log_data({"email": email}).get("email", "***")
+            logger.info("VirtualEmailAdapter: Checking %s", sanitized)
 
             result = await self.service.check_email(email)
 

@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from app.adapters.base import OSINTAdapter
+from app.core.logging import mask_phone_number
 from app.services.integrations.virtual_number.numcheckr_service import NumCheckrService
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,8 @@ class VirtualNumberAdapter(OSINTAdapter):
     ) -> dict[str, Any]:
         """Check if phone number is virtual."""
         try:
-            logger.info(f"VirtualNumberAdapter: Checking {phone_number}")
+            masked = mask_phone_number(phone_number)
+            logger.debug("VirtualNumberAdapter: Checking %s", masked)
 
             result = await self.service.check_number(phone_number, country_code)
 

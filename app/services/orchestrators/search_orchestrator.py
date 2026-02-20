@@ -2,6 +2,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
+from urllib.parse import parse_qs
 
 from beanie import PydanticObjectId
 from bson import ObjectId
@@ -711,12 +712,31 @@ class SearchOrchestrator:
         return country_code, phone
 
     def _parse_vehicle_query(self, query: str) -> tuple[str | None, str | None, str]:
-        """Parse vehicle query into vehicle_number, chassis_number, lookup_type"""
+        """Parse vehicle query into vehicle_number, chassis_number, lookup_type.
+
+        Supports URL-encoded format (veh=...&ch=...&type=...) and legacy
+        pipe-delimited format for backward compatibility.
+        """
         vehicle_number = query
         chassis_number = None
         lookup_type = "all"
 
-        if "veh=" in query or "type=" in query:
+        # URL-encoded format (e.g. veh=ABC&ch=XYZ&type=rc)
+        if "&" in query and "veh=" in query:
+            parsed = parse_qs(query)
+
+            def _first(key: str, default: str | None = None) -> str | None:
+                vals = parsed.get(key)
+                if vals and vals[0]:
+                    v = vals[0].strip()
+                    return v or None
+                return default
+
+            vehicle_number = _first("veh")
+            chassis_number = _first("ch")
+            lookup_type = _first("type") or "all"
+        elif "veh=" in query or "type=" in query:
+            # Legacy pipe-delimited format
             parts = [p for p in query.split("|") if p]
             for part in parts:
                 if part.startswith("veh="):

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from urllib.parse import urlencode
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -263,9 +264,14 @@ async def create_vehicle_lookup_search(
                 detail="vehicle_number is required for this lookup type",
             )
 
+        lookup_value = (
+            request.chassis_number
+            if lookup_type == "chassis"
+            else request.vehicle_number
+        )
         logger.info(
             "Vehicle lookup search started: %s (type=%s)",
-            request.vehicle_number,
+            lookup_value,
             lookup_type,
         )
 
@@ -279,10 +285,12 @@ async def create_vehicle_lookup_search(
         )
 
         # Encode vehicle lookup params into the query so we can parse it later.
-        query = (
-            f"veh={request.vehicle_number or ''}|"
-            f"ch={request.chassis_number or ''}|"
-            f"type={lookup_type}"
+        query = urlencode(
+            {
+                "veh": request.vehicle_number or "",
+                "ch": request.chassis_number or "",
+                "type": lookup_type,
+            }
         )
 
         search_type_map = {

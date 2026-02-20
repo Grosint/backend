@@ -518,6 +518,7 @@ jobs:
                       SECRET_KEY=${{ secrets.SECRET_KEY }}
                       ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
                       ENVIRONMENT=production
+                      FRONTEND_URL=${{ secrets.FRONTEND_URL }}
 
                       # Azure Email Configuration
                       AZURE_EMAIL_ENDPOINT=${{ secrets.AZURE_EMAIL_ENDPOINT }}
@@ -528,6 +529,11 @@ jobs:
                       AZURE_STORAGE_ACCOUNT_NAME=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}
                       AZURE_STORAGE_ACCOUNT_KEY=${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
                       AZURE_STORAGE_CONTAINER_NAME=${{ secrets.AZURE_STORAGE_CONTAINER_NAME }}
+
+                      # Cashfree Payment Gateway Configuration
+                      CASHFREE_PAYMENT_APP_ID=${{ secrets.CASHFREE_PAYMENT_APP_ID }}
+                      CASHFREE_PAYMENT_SECRET=${{ secrets.CASHFREE_PAYMENT_SECRET }}
+                      CASHFREE_WEBHOOK_SECRET=${{ secrets.CASHFREE_WEBHOOK_SECRET }}
 
                       # External API Keys
                       RAPIDAPI_KEY=${{ secrets.RAPIDAPI_KEY }}

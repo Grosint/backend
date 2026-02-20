@@ -37,6 +37,7 @@ class KelpomIMEIService:
                 params=params,
                 headers=headers,
                 circuit_key="kelpom_imei",
+                allowed_statuses=[403],
             )
 
             if response.status_code == 403:

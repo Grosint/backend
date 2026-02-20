@@ -331,6 +331,25 @@ def sanitize_log_data(data):
     return sanitized
 
 
+def mask_phone_number(phone: str, visible_digits: int = 2) -> str:
+    """
+    Mask a phone number for safe logging, keeping only the last few digits visible.
+
+    Args:
+        phone: The phone number to mask (may include country code, spaces, etc.)
+        visible_digits: Number of trailing digits to show (default 2)
+
+    Returns:
+        str: Masked value like "XXXXXXXX90" to avoid exposing PII in logs
+    """
+    if not phone or not isinstance(phone, str):
+        return "***"
+    digits = "".join(c for c in phone if c.isdigit())
+    if len(digits) <= visible_digits:
+        return "X" * len(digits) if digits else "***"
+    return "X" * (len(digits) - visible_digits) + digits[-visible_digits:]
+
+
 def hash_identifier(identifier: str) -> str:
     """
     Create a non-reversible hash of an identifier for logging purposes.

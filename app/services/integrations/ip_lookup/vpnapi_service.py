@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from app.core.config import settings
+from app.core.logging import hash_identifier
 from app.core.resilience import ResilientHttpClient
 from app.utils.string_utils import snake_to_title_case
 
@@ -23,7 +24,7 @@ class VPNAPIService:
     async def search_ip(self, ip: str) -> dict[str, Any]:
         """Search IP address for geolocation, network, and security info."""
         try:
-            logger.info(f"VPNAPI: Searching IP {ip}")
+            logger.info("VPNAPI: Searching IP %s", hash_identifier(ip))
 
             url = f"{self.base_url}/{ip}"
             params = (
