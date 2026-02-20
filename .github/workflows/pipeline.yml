@@ -610,6 +610,12 @@ jobs:
                       sudo chown $USER:$USER /opt/grosint-backend/logs
                       sudo chmod 755 /opt/grosint-backend/logs
 
+                      # Ensure systemd loads .env (belt-and-suspenders - cwd can differ under systemd)
+                      if ! grep -q "EnvironmentFile=.*grosint-backend/.env" /etc/systemd/system/grosint-backend.service; then
+                        sudo sed -i '/\[Service\]/a EnvironmentFile=-/opt/grosint-backend/.env' /etc/systemd/system/grosint-backend.service
+                        echo "Added EnvironmentFile to systemd service"
+                      fi
+
                       # Systemd service and Nginx config are already created by setup.sh
                       # Just reload the services
                       sudo systemctl daemon-reload

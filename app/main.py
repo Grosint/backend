@@ -16,9 +16,10 @@ from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.base import BaseHTTPMiddleware
 
-# Load .env file into environment before importing settings
-# This must happen before settings import to ensure ENV vars are loaded
-load_dotenv()
+# Load .env file from project root (explicit path - required for systemd where cwd may differ)
+# Path: app/main.py -> parent.parent = project root
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=_env_path)
 
 from app.api.router import api_router
 from app.core.config import settings
