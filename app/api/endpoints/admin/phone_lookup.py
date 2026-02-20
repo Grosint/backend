@@ -132,6 +132,8 @@ async def test_phone_lookup_service(
             "eyecon",
             "callapp",
             "whatsapp",
+            "telegram",
+            "skype",
             "hlr",
             "ignorant",
             "leakcheck",
@@ -229,14 +231,20 @@ async def test_all_phone_lookup_services(
                 }
             else:
                 is_success = isinstance(result, dict) and not result.get("error")
-                data = (
-                    normalize_source_or_type(result)
-                    if isinstance(result, dict)
-                    else None
-                )
                 raw_response = (
                     result.get("_raw_response")
                     if request.include_raw_response and isinstance(result, dict)
+                    else None
+                )
+                # Remove _raw_response from data (exposed at raw_response level)
+                result_for_data = (
+                    {k: v for k, v in result.items() if k != "_raw_response"}
+                    if isinstance(result, dict)
+                    else result
+                )
+                data = (
+                    normalize_source_or_type(result_for_data)
+                    if isinstance(result, dict)
                     else None
                 )
                 service_results[service_name] = {

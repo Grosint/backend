@@ -702,13 +702,13 @@ class AITANVehicleService:
         self,
         data: dict,
         func_name: str,
-        include_sensitive: bool = False,
+        include_sensitive: bool = True,
     ) -> list[dict[str, Any]]:
         """Format AITAN vehicle response to standard format.
 
         Sensitive owner identity fields (pan_no, aadhar_no, etc.) are omitted
         unless include_sensitive is True and is_authorized_for_sensitive_fields
-        permits. When permitted, values are masked (last 4 chars visible).
+        permits. When permitted, full values are returned (authorized access).
         """
         formatted_response = []
 
@@ -745,15 +745,8 @@ class AITANVehicleService:
                                 },
                             )
                             continue
-                        value = self._mask_sensitive_value(str(value))
-                        logger.info(
-                            "Sensitive owner field access granted (masked): %s",
-                            source_key,
-                            extra={
-                                "event": "sensitive_field_masked",
-                                "field": source_key,
-                            },
-                        )
+                        # Authorized: include full value (no masking)
+                        value = str(value)
                     formatted_response.append(
                         {
                             "source": source_key,
