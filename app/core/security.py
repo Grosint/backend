@@ -140,18 +140,19 @@ async def add_security_headers(request: Request, call_next):
         "max-age=31536000; includeSubDomains"
     )
 
-    # Check if this is a redirect page (needs inline styles)
-    # Both payment and subscription redirects need inline CSS/JS
-    # Use allow-list of explicit redirect path prefixes for security
-    redirect_path_prefixes = [
+    # Check if this is a page that needs inline styles/scripts (CSP relaxation)
+    # - Payment/subscription redirect pages
+    # - Seeker tracking pages (nearyou.html has inline scripts for api_base injection)
+    paths_needing_inline = [
         "/api/payments/redirect/",
         "/api/subscriptions/redirect/",
+        "/seeker/",
     ]
-    is_redirect_page = any(
-        request.url.path.startswith(prefix) for prefix in redirect_path_prefixes
+    needs_inline_execution = any(
+        request.url.path.startswith(prefix) for prefix in paths_needing_inline
     )
 
-    if is_redirect_page:
+    if needs_inline_execution:
         # Allow inline styles for redirect pages
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "

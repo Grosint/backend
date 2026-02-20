@@ -89,6 +89,7 @@ async def connect_to_mongo():
         from app.models.plan import Plan
         from app.models.result import Result
         from app.models.search import Search
+        from app.models.seeker import SeekerLink, SeekerResult
         from app.models.subscription import Subscription
         from app.models.user import User  # local import to avoid circulars
 
@@ -105,6 +106,8 @@ async def connect_to_mongo():
                 Subscription,
                 Credit,
                 CreditTxn,
+                SeekerLink,
+                SeekerResult,
             ],
         )
         logger.info("Initialized Beanie")
