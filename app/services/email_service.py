@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote_plus
@@ -16,7 +16,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-class EmailTemplate(str, Enum):
+class EmailTemplate(StrEnum):
     """Available email templates."""
 
     OTP = "otp"

@@ -227,7 +227,12 @@ class GHuntService:
         profile = email_result.get("profile") or email_result.get("person", {})
         if isinstance(profile, dict):
             profile_photos = profile.get("profilePhotos") or profile.get("photos", [])
-            for photo in profile_photos:
+            items = (
+                profile_photos.values()
+                if hasattr(profile_photos, "values")
+                else profile_photos
+            )
+            for photo in items:
                 if isinstance(photo, dict):
                     photo_url = photo.get("url") or photo.get("photoUrl")
                 else:

@@ -39,6 +39,18 @@ from app.services.orchestrators.email_lookup_orchestrator import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
+def _remove_raw_response(data: Any) -> Any:
+    """Recursively remove _raw_response from data (it's exposed at raw_response level)."""
+    if isinstance(data, dict):
+        return {
+            k: _remove_raw_response(v) for k, v in data.items() if k != "_raw_response"
+        }
+    if isinstance(data, list):
+        return [_remove_raw_response(item) for item in data]
+    return data
+
+
 # Email lookup service registry
 EMAIL_LOOKUP_SERVICES = {
     "skype": SkypeService,
@@ -84,17 +96,18 @@ async def test_skype_search(request: SkypeSearchRequest):
             and not result.get("error")
         )
 
-        # Extract raw response from service result
+        # Extract raw response from service result (remove from data to avoid duplication)
         raw_response = None
         if request.include_raw_response and isinstance(result, dict):
-            raw_response = result.get("_raw_response")
+            raw_response = result.pop("_raw_response", None)
+        data_clean = _remove_raw_response(result) if isinstance(result, dict) else None
 
         response_data = ServiceTestResponse(
             service_name="skype",
             success=is_success,
             execution_time_ms=round(execution_time, 2),
             found=result.get("found") if isinstance(result, dict) else None,
-            data=result if isinstance(result, dict) else None,
+            data=data_clean,
             error=str(result) if isinstance(result, Exception) else result.get("error"),
             raw_response=raw_response,
         )
@@ -161,17 +174,18 @@ async def test_email_lookup_service(
             and not result.get("error")
         )
 
-        # Extract raw response from service result (services include _raw_response field)
+        # Extract raw response from service result (remove from data to avoid duplication)
         raw_response = None
         if request.include_raw_response and isinstance(result, dict):
-            raw_response = result.get("_raw_response")
+            raw_response = result.pop("_raw_response", None)
+        data_clean = _remove_raw_response(result) if isinstance(result, dict) else None
 
         response_data = ServiceTestResponse(
             service_name=service_name_lower,
             success=is_success,
             execution_time_ms=round(execution_time, 2),
             found=result.get("found") if isinstance(result, dict) else None,
-            data=result if isinstance(result, dict) else None,
+            data=data_clean,
             error=str(result) if isinstance(result, Exception) else result.get("error"),
             raw_response=raw_response,
         )
@@ -246,15 +260,20 @@ async def test_all_email_lookup_services(
                 }
             else:
                 is_success = isinstance(result, dict) and not result.get("error")
-                # Extract raw response if requested
+                # Extract raw response if requested (remove from data to avoid duplication)
                 raw_response = None
                 if request.include_raw_response and isinstance(result, dict):
-                    raw_response = result.get("_raw_response")
+                    raw_response = result.pop("_raw_response", None)
+                data_clean = (
+                    _remove_raw_response(result)
+                    if request.include_raw_response and isinstance(result, dict)
+                    else None
+                )
 
                 service_results[service_name] = {
                     "success": is_success,
                     "found": result.get("found") if isinstance(result, dict) else None,
-                    "data": result if request.include_raw_response else None,
+                    "data": data_clean,
                     "error": result.get("error") if isinstance(result, dict) else None,
                     "raw_response": raw_response,
                 }

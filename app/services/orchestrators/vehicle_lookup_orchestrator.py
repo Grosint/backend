@@ -60,7 +60,7 @@ class VehicleLookupOrchestrator:
 
                         vehicle_number = resolved_vehicle_number
                         result = await service.search_vehicle(
-                            vehicle_number, "chassis", chassis_number
+                            vehicle_number, "rc", chassis_number
                         )
                 else:
                     async with AITANService() as service:

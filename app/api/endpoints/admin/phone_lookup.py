@@ -229,19 +229,20 @@ async def test_all_phone_lookup_services(
                 }
             else:
                 is_success = isinstance(result, dict) and not result.get("error")
-                # Extract raw response if requested
-                raw_response = None
-                if request.include_raw_response and isinstance(result, dict):
-                    raw_response = result.get("_raw_response")
-
+                data = (
+                    normalize_source_or_type(result)
+                    if isinstance(result, dict)
+                    else None
+                )
+                raw_response = (
+                    result.get("_raw_response")
+                    if request.include_raw_response and isinstance(result, dict)
+                    else None
+                )
                 service_results[service_name] = {
                     "success": is_success,
                     "found": result.get("found") if isinstance(result, dict) else None,
-                    "data": (
-                        normalize_source_or_type(result)
-                        if request.include_raw_response and isinstance(result, dict)
-                        else None
-                    ),
+                    "data": data,
                     "error": result.get("error") if isinstance(result, dict) else None,
                     "raw_response": raw_response,
                 }

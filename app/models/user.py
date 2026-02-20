@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 
 from beanie import Document, Insert, Replace, before_event
 from bson import ObjectId
@@ -14,7 +14,7 @@ from app.utils.validators import (
 )
 
 
-class UserType(str, Enum):
+class UserType(StrEnum):
     """User type enumeration."""
 
     ADMIN = "admin"

@@ -311,5 +311,11 @@ response_mapper.register_error_mapper("DomainAdapter", api_error_mapper)
 response_mapper.register_error_mapper("EmailAdapter", api_error_mapper)
 response_mapper.register_error_mapper("PhoneLookupAdapter", api_error_mapper)
 response_mapper.register_error_mapper("VehicleLookupAdapter", api_error_mapper)
+response_mapper.register_error_mapper("BankLookupAdapter", api_error_mapper)
+response_mapper.register_error_mapper("VerifyIdAdapter", api_error_mapper)
+response_mapper.register_error_mapper("IPLookupAdapter", api_error_mapper)
+response_mapper.register_error_mapper("IMEILookupAdapter", api_error_mapper)
+response_mapper.register_error_mapper("VirtualNumberAdapter", api_error_mapper)
+response_mapper.register_error_mapper("VirtualEmailAdapter", api_error_mapper)
 # Note: GHuntService errors are handled within the service itself
 # and returned as part of the response dict, not as exceptions

@@ -138,3 +138,37 @@ class AITANVehicleLookupRequest(BaseModel):
         None, description="Chassis number - optional for chassis_to_rc lookup"
     )
     include_raw_response: bool = Field(False, description="Include raw API response")
+
+
+class SimpleLookupDebugRequest(BaseModel):
+    """Request model for simple lookup debug endpoints (IP, IMEI, Virtual Number, Virtual Email)"""
+
+    include_raw_response: bool = Field(False, description="Include raw API response")
+
+
+class IPLookupDebugRequest(SimpleLookupDebugRequest):
+    """Request for IP lookup debug"""
+
+    ip: str = Field(..., description="IP address to lookup")
+
+
+class IMEILookupDebugRequest(SimpleLookupDebugRequest):
+    """Request for IMEI lookup debug"""
+
+    imei: str = Field(..., description="IMEI number (15 digits)")
+
+
+class VirtualNumberLookupDebugRequest(SimpleLookupDebugRequest):
+    """Request for virtual number check debug"""
+
+    phone_number: str = Field(..., description="Phone number to check")
+    country_code: str = Field(
+        "+91",
+        description="Country code for E.164 (e.g. +91, +1). Used when phone lacks + prefix.",
+    )
+
+
+class VirtualEmailLookupDebugRequest(SimpleLookupDebugRequest):
+    """Request for virtual email check debug"""
+
+    email: str = Field(..., description="Email address to check")

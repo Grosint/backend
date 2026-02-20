@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 
 from beanie import Document, Indexed, Insert, Replace, before_event
 from pydantic import BaseModel, Field
@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from app.utils.validators import PyObjectId
 
 
-class SearchType(str, Enum):
+class SearchType(StrEnum):
     """Enum for search types"""
 
     EMAIL = "email"
@@ -20,9 +20,16 @@ class SearchType(str, Enum):
     VEHICLE_ALL = "vehicle-all"
     VEHICLE_CHASIS = "vehicle-chasis"
     USERNAME = "username"
+    # Simple search types (1-3 APIs each)
+    IP_LOOKUP = "ip-lookup"
+    IMEI_LOOKUP = "imei-lookup"
+    VIRTUAL_NUMBER = "virtual-number"
+    VIRTUAL_EMAIL = "virtual-email"
+    BANK_ACCOUNT = "bank-account"
+    VERIFY_ID = "verify-id"
 
 
-class SearchStatus(str, Enum):
+class SearchStatus(StrEnum):
     """Enum for search status"""
 
     PENDING = "pending"

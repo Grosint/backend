@@ -68,6 +68,12 @@ class Settings(BaseSettings):
     # RAPIDAPI KEYS
     RAPIDAPI_KEY: str = os.getenv("RAPIDAPI_KEY", "")
 
+    # NumCheckr (Virtual Number) API
+    NUMCHECKR_API_KEY: str = os.getenv("NUMCHECKR_API_KEY", "")
+
+    # VPNAPI.io (IP Search)
+    VPNAPI_IO_API_KEY: str = os.getenv("VPNAPI_IO_API_KEY", "")
+
     # LeakCheck API configuration
     LEAK_CHECK_API_KEY: str = os.getenv("LEAK_CHECK_API_KEY", "")
 

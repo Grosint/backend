@@ -1,17 +1,21 @@
 import asyncio
-import json
 import logging
-import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
 from beanie import PydanticObjectId
 from bson import ObjectId
 
+from app.adapters.bank_lookup_adapter import BankLookupAdapter
 from app.adapters.domain_adapter import DomainAdapter
 from app.adapters.email_adapter import EmailAdapter
+from app.adapters.imei_lookup_adapter import IMEILookupAdapter
+from app.adapters.ip_lookup_adapter import IPLookupAdapter
 from app.adapters.phone_lookup_adapter import PhoneLookupAdapter
 from app.adapters.vehicle_lookup_adapter import VehicleLookupAdapter
+from app.adapters.verify_id_adapter import VerifyIdAdapter
+from app.adapters.virtual_email_adapter import VirtualEmailAdapter
+from app.adapters.virtual_number_adapter import VirtualNumberAdapter
 from app.core.response_utils import normalize_source_or_type
 from app.models.history import HistorySourceResult
 from app.models.result import ResultCreate
@@ -21,22 +25,6 @@ from app.services.result_service import ResultService
 from app.services.search_service import SearchService
 
 logger = logging.getLogger(__name__)
-
-
-# region agent log
-def _debug_log(payload: dict[str, Any]) -> None:
-    try:
-        with open(
-            "/Users/navitas28/Work/grosint/backend/.cursor/debug.log",
-            "a",
-            encoding="utf-8",
-        ) as log_file:
-            log_file.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except Exception as exc:
-        logger.debug("Debug log write failed: %s", exc)
-
-
-# endregion agent log
 
 
 class SearchOrchestrator:
@@ -53,6 +41,12 @@ class SearchOrchestrator:
         self.domain_adapter = DomainAdapter()
         self.phone_lookup_adapter = PhoneLookupAdapter()
         self.vehicle_lookup_adapter = VehicleLookupAdapter()
+        self.bank_lookup_adapter = BankLookupAdapter()
+        self.verify_id_adapter = VerifyIdAdapter()
+        self.ip_lookup_adapter = IPLookupAdapter()
+        self.imei_lookup_adapter = IMEILookupAdapter()
+        self.virtual_number_adapter = VirtualNumberAdapter()
+        self.virtual_email_adapter = VirtualEmailAdapter()
 
         # Adapter mapping
         self.adapters = {
@@ -64,6 +58,12 @@ class SearchOrchestrator:
             SearchType.VEHICLE_ALL: [self.vehicle_lookup_adapter],
             SearchType.VEHICLE_CHASIS: [self.vehicle_lookup_adapter],
             SearchType.USERNAME: [],  # Add username adapters here
+            SearchType.IP_LOOKUP: [self.ip_lookup_adapter],
+            SearchType.IMEI_LOOKUP: [self.imei_lookup_adapter],
+            SearchType.VIRTUAL_NUMBER: [self.virtual_number_adapter],
+            SearchType.VIRTUAL_EMAIL: [self.virtual_email_adapter],
+            SearchType.BANK_ACCOUNT: [self.bank_lookup_adapter],
+            SearchType.VERIFY_ID: [self.verify_id_adapter],
         }
 
         # Map search type to adapter method
@@ -76,6 +76,12 @@ class SearchOrchestrator:
             SearchType.VEHICLE_ALL: self._get_vehicle_search_method,
             SearchType.VEHICLE_CHASIS: self._get_vehicle_search_method,
             SearchType.USERNAME: self._get_username_search_method,
+            SearchType.IP_LOOKUP: self._get_ip_search_method,
+            SearchType.IMEI_LOOKUP: self._get_imei_search_method,
+            SearchType.VIRTUAL_NUMBER: self._get_virtual_number_search_method,
+            SearchType.VIRTUAL_EMAIL: self._get_virtual_email_search_method,
+            SearchType.BANK_ACCOUNT: self._get_bank_search_method,
+            SearchType.VERIFY_ID: self._get_verify_id_search_method,
         }
 
     async def execute_search(self, search_id: str) -> dict[str, Any]:
@@ -117,6 +123,12 @@ class SearchOrchestrator:
                         SearchType.VEHICLE_ALL: "vehicle-all",
                         SearchType.VEHICLE_CHASIS: "vehicle-chasis",
                         SearchType.USERNAME: "username-lookup",
+                        SearchType.IP_LOOKUP: "ip-lookup",
+                        SearchType.IMEI_LOOKUP: "imei-lookup",
+                        SearchType.VIRTUAL_NUMBER: "virtual-number",
+                        SearchType.VIRTUAL_EMAIL: "virtual-email",
+                        SearchType.BANK_ACCOUNT: "bank-account",
+                        SearchType.VERIFY_ID: "verify-id",
                     }
                     query_type = query_type_map.get(search.search_type, "search")
 
@@ -317,27 +329,12 @@ class SearchOrchestrator:
         normalized_data = normalize_source_or_type(data)
         lookup_results = normalized_data.get("lookup_results", {})
 
-        # region agent log
-        _debug_log(
-            {
-                "id": f"log_{int(time.time() * 1000)}_store_results",
-                "timestamp": int(time.time() * 1000),
-                "runId": "pre-fix",
-                "hypothesisId": "H2",
-                "location": "search_orchestrator.py:_store_adapter_results:lookup_results",
-                "message": "Storing adapter lookup results",
-                "data": {
-                    "adapter": getattr(adapter, "name", None),
-                    "lookup_results_keys": (
-                        list(lookup_results.keys())
-                        if isinstance(lookup_results, dict)
-                        else []
-                    ),
-                    "has_lookup_results": bool(lookup_results),
-                },
-            }
+        logger.debug(
+            "Storing adapter lookup results: adapter=%s, lookup_results_keys=%s, has_lookup_results=%s",
+            getattr(adapter, "name", None),
+            list(lookup_results.keys()) if isinstance(lookup_results, dict) else [],
+            bool(lookup_results),
         )
-        # endregion agent log
 
         # For phone and email, store each source result separately
         if lookup_results:
@@ -365,31 +362,19 @@ class SearchOrchestrator:
                     )
                     await self.result_service.create_result(result_create)
 
-                    # region agent log
-                    _debug_log(
-                        {
-                            "id": f"log_{int(time.time() * 1000)}_source_result",
-                            "timestamp": int(time.time() * 1000),
-                            "runId": "pre-fix",
-                            "hypothesisId": "H4",
-                            "location": "search_orchestrator.py:_store_adapter_results:source_result",
-                            "message": "Stored source result summary",
-                            "data": {
-                                "source": source_name,
-                                "is_success": is_success,
-                                "has_error": isinstance(source_result, dict)
-                                and "error" in source_result,
-                                "found": (
-                                    source_result.get("found", False)
-                                    if isinstance(source_result, dict)
-                                    else False
-                                ),
-                                "has_data": isinstance(source_result, dict)
-                                and source_result.get("data") is not None,
-                            },
-                        }
+                    logger.debug(
+                        "Stored source result summary: source=%s, is_success=%s, has_error=%s, found=%s, has_data=%s",
+                        source_name,
+                        is_success,
+                        isinstance(source_result, dict) and "error" in source_result,
+                        (
+                            source_result.get("found", False)
+                            if isinstance(source_result, dict)
+                            else False
+                        ),
+                        isinstance(source_result, dict)
+                        and source_result.get("data") is not None,
                     )
-                    # endregion agent log
 
                     # Add result to history if history exists
                     if history:
@@ -578,6 +563,105 @@ class SearchOrchestrator:
 
         return fn
 
+    def _get_ip_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        async def fn(a=adapter, q=query):
+            return await a.search_ip(q)
+
+        return fn
+
+    def _get_imei_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        async def fn(a=adapter, q=query):
+            return await a.search_imei(q)
+
+        return fn
+
+    def _get_virtual_number_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        phone_number, country_code = self._parse_virtual_number_query(query)
+
+        async def fn(a=adapter, ph=phone_number, cc=country_code):
+            return await a.search_virtual_number(ph, cc)
+
+        return fn
+
+    def _parse_virtual_number_query(self, query: str) -> tuple[str, str]:
+        """Parse virtual number query: ph=X|cc=Y or raw phone (default cc=+91)"""
+        phone_number, country_code = query, "+91"
+        for part in query.split("|"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                k, v = k.strip(), v.strip()
+                if k == "ph":
+                    phone_number = v
+                elif k == "cc":
+                    country_code = v if v.startswith("+") else "+" + v
+        return phone_number, country_code
+
+    def _get_virtual_email_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        async def fn(a=adapter, q=query):
+            return await a.search_virtual_email(q)
+
+        return fn
+
+    def _get_bank_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        account_no, ifsc_code, upi = self._parse_bank_query(query)
+
+        async def fn(a=adapter, acc=account_no, ifsc=ifsc_code, u=upi):
+            return await a.search_bank(account_no=acc, ifsc_code=ifsc, upi=u)
+
+        return fn
+
+    def _get_verify_id_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        id_type, value, dob = self._parse_verify_id_query(query)
+
+        async def fn(a=adapter, it=id_type, v=value, d=dob):
+            return await a.search_verify_id(id_type=it, value=v, dob=d)
+
+        return fn
+
+    def _parse_bank_query(
+        self, query: str
+    ) -> tuple[str | None, str | None, str | None]:
+        """Parse bank query: acc=X|ifsc=Y or upi=Z"""
+        account_no, ifsc_code, upi = None, None, None
+        for part in query.split("|"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                k, v = k.strip(), v.strip()
+                if k == "acc":
+                    account_no = v or None
+                elif k == "ifsc":
+                    ifsc_code = v or None
+                elif k == "upi":
+                    upi = v or None
+        return account_no, ifsc_code, upi
+
+    def _parse_verify_id_query(self, query: str) -> tuple[str, str, str | None]:
+        """Parse verify ID query: type=pan|value=X or type=dl|value=X|dob=DD-MM-YYYY"""
+        id_type, value, dob = "pan", "", None
+        for part in query.split("|"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                k, v = k.strip(), v.strip()
+                if k == "type":
+                    id_type = v or "pan"
+                elif k == "value":
+                    value = v
+                elif k == "dob":
+                    dob = v or None
+        return id_type, value, dob
+
     def _parse_phone_query(self, query: str) -> tuple[str, str]:
         """Parse phone query into country_code and phone"""
         # Query format can be:
@@ -689,19 +773,10 @@ class SearchOrchestrator:
             return []
 
         if "error" in result_data:
-            # region agent log
-            _debug_log(
-                {
-                    "id": f"log_{int(time.time() * 1000)}_flatten_skip",
-                    "timestamp": int(time.time() * 1000),
-                    "runId": "pre-fix",
-                    "hypothesisId": "H1",
-                    "location": "search_orchestrator.py:_flatten_result_data:error",
-                    "message": "Flatten skipped due to error in result_data",
-                    "data": {"source": source},
-                }
+            logger.debug(
+                "Flatten skipped due to error in result_data: source=%s",
+                source,
             )
-            # endregion agent log
             return []
 
         # Remove _raw_response first

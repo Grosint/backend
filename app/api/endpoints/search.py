@@ -32,9 +32,15 @@ from app.core.database import get_database
 from app.models.search import SearchCreate, SearchStatus, SearchType
 from app.schemas.response import SuccessResponse
 from app.schemas.search import (
+    BankLookupRequest,
     EmailLookupRequest,
+    IMEILookupRequest,
+    IPLookupRequest,
     PhoneLookupRequest,
     VehicleLookupRequest,
+    VerifyIdRequest,
+    VirtualEmailLookupRequest,
+    VirtualNumberLookupRequest,
 )
 from app.services.orchestrators.search_orchestrator import SearchOrchestrator
 from app.services.search_service import SearchService
@@ -396,5 +402,251 @@ async def create_email_lookup_search(
                 "email": request.email,
                 "user_id": current_user.user_id,
             },
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/bank-lookup", response_model=SuccessResponse[dict[str, Any]])
+async def create_bank_lookup_search(
+    request: BankLookupRequest,
+    current_user: TokenData = Depends(get_current_user_token),
+    db=Depends(get_database),
+):
+    """Bank account lookup by account+IFSC or UPI."""
+    if (request.account_no and request.ifsc_code) or request.upi:
+        pass
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Either (account_no and ifsc_code) or upi is required",
+        )
+    try:
+        query = (
+            f"acc={request.account_no or ''}|ifsc={request.ifsc_code or ''}"
+            if request.account_no and request.ifsc_code
+            else f"upi={request.upi or ''}"
+        )
+        search_create = SearchCreate(
+            user_id=(
+                PydanticObjectId(current_user.user_id) if current_user.user_id else None
+            ),
+            search_type=SearchType.BANK_ACCOUNT,
+            query=query,
+        )
+        search = await SearchService(db).create_search(search_create)
+        result = await SearchOrchestrator(db).execute_search(str(search.id))
+        return SuccessResponse[dict[str, Any]](
+            data={
+                "search_id": str(search.id),
+                "status": result["status"],
+                "results_count": result["results_count"],
+                "failed_count": result["failed_count"],
+                "error_message": result.get("error_message"),
+                "results": result["results"],
+                "created_at": search.created_at.isoformat(),
+                "updated_at": search.updated_at.isoformat(),
+            },
+            success=True,
+            message=f"Bank lookup executed with {result['results_count']} results",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Bank lookup failed", extra={"exception": type(e).__name__})
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/verify-id", response_model=SuccessResponse[dict[str, Any]])
+async def create_verify_id_search(
+    request: VerifyIdRequest,
+    current_user: TokenData = Depends(get_current_user_token),
+    db=Depends(get_database),
+):
+    """Verify ID (PAN, DL, Voter ID). DL requires dob (DD-MM-YYYY)."""
+    if request.id_type == "dl" and not request.dob:
+        raise HTTPException(
+            status_code=400,
+            detail="dob (DD-MM-YYYY) is required for driving license",
+        )
+    try:
+        query = f"type={request.id_type}|value={request.value}"
+        if request.dob:
+            query += f"|dob={request.dob}"
+        search_create = SearchCreate(
+            user_id=(
+                PydanticObjectId(current_user.user_id) if current_user.user_id else None
+            ),
+            search_type=SearchType.VERIFY_ID,
+            query=query,
+        )
+        search = await SearchService(db).create_search(search_create)
+        result = await SearchOrchestrator(db).execute_search(str(search.id))
+        return SuccessResponse[dict[str, Any]](
+            data={
+                "search_id": str(search.id),
+                "id_type": request.id_type,
+                "status": result["status"],
+                "results_count": result["results_count"],
+                "failed_count": result["failed_count"],
+                "error_message": result.get("error_message"),
+                "results": result["results"],
+                "created_at": search.created_at.isoformat(),
+                "updated_at": search.updated_at.isoformat(),
+            },
+            success=True,
+            message=f"Verify ID executed with {result['results_count']} results",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Verify ID failed", extra={"exception": type(e).__name__})
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/ip-lookup", response_model=SuccessResponse[dict[str, Any]])
+async def create_ip_lookup_search(
+    request: IPLookupRequest,
+    current_user: TokenData = Depends(get_current_user_token),
+    db=Depends(get_database),
+):
+    try:
+        search_create = SearchCreate(
+            user_id=(
+                PydanticObjectId(current_user.user_id) if current_user.user_id else None
+            ),
+            search_type=SearchType.IP_LOOKUP,
+            query=request.ip,
+        )
+        search = await SearchService(db).create_search(search_create)
+        result = await SearchOrchestrator(db).execute_search(str(search.id))
+        return SuccessResponse[dict[str, Any]](
+            data={
+                "search_id": str(search.id),
+                "ip": request.ip,
+                "status": result["status"],
+                "results_count": result["results_count"],
+                "results": result["results"],
+                "created_at": search.created_at.isoformat(),
+                "updated_at": search.updated_at.isoformat(),
+            },
+            success=True,
+            message=f"IP lookup executed with {result['results_count']} results",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("IP lookup failed", extra={"exception": type(e).__name__})
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/imei-lookup", response_model=SuccessResponse[dict[str, Any]])
+async def create_imei_lookup_search(
+    request: IMEILookupRequest,
+    current_user: TokenData = Depends(get_current_user_token),
+    db=Depends(get_database),
+):
+    try:
+        search_create = SearchCreate(
+            user_id=(
+                PydanticObjectId(current_user.user_id) if current_user.user_id else None
+            ),
+            search_type=SearchType.IMEI_LOOKUP,
+            query=request.imei,
+        )
+        search = await SearchService(db).create_search(search_create)
+        result = await SearchOrchestrator(db).execute_search(str(search.id))
+        return SuccessResponse[dict[str, Any]](
+            data={
+                "search_id": str(search.id),
+                "imei": request.imei,
+                "status": result["status"],
+                "results_count": result["results_count"],
+                "results": result["results"],
+                "created_at": search.created_at.isoformat(),
+                "updated_at": search.updated_at.isoformat(),
+            },
+            success=True,
+            message=f"IMEI lookup executed with {result['results_count']} results",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("IMEI lookup failed", extra={"exception": type(e).__name__})
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/virtual-number", response_model=SuccessResponse[dict[str, Any]])
+async def create_virtual_number_search(
+    request: VirtualNumberLookupRequest,
+    current_user: TokenData = Depends(get_current_user_token),
+    db=Depends(get_database),
+):
+    try:
+        query = f"ph={request.phone_number}|cc={request.country_code}"
+        search_create = SearchCreate(
+            user_id=(
+                PydanticObjectId(current_user.user_id) if current_user.user_id else None
+            ),
+            search_type=SearchType.VIRTUAL_NUMBER,
+            query=query,
+        )
+        search = await SearchService(db).create_search(search_create)
+        result = await SearchOrchestrator(db).execute_search(str(search.id))
+        return SuccessResponse[dict[str, Any]](
+            data={
+                "search_id": str(search.id),
+                "phone_number": request.phone_number,
+                "status": result["status"],
+                "results_count": result["results_count"],
+                "results": result["results"],
+                "created_at": search.created_at.isoformat(),
+                "updated_at": search.updated_at.isoformat(),
+            },
+            success=True,
+            message=f"Virtual number check executed with {result['results_count']} results",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Virtual number check failed", extra={"exception": type(e).__name__}
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/virtual-email", response_model=SuccessResponse[dict[str, Any]])
+async def create_virtual_email_search(
+    request: VirtualEmailLookupRequest,
+    current_user: TokenData = Depends(get_current_user_token),
+    db=Depends(get_database),
+):
+    try:
+        search_create = SearchCreate(
+            user_id=(
+                PydanticObjectId(current_user.user_id) if current_user.user_id else None
+            ),
+            search_type=SearchType.VIRTUAL_EMAIL,
+            query=request.email,
+        )
+        search = await SearchService(db).create_search(search_create)
+        result = await SearchOrchestrator(db).execute_search(str(search.id))
+        return SuccessResponse[dict[str, Any]](
+            data={
+                "search_id": str(search.id),
+                "email": request.email,
+                "status": result["status"],
+                "results_count": result["results_count"],
+                "results": result["results"],
+                "created_at": search.created_at.isoformat(),
+                "updated_at": search.updated_at.isoformat(),
+            },
+            success=True,
+            message=f"Virtual email check executed with {result['results_count']} results",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Virtual email check failed", extra={"exception": type(e).__name__}
         )
         raise HTTPException(status_code=500, detail=str(e)) from e

@@ -535,6 +535,8 @@ jobs:
                       HLR_API_KEY=${{ secrets.HLR_API_KEY }}
                       AITAN_API_KEY=${{ secrets.AITAN_API_KEY }}
                       BEFISC_API_KEY=${{ secrets.BEFISC_API_KEY }}
+                      NUMCHECKR_API_KEY=${{ secrets.NUMCHECKR_API_KEY }}
+                      VPNAPI_IO_API_KEY=${{ secrets.VPNAPI_IO_API_KEY }}
 
                       # Telegram Configuration (Account 1)
                       TELEGRAM_API_ID_1=${{ secrets.TELEGRAM_API_ID_1 }}

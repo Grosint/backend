@@ -76,7 +76,7 @@ class GHuntPeopleService:
             people_api = PeoplePaHttp(creds)
 
             async with httpx.AsyncClient() as client:
-                found, person = await people_api.people_gaia_id_lookup(
+                found, person = await people_api.people(
                     client, gaia_id, params_template="max_details"
                 )
 
@@ -95,15 +95,34 @@ class GHuntPeopleService:
                         result["name"] = person.names["CONTACT"].fullname
 
                 if hasattr(person, "emails") and person.emails:
-                    result["emails"] = [email.value for email in person.emails]
+                    if hasattr(person.emails, "values"):
+                        result["emails"] = [
+                            e.value
+                            for e in person.emails.values()
+                            if hasattr(e, "value")
+                        ]
+                    else:
+                        result["emails"] = [e.value for e in person.emails]
 
                 if hasattr(person, "phones") and person.phones:
-                    result["phones"] = [phone.value for phone in person.phones]
+                    if hasattr(person.phones, "values"):
+                        result["phones"] = [
+                            p.value
+                            for p in person.phones.values()
+                            if hasattr(p, "value")
+                        ]
+                    else:
+                        result["phones"] = [p.value for p in person.phones]
 
                 if hasattr(person, "profilePhotos") and person.profilePhotos:
-                    result["profile_photos"] = [
-                        photo.url for photo in person.profilePhotos
-                    ]
+                    if hasattr(person.profilePhotos, "values"):
+                        result["profile_photos"] = [
+                            p.url
+                            for p in person.profilePhotos.values()
+                            if hasattr(p, "url")
+                        ]
+                    else:
+                        result["profile_photos"] = [p.url for p in person.profilePhotos]
 
                 return result
         except Exception as e:

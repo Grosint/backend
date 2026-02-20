@@ -60,3 +60,52 @@ class EmailLookupRequest(BaseModel):
     """Request schema for creating and executing an email lookup search"""
 
     email: str = Field(..., description="Email address to search")
+
+
+class BankLookupRequest(BaseModel):
+    """Request schema for bank account lookup (account+IFSC or UPI)"""
+
+    account_no: str | None = Field(None, description="Bank account number")
+    ifsc_code: str | None = Field(None, description="IFSC code")
+    upi: str | None = Field(None, description="UPI ID (e.g. user@paytm)")
+
+
+class VerifyIdRequest(BaseModel):
+    """Request schema for ID verification (PAN, DL, Voter ID)"""
+
+    id_type: Literal["pan", "dl", "voter", "passport"] = Field(
+        ..., description="Type of ID to verify"
+    )
+    value: str = Field(..., description="ID value (PAN, license number, epic number)")
+    dob: str | None = Field(
+        None,
+        description="Date of birth DD-MM-YYYY (required for driving license)",
+    )
+
+
+class IPLookupRequest(BaseModel):
+    """Request schema for IP lookup"""
+
+    ip: str = Field(..., description="IP address to lookup")
+
+
+class IMEILookupRequest(BaseModel):
+    """Request schema for IMEI lookup"""
+
+    imei: str = Field(..., description="IMEI number (15 digits)")
+
+
+class VirtualNumberLookupRequest(BaseModel):
+    """Request schema for virtual number check"""
+
+    phone_number: str = Field(..., description="Phone number to check")
+    country_code: str = Field(
+        "+91",
+        description="Country code for E.164 format (e.g. +91, +1). Used when phone_number lacks + prefix.",
+    )
+
+
+class VirtualEmailLookupRequest(BaseModel):
+    """Request schema for virtual/disposable email check"""
+
+    email: str = Field(..., description="Email address to check")
