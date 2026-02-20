@@ -265,6 +265,31 @@ def email_lookup_success_mapper(raw_response: dict) -> dict:
     }
 
 
+def vehicle_lookup_success_mapper(raw_response: dict) -> dict:
+    """Mapper for vehicle lookup API responses"""
+    return {
+        "success": True,
+        "message": "Vehicle lookup completed successfully",
+        "data": {
+            "vehicle_number": raw_response.get("vehicle_number", "unknown"),
+            "lookup_results": raw_response.get("lookup_results", {}),
+            "summary": raw_response.get("summary", {}),
+            "confidence_score": raw_response.get("summary", {}).get(
+                "successful_sources", 0
+            )
+            / max(raw_response.get("summary", {}).get("total_sources", 1), 1),
+        },
+        "metadata": {
+            "source_type": "vehicle_lookup",
+            "data_completeness": (
+                "high"
+                if raw_response.get("summary", {}).get("found_data", False)
+                else "low"
+            ),
+        },
+    }
+
+
 # Register default mappers
 response_mapper.register_success_mapper(
     "SocialMediaAdapter", social_media_success_mapper
@@ -275,6 +300,9 @@ response_mapper.register_success_mapper("EmailAdapter", email_lookup_success_map
 response_mapper.register_success_mapper(
     "PhoneLookupAdapter", phone_lookup_success_mapper
 )
+response_mapper.register_success_mapper(
+    "VehicleLookupAdapter", vehicle_lookup_success_mapper
+)
 
 # Register error mappers
 response_mapper.register_error_mapper("SocialMediaAdapter", api_error_mapper)
@@ -282,5 +310,6 @@ response_mapper.register_error_mapper("SecurityAdapter", api_error_mapper)
 response_mapper.register_error_mapper("DomainAdapter", api_error_mapper)
 response_mapper.register_error_mapper("EmailAdapter", api_error_mapper)
 response_mapper.register_error_mapper("PhoneLookupAdapter", api_error_mapper)
+response_mapper.register_error_mapper("VehicleLookupAdapter", api_error_mapper)
 # Note: GHuntService errors are handled within the service itself
 # and returned as part of the response dict, not as exceptions

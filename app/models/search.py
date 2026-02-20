@@ -15,6 +15,10 @@ class SearchType(str, Enum):
     EMAIL = "email"
     DOMAIN = "domain"
     PHONE = "phone"
+    VEHICLE_RC = "vehicle-rc"
+    VEHICLE_FAST_TAG = "vehicle-fast-tag"
+    VEHICLE_ALL = "vehicle-all"
+    VEHICLE_CHASIS = "vehicle-chasis"
     USERNAME = "username"
 
 

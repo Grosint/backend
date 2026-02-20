@@ -4,6 +4,8 @@ import logging
 from typing import Any
 
 from app.core.config import settings
+from app.core.lookup_extractor import extract_items
+from app.core.lookup_specs import PHONE_LOOKUP_SPECS
 from app.core.resilience import ResilientHttpClient
 
 logger = logging.getLogger(__name__)
@@ -37,7 +39,9 @@ class EyeconService:
 
             if "data" in data:
                 # Format Eyecon response
-                formatted_data = self._format_response(data["data"])
+                formatted_data = extract_items(
+                    data["data"], PHONE_LOOKUP_SPECS["eyecon"]
+                )
                 return {
                     "found": True,
                     "source": "eyecon",
@@ -61,86 +65,3 @@ class EyeconService:
                 "error": str(e),
                 "_raw_response": raw_response,
             }
-
-    def _format_response(self, data: dict) -> list[dict]:
-        """Format Eyecon response to standard format"""
-        formatted_response = []
-
-        # Extract full name
-        if "fullName" in data:
-            formatted_response.append(
-                {
-                    "source": "eyecon",
-                    "type": "name",
-                    "value": data["fullName"],
-                    "showSource": False,
-                    "category": "TEXT",
-                }
-            )
-
-        # Extract image
-        if "image" in data:
-            formatted_response.append(
-                {
-                    "source": "eyecon",
-                    "type": "image",
-                    "value": data["image"],
-                    "showSource": False,
-                    "category": "IMAGE",
-                }
-            )
-
-        # Extract other names
-        if "otherNames" in data and len(data["otherNames"]) != 0:
-            for item in data["otherNames"]:
-                formatted_response.append(
-                    {
-                        "source": "eyecon",
-                        "type": "name",
-                        "value": item["name"],
-                        "showSource": False,
-                        "category": "TEXT",
-                    }
-                )
-
-        # Extract Facebook info
-        if "facebookID" in data and "url" in data["facebookID"]:
-            formatted_response.append(
-                {
-                    "source": "Account Exist",
-                    "type": "facebook",
-                    "value": "Yes",
-                    "showSource": True,
-                    "category": "TEXT",
-                }
-            )
-            formatted_response.append(
-                {
-                    "source": "eyecon",
-                    "type": "facebook",
-                    "value": data["facebookID"]["url"],
-                    "showSource": False,
-                    "category": "LINK",
-                }
-            )
-            formatted_response.append(
-                {
-                    "source": "eyecon",
-                    "type": "image",
-                    "value": data["facebookID"]["profileURL"],
-                    "showSource": False,
-                    "category": "IMAGE",
-                }
-            )
-        else:
-            formatted_response.append(
-                {
-                    "source": "Account Exist",
-                    "type": "facebook",
-                    "value": "No",
-                    "showSource": True,
-                    "category": "TEXT",
-                }
-            )
-
-        return formatted_response

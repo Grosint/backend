@@ -70,6 +70,11 @@ class AITANVehicleService:
             "chassis_to_rc",
             "mobile_to_fasttag_history",
         ],
+        # Narrowed lookups for production vehicle-lookup API
+        "rc": ["rc_advance"],
+        "fast-tag": ["mobile_to_fasttag_history"],
+        "chassis": ["chassis_to_rc", "rc_advance"],
+        "all": ["rc_advance", "chassis_to_rc", "mobile_to_fasttag_history"],
     }
 
     def __init__(self, parent_service):

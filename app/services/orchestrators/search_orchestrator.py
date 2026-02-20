@@ -1,5 +1,7 @@
 import asyncio
+import json
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -9,6 +11,8 @@ from bson import ObjectId
 from app.adapters.domain_adapter import DomainAdapter
 from app.adapters.email_adapter import EmailAdapter
 from app.adapters.phone_lookup_adapter import PhoneLookupAdapter
+from app.adapters.vehicle_lookup_adapter import VehicleLookupAdapter
+from app.core.response_utils import normalize_source_or_type
 from app.models.history import HistorySourceResult
 from app.models.result import ResultCreate
 from app.models.search import SearchStatus, SearchType, SearchUpdate
@@ -17,6 +21,22 @@ from app.services.result_service import ResultService
 from app.services.search_service import SearchService
 
 logger = logging.getLogger(__name__)
+
+
+# region agent log
+def _debug_log(payload: dict[str, Any]) -> None:
+    try:
+        with open(
+            "/Users/navitas28/Work/grosint/backend/.cursor/debug.log",
+            "a",
+            encoding="utf-8",
+        ) as log_file:
+            log_file.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except Exception as exc:
+        logger.debug("Debug log write failed: %s", exc)
+
+
+# endregion agent log
 
 
 class SearchOrchestrator:
@@ -32,12 +52,17 @@ class SearchOrchestrator:
         self.email_adapter = EmailAdapter()
         self.domain_adapter = DomainAdapter()
         self.phone_lookup_adapter = PhoneLookupAdapter()
+        self.vehicle_lookup_adapter = VehicleLookupAdapter()
 
         # Adapter mapping
         self.adapters = {
             SearchType.EMAIL: [self.email_adapter],
             SearchType.DOMAIN: [self.domain_adapter],
             SearchType.PHONE: [self.phone_lookup_adapter],
+            SearchType.VEHICLE_RC: [self.vehicle_lookup_adapter],
+            SearchType.VEHICLE_FAST_TAG: [self.vehicle_lookup_adapter],
+            SearchType.VEHICLE_ALL: [self.vehicle_lookup_adapter],
+            SearchType.VEHICLE_CHASIS: [self.vehicle_lookup_adapter],
             SearchType.USERNAME: [],  # Add username adapters here
         }
 
@@ -46,6 +71,10 @@ class SearchOrchestrator:
             SearchType.EMAIL: self._get_email_search_method,
             SearchType.DOMAIN: self._get_domain_search_method,
             SearchType.PHONE: self._get_phone_search_method,
+            SearchType.VEHICLE_RC: self._get_vehicle_search_method,
+            SearchType.VEHICLE_FAST_TAG: self._get_vehicle_search_method,
+            SearchType.VEHICLE_ALL: self._get_vehicle_search_method,
+            SearchType.VEHICLE_CHASIS: self._get_vehicle_search_method,
             SearchType.USERNAME: self._get_username_search_method,
         }
 
@@ -83,6 +112,10 @@ class SearchOrchestrator:
                         SearchType.PHONE: "phone-lookup",
                         SearchType.EMAIL: "email-lookup",
                         SearchType.DOMAIN: "domain-lookup",
+                        SearchType.VEHICLE_RC: "vehicle-rc",
+                        SearchType.VEHICLE_FAST_TAG: "vehicle-fast-tag",
+                        SearchType.VEHICLE_ALL: "vehicle-all",
+                        SearchType.VEHICLE_CHASIS: "vehicle-chasis",
                         SearchType.USERNAME: "username-lookup",
                     }
                     query_type = query_type_map.get(search.search_type, "search")
@@ -281,7 +314,30 @@ class SearchOrchestrator:
             return {"successful_count": 0, "failed_count": 1}
 
         data = result.get("data", {})
-        lookup_results = data.get("lookup_results", {})
+        normalized_data = normalize_source_or_type(data)
+        lookup_results = normalized_data.get("lookup_results", {})
+
+        # region agent log
+        _debug_log(
+            {
+                "id": f"log_{int(time.time() * 1000)}_store_results",
+                "timestamp": int(time.time() * 1000),
+                "runId": "pre-fix",
+                "hypothesisId": "H2",
+                "location": "search_orchestrator.py:_store_adapter_results:lookup_results",
+                "message": "Storing adapter lookup results",
+                "data": {
+                    "adapter": getattr(adapter, "name", None),
+                    "lookup_results_keys": (
+                        list(lookup_results.keys())
+                        if isinstance(lookup_results, dict)
+                        else []
+                    ),
+                    "has_lookup_results": bool(lookup_results),
+                },
+            }
+        )
+        # endregion agent log
 
         # For phone and email, store each source result separately
         if lookup_results:
@@ -300,7 +356,7 @@ class SearchOrchestrator:
                     result_create = ResultCreate(
                         search_id=ObjectId(search_id),
                         source=source_name,
-                        data=source_result,
+                        data=normalize_source_or_type(source_result),
                         confidence_score=(
                             source_result.get("confidence", 0.0)
                             if isinstance(source_result, dict)
@@ -308,6 +364,32 @@ class SearchOrchestrator:
                         ),
                     )
                     await self.result_service.create_result(result_create)
+
+                    # region agent log
+                    _debug_log(
+                        {
+                            "id": f"log_{int(time.time() * 1000)}_source_result",
+                            "timestamp": int(time.time() * 1000),
+                            "runId": "pre-fix",
+                            "hypothesisId": "H4",
+                            "location": "search_orchestrator.py:_store_adapter_results:source_result",
+                            "message": "Stored source result summary",
+                            "data": {
+                                "source": source_name,
+                                "is_success": is_success,
+                                "has_error": isinstance(source_result, dict)
+                                and "error" in source_result,
+                                "found": (
+                                    source_result.get("found", False)
+                                    if isinstance(source_result, dict)
+                                    else False
+                                ),
+                                "has_data": isinstance(source_result, dict)
+                                and source_result.get("data") is not None,
+                            },
+                        }
+                    )
+                    # endregion agent log
 
                     # Add result to history if history exists
                     if history:
@@ -472,6 +554,19 @@ class SearchOrchestrator:
 
         return fn
 
+    def _get_vehicle_search_method(
+        self, adapter: VehicleLookupAdapter, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        """Get vehicle search method for adapter"""
+
+        vehicle_number, chassis_number, lookup_type = self._parse_vehicle_query(query)
+
+        async def fn(a=adapter, v=vehicle_number, c=chassis_number, t=lookup_type):
+            raw = await a.search_vehicle(v, chassis_number=c, lookup_type=t)
+            return raw
+
+        return fn
+
     def _get_username_search_method(
         self, adapter: Any, query: str
     ) -> Callable[[], Awaitable[dict[str, Any]]]:
@@ -531,6 +626,30 @@ class SearchOrchestrator:
 
         return country_code, phone
 
+    def _parse_vehicle_query(self, query: str) -> tuple[str | None, str | None, str]:
+        """Parse vehicle query into vehicle_number, chassis_number, lookup_type"""
+        vehicle_number = query
+        chassis_number = None
+        lookup_type = "all"
+
+        if "veh=" in query or "type=" in query:
+            parts = [p for p in query.split("|") if p]
+            for part in parts:
+                if part.startswith("veh="):
+                    value = part.split("=", 1)[1]
+                    vehicle_number = value or None
+                elif part.startswith("ch="):
+                    value = part.split("=", 1)[1]
+                    chassis_number = value or None
+                elif part.startswith("type="):
+                    value = part.split("=", 1)[1]
+                    lookup_type = value or "all"
+        elif "|" in query:
+            vehicle_number, chassis_number = query.split("|", 1)
+            chassis_number = chassis_number or None
+
+        return vehicle_number, chassis_number, lookup_type
+
     def _remove_raw_response(self, data: dict[str, Any]) -> dict[str, Any]:
         """Recursively remove _raw_response from data dictionary"""
         if not isinstance(data, dict):
@@ -570,14 +689,29 @@ class SearchOrchestrator:
             return []
 
         if "error" in result_data:
+            # region agent log
+            _debug_log(
+                {
+                    "id": f"log_{int(time.time() * 1000)}_flatten_skip",
+                    "timestamp": int(time.time() * 1000),
+                    "runId": "pre-fix",
+                    "hypothesisId": "H1",
+                    "location": "search_orchestrator.py:_flatten_result_data:error",
+                    "message": "Flatten skipped due to error in result_data",
+                    "data": {"source": source},
+                }
+            )
+            # endregion agent log
             return []
 
         # Remove _raw_response first
         cleaned_data = self._remove_raw_response(result_data)
 
         # If this is a phone/email lookup result with nested data structure
-        if isinstance(cleaned_data, dict) and "data" in cleaned_data:
-            inner_data = cleaned_data.get("data")
+        normalized_cleaned = normalize_source_or_type(cleaned_data)
+
+        if isinstance(normalized_cleaned, dict) and "data" in normalized_cleaned:
+            inner_data = normalized_cleaned.get("data")
 
             # If inner data is a list, extract those items
             if isinstance(inner_data, list):
@@ -609,8 +743,8 @@ class SearchOrchestrator:
                 return [item_copy]
 
         # If data doesn't have nested structure, return as single item
-        if isinstance(cleaned_data, dict):
-            item_copy = cleaned_data.copy()
+        if isinstance(normalized_cleaned, dict):
+            item_copy = normalized_cleaned.copy()
             if "source" not in item_copy:
                 item_copy["source"] = source
             return [item_copy]
@@ -620,7 +754,7 @@ class SearchOrchestrator:
             {
                 "source": source,
                 "type": "unknown",
-                "value": str(cleaned_data),
+                "value": str(normalized_cleaned),
                 "category": "TEXT",
             }
         ]

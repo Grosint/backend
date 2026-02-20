@@ -46,6 +46,10 @@ class AITANService:
             "chassis_to_rc",
             "mobile_to_fasttag_history",
         ],
+        "rc": ["rc_advance"],
+        "fast-tag": ["mobile_to_fasttag_history"],
+        "chassis": ["chassis_to_rc", "rc_advance"],
+        "all": ["rc_advance", "chassis_to_rc", "mobile_to_fasttag_history"],
         "bank-lookup": [
             "mobile_to_vpa_advance",
             "vpa_360",

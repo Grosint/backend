@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.core.lookup_extractor import extract_items
+from app.core.lookup_specs import PHONE_LOOKUP_SPECS
 from app.core.resilience import ResilientHttpClient
 
 logger = logging.getLogger(__name__)
@@ -55,7 +57,7 @@ class CallAppService:
             # Handle status code 525 (special case)
             if response.status_code == 525:
                 raw_response = {"status_code": 525, "message": "Service unavailable"}
-                formatted_data = self._format_response(None)
+                formatted_data = extract_items({}, PHONE_LOOKUP_SPECS["callapp"])
                 return {
                     "found": False,
                     "source": "callapp",
@@ -74,7 +76,7 @@ class CallAppService:
                     "error": "Invalid JSON response",
                     "status_code": response.status_code,
                 }
-                formatted_data = self._format_response(None)
+                formatted_data = extract_items({}, PHONE_LOOKUP_SPECS["callapp"])
                 return {
                     "found": False,
                     "source": "callapp",
@@ -84,8 +86,8 @@ class CallAppService:
                 }
 
             # Format response
-            formatted_data = self._format_response(data)
-            found = formatted_data[0]["value"] is not None if formatted_data else False
+            formatted_data = extract_items(data or {}, PHONE_LOOKUP_SPECS["callapp"])
+            found = bool(data and data.get("name"))
 
             return {
                 "found": found,
@@ -97,7 +99,7 @@ class CallAppService:
         except Exception as e:
             logger.error(f"CallApp search failed: {e}")
             raw_response = {"error": str(e), "exception_type": type(e).__name__}
-            formatted_data = self._format_response(None)
+            formatted_data = extract_items({}, PHONE_LOOKUP_SPECS["callapp"])
             return {
                 "found": False,
                 "source": "callapp",
@@ -105,30 +107,3 @@ class CallAppService:
                 "error": str(e),
                 "_raw_response": raw_response,
             }
-
-    def _format_response(self, data: dict | None) -> list[dict]:
-        """Format CallApp response to standard format"""
-        formatted_response = []
-
-        if data and "name" in data and data["name"]:
-            formatted_response.append(
-                {
-                    "source": "callapp",
-                    "type": "name",
-                    "value": data["name"],
-                    "showSource": False,
-                    "category": "TEXT",
-                }
-            )
-        else:
-            formatted_response.append(
-                {
-                    "source": "callapp",
-                    "type": "name",
-                    "value": None,
-                    "showSource": False,
-                    "category": "TEXT",
-                }
-            )
-
-        return formatted_response

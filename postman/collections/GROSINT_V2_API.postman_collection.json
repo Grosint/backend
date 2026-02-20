@@ -481,6 +481,33 @@
 					"response": []
 				},
 				{
+					"name": "Vehicle Lookup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vehicle_number\": \"MH12AB1234\",\n  \"chassis_number\": \"\",\n  \"lookup_type\": \"all\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/search/vehicle-lookup",
+							"host": ["{{base_url}}"],
+							"path": ["search", "vehicle-lookup"]
+						},
+						"description": "Create and execute a vehicle lookup search. lookup_type: rc | fast-tag | chasis | chassis | all. For chassis-only, omit vehicle_number and provide chassis_number."
+					},
+					"response": []
+				},
+				{
 					"name": "Get Search Results",
 					"request": {
 						"method": "GET",

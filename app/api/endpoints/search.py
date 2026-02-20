@@ -34,6 +34,7 @@ from app.schemas.response import SuccessResponse
 from app.schemas.search import (
     EmailLookupRequest,
     PhoneLookupRequest,
+    VehicleLookupRequest,
 )
 from app.services.orchestrators.search_orchestrator import SearchOrchestrator
 from app.services.search_service import SearchService
@@ -227,6 +228,110 @@ async def create_phone_lookup_search(
                 "exception": type(e).__name__,
                 "phone": request.phone,
                 "country_code": request.country_code,
+                "user_id": current_user.user_id,
+            },
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/vehicle-lookup", response_model=SuccessResponse[dict[str, Any]])
+async def create_vehicle_lookup_search(
+    request: VehicleLookupRequest,
+    current_user: TokenData = Depends(get_current_user_token),
+    db=Depends(get_database),
+):
+    try:
+        lookup_type = (
+            "chassis" if request.lookup_type == "chasis" else request.lookup_type
+        )
+
+        if lookup_type == "chassis" and not request.chassis_number:
+            raise HTTPException(
+                status_code=400,
+                detail="chassis_number is required for chassis lookup",
+            )
+
+        if lookup_type != "chassis" and not request.vehicle_number:
+            raise HTTPException(
+                status_code=400,
+                detail="vehicle_number is required for this lookup type",
+            )
+
+        logger.info(
+            "Vehicle lookup search started: %s (type=%s)",
+            request.vehicle_number,
+            lookup_type,
+        )
+
+        # Create search service and orchestrator
+        search_service = SearchService(db)
+        search_orchestrator = SearchOrchestrator(db)
+
+        # Extract user_id from authenticated token
+        user_id = (
+            PydanticObjectId(current_user.user_id) if current_user.user_id else None
+        )
+
+        # Encode vehicle lookup params into the query so we can parse it later.
+        query = (
+            f"veh={request.vehicle_number or ''}|"
+            f"ch={request.chassis_number or ''}|"
+            f"type={lookup_type}"
+        )
+
+        search_type_map = {
+            "rc": SearchType.VEHICLE_RC,
+            "fast-tag": SearchType.VEHICLE_FAST_TAG,
+            "all": SearchType.VEHICLE_ALL,
+            "chassis": SearchType.VEHICLE_CHASIS,
+        }
+        search_type = search_type_map.get(lookup_type, SearchType.VEHICLE_ALL)
+
+        search_create = SearchCreate(
+            user_id=user_id,
+            search_type=search_type,
+            query=query,
+        )
+
+        search = await search_service.create_search(search_create)
+        logger.info(f"Vehicle search record created: {search.id}")
+
+        # Execute the vehicle lookup search
+        result = await search_orchestrator.execute_search(str(search.id))
+
+        logger.info(
+            f"Vehicle lookup completed: {search.id} - Status: {result['status']}"
+        )
+
+        return SuccessResponse[dict[str, Any]](
+            data={
+                "search_id": str(search.id),
+                "vehicle_number": request.vehicle_number,
+                "chassis_number": request.chassis_number,
+                "lookup_type": lookup_type,
+                "status": result["status"],
+                "results_count": result["results_count"],
+                "failed_count": result["failed_count"],
+                "error_message": result.get("error_message"),
+                "results": result["results"],
+                "created_at": search.created_at.isoformat(),
+                "updated_at": search.updated_at.isoformat(),
+            },
+            success=True,
+            message=(
+                "Vehicle lookup executed successfully with "
+                f"{result['results_count']} successful results"
+            ),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Vehicle lookup failed",
+            extra={
+                "exception": type(e).__name__,
+                "vehicle_number": request.vehicle_number,
                 "user_id": current_user.user_id,
             },
         )

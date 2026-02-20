@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import logging
+import time
 from typing import Any
 
 from app.services.integrations.phone_lookup.aitan import AITANService
@@ -15,6 +17,22 @@ from app.services.integrations.phone_lookup.viewcaller_service import ViewCaller
 from app.services.integrations.phone_lookup.whatsapp_service import WhatsAppService
 
 logger = logging.getLogger(__name__)
+
+
+# region agent log
+def _debug_log(payload: dict[str, Any]) -> None:
+    try:
+        with open(
+            "/Users/navitas28/Work/grosint/backend/.cursor/debug.log",
+            "a",
+            encoding="utf-8",
+        ) as log_file:
+            log_file.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except Exception as exc:
+        logger.debug("Debug log write failed: %s", exc)
+
+
+# endregion agent log
 
 
 class PhoneLookupOrchestrator:
@@ -89,6 +107,24 @@ class PhoneLookupOrchestrator:
                 tasks.append(_aitan_task())
                 service_names.append("aitan")
 
+            # region agent log
+            _debug_log(
+                {
+                    "id": f"log_{int(time.time() * 1000)}_phone_start",
+                    "timestamp": int(time.time() * 1000),
+                    "runId": "pre-fix",
+                    "hypothesisId": "H3",
+                    "location": "phone_lookup_orchestrator.py:search_phone:services",
+                    "message": "Phone lookup service list built",
+                    "data": {
+                        "service_names": service_names,
+                        "task_count": len(tasks),
+                        "is_advance": is_advance,
+                    },
+                }
+            )
+            # endregion agent log
+
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             # Combine results
@@ -102,6 +138,7 @@ class PhoneLookupOrchestrator:
                 },
             }
 
+            service_summaries = []
             for i, result in enumerate(results):
                 service_name = service_names[i]
                 if isinstance(result, Exception):
@@ -111,11 +148,53 @@ class PhoneLookupOrchestrator:
                     logger.error(
                         f"Phone lookup service {service_name} failed: {result}"
                     )
+                    service_summaries.append(
+                        {
+                            "service": service_name,
+                            "is_exception": True,
+                            "has_error": True,
+                            "found": False,
+                        }
+                    )
                 else:
                     combined_data["lookup_results"][service_name] = result
                     if result.get("found", False):
                         combined_data["summary"]["successful_sources"] += 1
                         combined_data["summary"]["found_data"] = True
+                    service_summaries.append(
+                        {
+                            "service": service_name,
+                            "is_exception": False,
+                            "has_error": (
+                                "error" in result if isinstance(result, dict) else False
+                            ),
+                            "found": (
+                                result.get("found", False)
+                                if isinstance(result, dict)
+                                else False
+                            ),
+                            "keys": (
+                                list(result.keys()) if isinstance(result, dict) else []
+                            ),
+                        }
+                    )
+
+            # region agent log
+            _debug_log(
+                {
+                    "id": f"log_{int(time.time() * 1000)}_phone_results",
+                    "timestamp": int(time.time() * 1000),
+                    "runId": "pre-fix",
+                    "hypothesisId": "H1",
+                    "location": "phone_lookup_orchestrator.py:search_phone:results",
+                    "message": "Phone lookup service summaries",
+                    "data": {
+                        "summary": combined_data["summary"],
+                        "service_summaries": service_summaries,
+                    },
+                }
+            )
+            # endregion agent log
 
             # Extract emails from results and search Skype
             emails = self._extract_emails_from_results(results, service_names)
