@@ -7,7 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.database import get_database
 from app.core.exceptions import AuthorizationException, UnauthorizedException
-from app.core.token_blocklist import is_token_blocked
+from app.infrastructure.blocklist import is_token_blocked
 from app.models.user import User, UserType
 from app.schemas.auth import AuthStatus, TokenInfo
 from app.utils.jwt import get_token_jti, verify_access_token

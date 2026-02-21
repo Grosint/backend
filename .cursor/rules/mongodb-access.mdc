@@ -1,0 +1,29 @@
+---
+description: MongoDB access boundaries - Beanie vs PyMongo
+globs: app/**/*.py
+alwaysApply: false
+---
+
+# MongoDB Access Rules
+
+## Beanie (ODM) – Domain Entities
+
+Use **only** for collections in `app/models/`:
+
+- `users`, `organizations`, `histories`, `searches`, `results`, `plans`, `payments`, `subscriptions`, `credits`, `credit_transactions`, `seeker_links`, `seeker_results`
+
+**Rule:** Never use raw PyMongo (e.g. `database.users.find_one()`) for these collections.
+
+## PyMongo (raw) – Infrastructure Collections
+
+Use **only** for infrastructure collections in `app/infrastructure/`:
+
+- `blocked_tokens` → `app/infrastructure/blocklist.py`
+- `email_otps` → `app/infrastructure/email_otp.py`
+
+**Rule:** Do not add Beanie models for `blocked_tokens` or `email_otps` unless explicitly justified.
+
+## Constants
+
+- `BEANIE_COLLECTIONS`, `INFRA_COLLECTIONS` in `app/core/database.py` define the boundary.
+- See `TECH_SPEC.md` "Database Access Rules" for full reference.

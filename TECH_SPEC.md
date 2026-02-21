@@ -101,7 +101,7 @@ Client → CORS Middleware → RateLimitMiddleware → add_security_headers
 | Tool | File(s) | Usage |
 |------|---------|-------|
 | **Beanie** | `database.py`, `models/*.py` (user, history, search, result, plan, payment, subscription, credit, credit_txn, organization, seeker), `search.py`, `history.py`, `seeker_service.py`, `api/endpoints/*.py` | `init_beanie`, `Document`, `Indexed`, `Insert`, `Replace`, `Update`, `before_event`, `PydanticObjectId`, `find_one`, `find`, `insert_one`, `update_one` |
-| **PyMongo** | `database.py`, `token_blocklist.py`, `models/user.py`, `models/seeker.py`, `seeker_service.py` | `pymongo.ASCENDING`, `pymongo.errors.ConnectionFailure`, `pymongo.errors.DuplicateKeyError`, `IndexModel`, `collection.create_index`, `insert_one`, `find_one`, `delete_one` |
+| **PyMongo** | `database.py`, `infrastructure/blocklist.py`, `infrastructure/email_otp.py`, `models/user.py`, `models/seeker.py`, `seeker_service.py` | `pymongo.ASCENDING`, `pymongo.errors.ConnectionFailure`, `pymongo.errors.DuplicateKeyError`, `IndexModel`, `collection.create_index`, `insert_one`, `find_one`, `delete_one` |
 | **Motor** | `database.py` | `AsyncIOMotorClient` – async MongoDB driver (from `motor.motor_asyncio`) |
 | **Pydantic** | `config.py`, `schemas/*.py`, `models/*.py`, `utils/validators.py` | `BaseModel`, `BaseSettings`, `Field`, `field_validator`, `field_serializer`, `ConfigDict`, `pydantic_settings.BaseSettings` |
 | **PyJWT** | `core/security.py`, `utils/jwt.py` | `jwt.encode`, `jwt.decode`, `PyJWTError` – access/refresh token creation and verification with issuer/audience checks |
@@ -170,16 +170,25 @@ Used to run multiple external lookups or adapter calls concurrently:
 
 ## 5. Database Layer
 
+### Database Access Rules
+
+| Layer | Tool | Collections | Rule |
+|-------|------|-------------|------|
+| Domain entities | Beanie ODM | `users`, `organizations`, `histories`, `searches`, `results`, `plans`, `payments`, `subscriptions`, `credits`, `credit_transactions`, `seeker_links`, `seeker_results` | Use Beanie models only. No raw PyMongo. |
+| Infrastructure | PyMongo (raw) | `blocked_tokens`, `email_otps` | Use raw driver only. No Beanie models. |
+
+**Rule:** Never use `database.users.find_one()` etc. for Beanie collections. Never add Beanie models for `blocked_tokens`/`email_otps` without explicit justification. Constants: `BEANIE_COLLECTIONS`, `INFRA_COLLECTIONS` in `app/core/database.py`.
+
 ### Beanie-Managed Collections
 
-- `users`, `orgs`, `history`, `searches`, `results`, `plans`, `payments`, `subscriptions`, `credits`, `credit_txn`, `seeker_links`, `seeker_results`
+- `users`, `organizations`, `histories`, `searches`, `results`, `plans`, `payments`, `subscriptions`, `credits`, `credit_transactions`, `seeker_links`, `seeker_results`
 
-### Raw PyMongo Collections (Non-Beanie)
+### Raw PyMongo Collections (Infrastructure)
 
-| Collection | Purpose | Indexes |
-|------------|---------|---------|
-| `email_otps` | OTP storage for email verification | TTL on `expires_at` |
-| `blocked_tokens` | JWT blocklist for logout | TTL on `expires_at`, unique on `jti` |
+| Collection | Purpose | Module | Indexes |
+|------------|---------|--------|---------|
+| `email_otps` | OTP storage for email verification | `app/infrastructure/email_otp.py` | TTL on `expires_at` |
+| `blocked_tokens` | JWT blocklist for logout | `app/infrastructure/blocklist.py` | TTL on `expires_at`, unique on `jti` |
 
 ### Encryption
 
@@ -286,11 +295,26 @@ Used to run multiple external lookups or adapter calls concurrently:
 
 ## 9. Resilience Patterns
 
+### Rate Limiting (Incoming Requests)
+
+**Purpose:** Limit how many requests clients can send to your API (protect your backend from abuse).
+
+| Type | Location | Scope | Config | Notes |
+|------|----------|-------|--------|-------|
+| **Global** | `core/security.py` – `RateLimitMiddleware` | All incoming requests, per-IP | `RATE_LIMIT_PER_MINUTE` (default 60) | Sliding 60s window, in-memory store; returns HTTP 429 when exceeded; adds `X-RateLimit-Limit`, `X-RateLimit-Remaining` headers |
+| **Seeker public** | `api/endpoints/seeker.py` – `_check_seeker_rate_limit()` | Public seeker endpoints (info/result) only | `SEEKER_PUBLIC_RATE_LIMIT_PER_MINUTE` (default 20) | Lower limit for unauthenticated public endpoints |
+
+**Production note:** In-memory store; use Redis or similar for distributed deployments.
+
 ### Circuit Breaker (`resilience.py`)
 
+**Purpose:** Protect your backend when external APIs fail – stops making requests to failing external services to avoid cascading failures.
+
+- **Direction:** Outgoing (your backend → external APIs), not incoming.
+- **Scope:** Per key (e.g. `circuit_key="truecaller_api"`, `"cashfree_api"`) or host extracted from URL.
 - **States:** closed, open, half-open
 - **Config:** `CB_FAILURE_THRESHOLD`, `CB_RECOVERY_TIMEOUT_SECONDS`, `CB_HALF_OPEN_PROBE_ATTEMPTS`
-- **Scope:** Per host (extracted from URL)
+- **Used by:** `ResilientHttpClient` – all external HTTP calls via adapters (phone lookup, payment, etc.)
 
 ### Retry Policy (`resilience.py`)
 
@@ -411,6 +435,7 @@ logger.info("message", extra={"key": value})
 | Auth | SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS |
 | DB | MONGODB_DATABASE |
 | Resilience | CB_*, RETRY_*, MAX_CONCURRENT_REQUESTS, EXTERNAL_API_TIMEOUT |
+| Rate limiting | RATE_LIMIT_PER_MINUTE, SEEKER_PUBLIC_RATE_LIMIT_PER_MINUTE |
 | Logging | LOG_LEVEL, LOG_PATH, LOG_BACKUP_COUNT |
 | Email | AZURE_EMAIL_*, FRONTEND_URL |
 | Payments | CASHFREE_*, GST_RATE, WEBHOOK_SIGNATURE_BYPASS |
@@ -474,16 +499,17 @@ Dense, structured reference for LLM consumption.
 backend/
 ├── app/
 │   ├── main.py              # FastAPI app, lifespan, middleware, routers
-│   ├── api/router.py        # API router aggregation
-│   ├── api/endpoints/       # auth, user, search, history, seeker, plan, payment, subscription, credit, admin
-│   ├── core/                # config, database, security, auth_dependencies, logging, resilience,
-│   │                        # credit_scheduler, token_blocklist, error_handlers, exceptions
-│   ├── models/              # Beanie documents
-│   ├── schemas/             # Pydantic API schemas
-│   ├── services/            # orchestrators, integrations
-│   ├── adapters/            # lookup adapters
-│   ├── utils/               # jwt, encryption, validators
-│   └── externals/           # PhilINT, Holehe (third-party)
+│   ├── api/router.py       # API router aggregation
+│   ├── api/endpoints/      # auth, user, search, history, seeker, plan, payment, subscription, credit, admin
+│   ├── core/               # config, database, security, auth_dependencies, logging, resilience,
+│   │                       # credit_scheduler, error_handlers, exceptions
+│   ├── infrastructure/     # raw PyMongo infra collections (blocklist, email_otp)
+│   ├── models/             # Beanie documents
+│   ├── schemas/            # Pydantic API schemas
+│   ├── services/           # orchestrators, integrations
+│   ├── adapters/           # lookup adapters
+│   ├── utils/              # jwt, encryption, validators
+│   └── externals/          # PhilINT, Holehe (third-party)
 ├── tests/
 ├── monitoring/
 ├── requirements.txt
@@ -498,7 +524,7 @@ backend/
 | Tool | Files | Usage |
 |------|-------|-------|
 | Beanie | database.py, models/*, search.py, history.py, seeker_service.py, endpoints | init_beanie, Document, Indexed, Insert/Replace/Update, before_event, PydanticObjectId, find_one, find, insert_one |
-| PyMongo | database.py, token_blocklist.py, models/user.py, models/seeker.py, seeker_service.py | ASCENDING, ConnectionFailure, DuplicateKeyError, IndexModel, create_index, insert_one, find_one, delete_one |
+| PyMongo | database.py, infrastructure/blocklist.py, infrastructure/email_otp.py, models/user.py, models/seeker.py, seeker_service.py | ASCENDING, ConnectionFailure, DuplicateKeyError, IndexModel, create_index, insert_one, find_one, delete_one |
 | Motor | database.py | AsyncIOMotorClient |
 | Pydantic | config.py, schemas/*, models/*, utils/validators.py | BaseModel, BaseSettings, Field, field_validator, field_serializer, ConfigDict |
 | PyJWT | security.py, utils/jwt.py | jwt.encode, jwt.decode, PyJWTError |
@@ -529,7 +555,12 @@ Deps: get_authorization_header, get_current_user_token, get_current_user, requir
 ## B5. Resilience
 
 ```
-CircuitBreaker: per-host, closed/open/half-open, CB_FAILURE_THRESHOLD, CB_RECOVERY_TIMEOUT_SECONDS
+Rate limiting (incoming):
+  - Global: RateLimitMiddleware, per-IP, RATE_LIMIT_PER_MINUTE=60, sliding 60s window
+  - Seeker: _check_seeker_rate_limit, SEEKER_PUBLIC_RATE_LIMIT_PER_MINUTE=20
+
+CircuitBreaker (outgoing): per-host/circuit_key, closed/open/half-open,
+  CB_FAILURE_THRESHOLD, CB_RECOVERY_TIMEOUT_SECONDS; used by ResilientHttpClient for external API calls
 RetryPolicy: exponential backoff + jitter, retry 408/425/429/5xx, httpx timeouts
 ConcurrencyLimiter: Semaphore(MAX_CONCURRENT_REQUESTS=10)
 ResilientHttpClient: httpx + retry + circuit breaker + concurrency limit

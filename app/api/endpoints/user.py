@@ -6,6 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.core.auth_dependencies import TokenData, get_current_user_token
 from app.core.database import get_database
 from app.core.exceptions import NotFoundException
+from app.infrastructure.email_otp import (
+    generate_otp,
+    mask_email,
+    send_otp_email,
+    store_otp,
+)
 from app.models.user import UserUpdate
 from app.schemas.response import PaginatedResponse, SuccessResponse
 from app.schemas.user import (
@@ -16,7 +22,6 @@ from app.schemas.user import (
     UserUpdateRequest,
 )
 from app.services.user_service import UserService
-from app.utils.email_otp import generate_otp, mask_email, send_otp_email, store_otp
 from app.utils.validators import is_gov_email
 
 router = APIRouter()

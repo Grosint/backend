@@ -11,6 +11,27 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Collections managed by Beanie (domain entities). Do not access via raw driver.
+BEANIE_COLLECTIONS = frozenset(
+    {
+        "users",
+        "organizations",
+        "histories",
+        "searches",
+        "results",
+        "plans",
+        "payments",
+        "subscriptions",
+        "credits",
+        "credit_transactions",
+        "seeker_links",
+        "seeker_results",
+    }
+)
+
+# Infrastructure collections. Use raw PyMongo only. Do not create Beanie models.
+INFRA_COLLECTIONS = frozenset({"blocked_tokens", "email_otps"})
+
 
 def extract_database_name_from_url(mongodb_url: str) -> str:
     """Extract database name from MongoDB URL"""

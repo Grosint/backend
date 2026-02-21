@@ -15,7 +15,7 @@ backend/
 │   │   ├── error_handlers.py
 │   │   ├── exceptions.py
 │   │   ├── security.py
-│   │   └── token_blocklist.py
+│   │   └── infrastructure/       # blocklist, email_otp
 │   ├── models/                 # Data models (user.py)
 │   ├── schemas/                # Pydantic schemas (auth.py, user.py, response.py)
 │   ├── services/               # Business logic (auth_service.py, user_service.py)

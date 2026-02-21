@@ -201,10 +201,13 @@ app/
 │   ├── logging.py                 # Logging configuration
 │   ├── resilience.py              # Circuit breaker, retry, timeout
 │   ├── response_mapper.py         # Response normalization
-│   ├── security.py                # Security utilities (password hashing, etc.)
-│   └── token_blocklist.py         # JWT token blacklist management
+│   └── security.py                # Security utilities (password hashing, etc.)
 │
-├── models/                         # Data models (Beanie ODM)
+├── infrastructure/                # Raw PyMongo infra collections (blocklist, email_otp)
+│   ├── blocklist.py               # JWT token blocklist
+│   └── email_otp.py               # Email OTP storage
+│
+├── models/                        # Data models (Beanie ODM)
 │   ├── user.py                    # User model
 │   ├── search.py                  # Search model
 │   ├── result.py                  # Result model

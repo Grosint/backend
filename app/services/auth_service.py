@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from bson import ObjectId
 
 from app.core.exceptions import NotFoundException, UnauthorizedException
-from app.core.token_blocklist import add_token_to_blocklist
+from app.infrastructure.blocklist import add_token_to_blocklist
 from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,

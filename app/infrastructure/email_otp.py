@@ -1,4 +1,8 @@
-"""Email OTP utilities for user verification."""
+"""Email OTP utilities for user verification.
+
+INFRA COLLECTION: email_otps — uses raw PyMongo. Do not add a Beanie model.
+See TECH_SPEC.md "Database Access Rules".
+"""
 
 import logging
 import secrets

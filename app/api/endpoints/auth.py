@@ -12,6 +12,14 @@ from app.core.auth_dependencies import (
 )
 from app.core.database import get_database
 from app.core.exceptions import UnauthorizedException
+from app.infrastructure.email_otp import (
+    delete_otp,
+    generate_otp,
+    mask_email,
+    send_otp_email,
+    store_otp,
+    verify_otp,
+)
 from app.schemas.auth import (
     AuthStatus,
     ChangePasswordRequest,
@@ -30,14 +38,6 @@ from app.schemas.auth import (
 )
 from app.schemas.response import SuccessResponse
 from app.services.auth_service import AuthService
-from app.utils.email_otp import (
-    delete_otp,
-    generate_otp,
-    mask_email,
-    send_otp_email,
-    store_otp,
-    verify_otp,
-)
 from app.utils.validators import is_gov_email
 
 router = APIRouter()

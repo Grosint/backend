@@ -1,4 +1,8 @@
-"""Token blocklist management for secure logout using MongoDB."""
+"""Token blocklist management for secure logout using MongoDB.
+
+INFRA COLLECTION: blocked_tokens — uses raw PyMongo. Do not add a Beanie model.
+See TECH_SPEC.md "Database Access Rules".
+"""
 
 from datetime import UTC, datetime, timedelta
 
