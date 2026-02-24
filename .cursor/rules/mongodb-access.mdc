@@ -8,9 +8,11 @@ alwaysApply: false
 
 ## Beanie (ODM) – Domain Entities
 
-Use **only** for collections in `app/models/`:
+Use **only** for collections in `app/models/` and `app/profiler/models/`:
 
 - `users`, `organizations`, `histories`, `searches`, `results`, `plans`, `payments`, `subscriptions`, `credits`, `credit_transactions`, `seeker_links`, `seeker_results`
+- `profiler_cases`, `profiler_targets`, `profiler_jobs`, `profiler_source_documents`, `profiler_artifacts`
+- `profiler_entities_profiles`, `profiler_entities_posts`, `profiler_entities_comments`, `profiler_entities_media`, `profiler_entities_locations`, `profiler_entities_interactions`, `profiler_entities_reviews`, `profiler_entities_tags`
 
 **Rule:** Never use raw PyMongo (e.g. `database.users.find_one()`) for these collections.
 

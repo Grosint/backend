@@ -26,6 +26,21 @@ BEANIE_COLLECTIONS = frozenset(
         "credit_transactions",
         "seeker_links",
         "seeker_results",
+        # Profiler bounded context
+        "profiler_cases",
+        "profiler_targets",
+        "profiler_jobs",
+        "profiler_source_documents",
+        "profiler_artifacts",
+        # Profiler canonical entity collections
+        "profiler_entities_profiles",
+        "profiler_entities_posts",
+        "profiler_entities_comments",
+        "profiler_entities_media",
+        "profiler_entities_locations",
+        "profiler_entities_interactions",
+        "profiler_entities_reviews",
+        "profiler_entities_tags",
     }
 )
 
@@ -63,8 +78,12 @@ async def get_database():
     return db.database
 
 
-async def connect_to_mongo():
-    """Create database connection"""
+async def connect_to_mongo(*, process: str = "Main Process"):
+    """Create database connection.
+
+    Args:
+        process: Identifier for logging (e.g. 'Main Process', 'Worker Process').
+    """
     # MONGODB_URL is validated at startup, but type checker needs assurance
     if not settings.MONGODB_URL:
         raise ValueError(
@@ -96,7 +115,7 @@ async def connect_to_mongo():
                     user, _ = user_pass.split(":", 1)
                     masked_url = masked_url.replace(user_pass, f"{user}:***")
 
-        logger.info(f"Connected to MongoDB at {masked_url}")
+        logger.info(f"Connected to MongoDB at {masked_url} (via {process})")
 
         # Migrate indexes: Drop old unique email index if it exists
         await migrate_user_indexes(db.database)
@@ -113,6 +132,21 @@ async def connect_to_mongo():
         from app.models.seeker import SeekerLink, SeekerResult
         from app.models.subscription import Subscription
         from app.models.user import User  # local import to avoid circulars
+        from app.profiler.models import (
+            CommentEntity,
+            InteractionEntity,
+            LocationEntity,
+            MediaEntity,
+            PostEntity,
+            ProfileEntity,
+            ProfilerArtifact,
+            ProfilerCase,
+            ProfilerJob,
+            ProfilerSourceDocument,
+            ProfilerTarget,
+            ReviewEntity,
+            TagEntity,
+        )
 
         await init_beanie(
             database=db.database,
@@ -129,9 +163,22 @@ async def connect_to_mongo():
                 CreditTxn,
                 SeekerLink,
                 SeekerResult,
+                ProfilerCase,
+                ProfilerTarget,
+                ProfilerJob,
+                ProfilerSourceDocument,
+                ProfilerArtifact,
+                ProfileEntity,
+                PostEntity,
+                CommentEntity,
+                MediaEntity,
+                LocationEntity,
+                InteractionEntity,
+                ReviewEntity,
+                TagEntity,
             ],
         )
-        logger.info("Initialized Beanie")
+        logger.info("Initialized Beanie (%s)", process)
 
         # Initialize non-Beanie collection indexes (e.g., email_otps)
         await initialize_collection_indexes(db.database)

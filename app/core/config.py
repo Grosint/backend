@@ -154,6 +154,47 @@ class Settings(BaseSettings):
     # Frontend URL for email links (password reset, etc.)
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://your-app.com")
 
+    # Profiler bounded context (public-web capture, evidence store, inference)
+    PROFILER_ENABLED: bool = os.getenv("PROFILER_ENABLED", "true").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    PROFILER_REDIS_URL: str = os.getenv(
+        "PROFILER_REDIS_URL", "redis://localhost:6379/0"
+    )
+    PROFILER_REDIS_STREAM: str = os.getenv("PROFILER_REDIS_STREAM", "profiler_jobs")
+    PROFILER_REDIS_CONSUMER_GROUP: str = os.getenv(
+        "PROFILER_REDIS_CONSUMER_GROUP", "profiler_workers"
+    )
+    PROFILER_REDIS_CONSUMER_NAME: str = os.getenv(
+        "PROFILER_REDIS_CONSUMER_NAME", "worker-1"
+    )
+    PROFILER_WORKER_CONCURRENCY: int = int(
+        os.getenv("PROFILER_WORKER_CONCURRENCY", "5")
+    )
+    PROFILER_PUBLIC_FETCH_TIMEOUT_SECONDS: int = int(
+        os.getenv("PROFILER_PUBLIC_FETCH_TIMEOUT_SECONDS", "30")
+    )
+    PROFILER_PUBLIC_MAX_PAGES_PER_JOB: int = int(
+        os.getenv("PROFILER_PUBLIC_MAX_PAGES_PER_JOB", "50")
+    )
+    PROFILER_PUBLIC_USER_AGENT: str = os.getenv(
+        "PROFILER_PUBLIC_USER_AGENT", "ProfilerPublicCapture/1.0"
+    )
+    # Azure Blob for profiler evidence - use connection string OR account name+key
+    AZURE_BLOB_CONNECTION_STRING: str = os.getenv("AZURE_BLOB_CONNECTION_STRING", "")
+    AZURE_STORAGE_ACCOUNT_NAME: str = os.getenv("AZURE_STORAGE_ACCOUNT_NAME", "")
+    AZURE_STORAGE_ACCOUNT_KEY: str = os.getenv("AZURE_STORAGE_ACCOUNT_KEY", "")
+    AZURE_STORAGE_CONTAINER_NAME: str = os.getenv(
+        "AZURE_STORAGE_CONTAINER_NAME", "uploads"
+    )
+    AZURE_BLOB_CONTAINER_EVIDENCE: str = os.getenv(
+        "AZURE_BLOB_CONTAINER_EVIDENCE"
+    ) or os.getenv("AZURE_STORAGE_CONTAINER_NAME", "profiler-evidence")
+    INFERENCE_MODE: str = os.getenv("INFERENCE_MODE", "disabled")
+    INFERENCE_BASE_URL: str | None = os.getenv("INFERENCE_BASE_URL") or None
+
     # Seeker geolocation/device-info collection (opt-in; set SEEKER_ENABLED=true to enable)
     SEEKER_ENABLED: bool = os.getenv("SEEKER_ENABLED", "true").lower() in (
         "true",

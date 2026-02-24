@@ -1,0 +1,50 @@
+# Profiler dev stack: Redis + Profiler Worker (Playwright/Chromium) + optional Azurite
+# Worker requires Playwright Chromium for scraping Facebook, Instagram, X.
+services:
+    redis:
+        image: redis:7-alpine
+        container_name: profiler-redis
+        ports:
+            - "6379:6379"
+        volumes:
+            - redis_data:/data
+        command: redis-server --appendonly yes
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    profiler-worker:
+        build:
+            context: .
+            dockerfile: Dockerfile.profiler-worker
+        container_name: profiler-worker
+        depends_on:
+            redis:
+                condition: service_healthy
+        ipc: host  # Recommended for Chromium to avoid memory issues
+        environment:
+            PROFILER_REDIS_URL: redis://redis:6379/0
+            # MONGODB_URL and AZURE_BLOB_* from .env or host
+        env_file:
+            - .env
+        restart: unless-stopped
+
+    # Optional: Azurite for local Azure Blob dev
+    azurite:
+        image: mcr.microsoft.com/azure-storage/azurite:latest
+        container_name: profiler-azurite
+        ports:
+            - "10000:10000"  # Blob
+            - "10001:10001"  # Queue
+            - "10002:10002"  # Table
+        volumes:
+            - azurite_data:/data
+        command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+        profiles:
+            - azurite
+
+volumes:
+    redis_data:
+    azurite_data:

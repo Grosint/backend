@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "fd991e9e-0a60-4e82-b42a-46eb3dbf3d7b",
 		"name": "GROSINT V2 API Collection",
-		"description": "Complete API collection for GROSINT V2 Backend - Authentication, User Management, Search, and Admin Operations",
+		"description": "Complete API collection for GROSINT V2 Backend - Authentication, User Management, Search, Profiler, and Admin Operations",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "1173637"
 	},
@@ -2234,6 +2234,277 @@
 					"description": "Test IP, IMEI, Virtual Number, Virtual Email lookups. Bank and Verify ID use Befisc - see Test Befisc Service."
 				},
 				{
+					"name": "Test Profiler Scrapers",
+					"item": [
+						{
+							"name": "Scrape X (Twitter)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"type\": \"x\",\n  \"url\": \"https://x.com/elonmusk\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/profiler/scrape",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "profiler", "scrape"]
+								},
+								"description": "Scrape a public X/Twitter profile directly. No auth. Test-only. Returns raw scraper result (status, extracted, reason)."
+							},
+							"response": []
+						},
+						{
+							"name": "Scrape X + Upload to Blob",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {",
+											"    var jsonData = pm.response.json();",
+											"    if (jsonData.data && jsonData.data.upload && jsonData.data.upload.blob_path) {",
+											"        pm.environment.set('admin_profiler_blob_path', jsonData.data.upload.blob_path);",
+											"        pm.environment.set('admin_profiler_url', jsonData.data.url);",
+											"        console.log('✅ blob_path and url saved for Normalize from Blob');",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"type\": \"x\",\n  \"url\": \"https://x.com/elonmusk\",\n  \"upload\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/profiler/scrape",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "profiler", "scrape"]
+								},
+								"description": "Scrape X profile and upload JSON to Azure Blob. Returns blob_path. Run 'Normalize from Blob' next to test full pipeline (no Redis/worker)."
+							},
+							"response": []
+						},
+						{
+							"name": "Scrape Instagram",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"type\": \"instagram\",\n  \"url\": \"https://instagram.com/instagram\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/profiler/scrape",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "profiler", "scrape"]
+								},
+								"description": "Scrape a public Instagram profile directly. No auth. Test-only. Returns raw scraper result."
+							},
+							"response": []
+						},
+						{
+							"name": "Scrape Instagram + Upload to Blob",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {",
+											"    var jsonData = pm.response.json();",
+											"    if (jsonData.data && jsonData.data.upload && jsonData.data.upload.blob_path) {",
+											"        pm.environment.set('admin_profiler_blob_path', jsonData.data.upload.blob_path);",
+											"        pm.environment.set('admin_profiler_url', jsonData.data.url);",
+											"        console.log('✅ blob_path and url saved for Normalize from Blob');",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"type\": \"instagram\",\n  \"url\": \"https://instagram.com/instagram\",\n  \"upload\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/profiler/scrape",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "profiler", "scrape"]
+								},
+								"description": "Scrape Instagram profile and upload JSON to Azure Blob. Returns blob_path. Run 'Normalize from Blob' next."
+							},
+							"response": []
+						},
+						{
+							"name": "Scrape Facebook",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"type\": \"facebook\",\n  \"url\": \"https://facebook.com/zuck\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/profiler/scrape",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "profiler", "scrape"]
+								},
+								"description": "Scrape a public Facebook profile directly. No auth. Test-only. Returns raw scraper result."
+							},
+							"response": []
+						},
+						{
+							"name": "Scrape Facebook + Upload to Blob",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {",
+											"    var jsonData = pm.response.json();",
+											"    if (jsonData.data && jsonData.data.upload && jsonData.data.upload.blob_path) {",
+											"        pm.environment.set('admin_profiler_blob_path', jsonData.data.upload.blob_path);",
+											"        pm.environment.set('admin_profiler_url', jsonData.data.url);",
+											"        console.log('✅ blob_path and url saved for Normalize from Blob');",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"type\": \"facebook\",\n  \"url\": \"https://facebook.com/zuck\",\n  \"upload\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/profiler/scrape",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "profiler", "scrape"]
+								},
+								"description": "Scrape Facebook profile and upload JSON to Azure Blob. Returns blob_path. Run 'Normalize from Blob' next."
+							},
+							"response": []
+						},
+						{
+							"name": "Normalize from Blob",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {",
+											"    var jsonData = pm.response.json();",
+											"    if (jsonData.data) {",
+											"        pm.environment.set('admin_profiler_org_id', jsonData.data.org_id || '');",
+											"        pm.environment.set('admin_profiler_case_id', jsonData.data.case_id || '');",
+											"        pm.environment.set('admin_profiler_target_id', jsonData.data.target_id || '');",
+											"        console.log('✅ org_id, case_id, target_id saved for Analyze');",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"blob_path\": \"{{admin_profiler_blob_path}}\",\n  \"url\": \"{{admin_profiler_url}}\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/profiler/normalize",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "profiler", "normalize"]
+								},
+								"description": "Pull JSON from Azure Blob and run normalization synchronously. No Redis, no worker. Use after 'Scrape X/Instagram/Facebook + Upload to Blob'. blob_path and url are auto-filled from env (set by scrape+upload test script). Saves org_id, case_id, target_id for Analyze."
+							},
+							"response": []
+						},
+						{
+							"name": "Analyze Entities",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"target_id\": \"{{admin_profiler_target_id}}\",\n  \"org_id\": \"{{admin_profiler_org_id}}\",\n  \"case_id\": \"{{admin_profiler_case_id}}\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/profiler/analyze",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "profiler", "analyze"]
+								},
+								"description": "Run all analyzers on normalized entities synchronously. No Redis, no worker. Use after 'Normalize from Blob'. target_id, org_id, case_id are auto-filled from env (set by normalize test script). Creates engagement, hashtags, locations, activity, etc. artifacts."
+							},
+							"response": []
+						}
+					],
+					"description": "Test profiler scrapers (X, Instagram, Facebook) directly. No auth, no worker. Flow: Scrape+Upload → Normalize from Blob → Analyze Entities. Full pipeline without Redis/worker."
+				},
+				{
 					"name": "Test AITAN Service",
 					"item": [
 						{
@@ -2855,6 +3126,257 @@
 			"description": "Admin endpoints for debugging and testing services"
 		},
 		{
+			"name": "Profiler",
+			"item": [
+				{
+					"name": "Cases",
+					"item": [
+						{
+							"name": "Create Case",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200 || pm.response.code === 201) {",
+											"    var jsonData = pm.response.json();",
+											"    if (jsonData.data && jsonData.data.id) {",
+											"        pm.environment.set('profiler_case_id', jsonData.data.id);",
+											"        console.log('✅ Case ID saved: ' + jsonData.data.id);",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{"key": "Content-Type", "value": "application/json"},
+									{"key": "Authorization", "value": "Bearer {{access_token}}"}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Investigation Case 1\",\n  \"description\": \"OSINT profiling investigation\",\n  \"org_id\": null\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/profiler/cases",
+									"host": ["{{base_url}}"],
+									"path": ["profiler", "cases"]
+								},
+								"description": "Create a new profiler case. Requires PROFILER feature. org_id is optional; resolved from user when not provided."
+							},
+							"response": []
+						},
+						{
+							"name": "List Cases",
+							"request": {
+								"method": "GET",
+								"header": [
+									{"key": "Authorization", "value": "Bearer {{access_token}}"}
+								],
+								"url": {
+									"raw": "{{base_url}}/profiler/cases",
+									"host": ["{{base_url}}"],
+									"path": ["profiler", "cases"]
+								},
+								"description": "List all profiler cases for the current user's organization."
+							},
+							"response": []
+						},
+						{
+							"name": "Get Case",
+							"request": {
+								"method": "GET",
+								"header": [
+									{"key": "Authorization", "value": "Bearer {{access_token}}"}
+								],
+								"url": {
+									"raw": "{{base_url}}/profiler/cases/{{profiler_case_id}}",
+									"host": ["{{base_url}}"],
+									"path": ["profiler", "cases", "{{profiler_case_id}}"]
+								},
+								"description": "Get case details by ID. Requires profiler_case_id (set automatically after Create Case)."
+							},
+							"response": []
+						}
+					],
+					"description": "Profiler case management"
+				},
+				{
+					"name": "Targets",
+					"item": [
+						{
+							"name": "Create Target",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200 || pm.response.code === 201) {",
+											"    var jsonData = pm.response.json();",
+											"    if (jsonData.data && jsonData.data.id) {",
+											"        pm.environment.set('profiler_target_id', jsonData.data.id);",
+											"        console.log('✅ Target ID saved: ' + jsonData.data.id);",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{"key": "Content-Type", "value": "application/json"},
+									{"key": "Authorization", "value": "Bearer {{access_token}}"}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"target_type\": \"url\",\n  \"input_value\": \"https://x.com/username\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/profiler/cases/{{profiler_case_id}}/targets",
+									"host": ["{{base_url}}"],
+									"path": ["profiler", "cases", "{{profiler_case_id}}", "targets"]
+								},
+								"description": "Create a target for a case. target_type: url | username. For url: provide profile/page URL. For username: provide handle (e.g. instagram/username, @username); source is auto-detected (X, Instagram, Facebook)."
+							},
+							"response": []
+						},
+						{
+							"name": "List Targets",
+							"request": {
+								"method": "GET",
+								"header": [
+									{"key": "Authorization", "value": "Bearer {{access_token}}"}
+								],
+								"url": {
+									"raw": "{{base_url}}/profiler/cases/{{profiler_case_id}}/targets",
+									"host": ["{{base_url}}"],
+									"path": ["profiler", "cases", "{{profiler_case_id}}", "targets"]
+								},
+								"description": "List all targets for a case."
+							},
+							"response": []
+						},
+						{
+							"name": "Collect Target",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200 || pm.response.code === 201) {",
+											"    var jsonData = pm.response.json();",
+											"    if (jsonData.data && jsonData.data.id) {",
+											"        pm.environment.set('profiler_job_id', jsonData.data.id);",
+											"        console.log('✅ Job ID saved: ' + jsonData.data.id);",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{"key": "Authorization", "value": "Bearer {{access_token}}"}
+								],
+								"url": {
+									"raw": "{{base_url}}/profiler/cases/{{profiler_case_id}}/targets/{{profiler_target_id}}/collect",
+									"host": ["{{base_url}}"],
+									"path": ["profiler", "cases", "{{profiler_case_id}}", "targets", "{{profiler_target_id}}", "collect"]
+								},
+								"description": "Enqueue public_capture job to scrape public profile/timeline from X, Instagram, or Facebook."
+							},
+							"response": []
+						},
+						{
+							"name": "List Artifacts",
+							"request": {
+								"method": "GET",
+								"header": [
+									{"key": "Authorization", "value": "Bearer {{access_token}}"}
+								],
+								"url": {
+									"raw": "{{base_url}}/profiler/cases/{{profiler_case_id}}/targets/{{profiler_target_id}}/artifacts",
+									"host": ["{{base_url}}"],
+									"path": ["profiler", "cases", "{{profiler_case_id}}", "targets", "{{profiler_target_id}}", "artifacts"]
+								},
+								"description": "List artifacts (profile_card, timeline, coverage, engagement, hashtags, locations, inference_result) for a target."
+							},
+							"response": []
+						},
+						{
+							"name": "Infer Target",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200 || pm.response.code === 201) {",
+											"    var jsonData = pm.response.json();",
+											"    if (jsonData.data && jsonData.data.id) {",
+											"        pm.environment.set('profiler_job_id', jsonData.data.id);",
+											"        console.log('✅ Inference job ID saved: ' + jsonData.data.id);",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{"key": "Content-Type", "value": "application/json"},
+									{"key": "Authorization", "value": "Bearer {{access_token}}"}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"task_type\": \"text_summary\",\n  \"inputs\": [\n    {\n      \"ref_type\": \"entity_id\",\n      \"ref\": \"entity_profile_123\",\n      \"mime_type\": null\n    }\n  ],\n  \"context\": {\n    \"org_id\": \"\",\n    \"case_id\": \"\",\n    \"target_id\": \"\",\n    \"job_id\": \"\",\n    \"policy_tier\": \"default\",\n    \"locale\": null,\n    \"redactions_required\": true,\n    \"required_citations\": true\n  },\n  \"constraints\": {\n    \"max_output_chars\": null,\n    \"allowed_labels\": null,\n    \"require_explanations\": true\n  }\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/profiler/cases/{{profiler_case_id}}/targets/{{profiler_target_id}}/infer",
+									"host": ["{{base_url}}"],
+									"path": ["profiler", "cases", "{{profiler_case_id}}", "targets", "{{profiler_target_id}}", "infer"]
+								},
+								"description": "Enqueue inference job. task_type: image_summary | text_summary | entity_resolution | topic_model | sentiment_summary | nsfw_media_flag | face_cluster | ocr_extract. context.org_id, case_id, target_id are overridden from path. ref_type: entity_id | source_document_id | blob_path | url."
+							},
+							"response": []
+						}
+					],
+					"description": "Target management and collection"
+				},
+				{
+					"name": "Jobs",
+					"item": [
+						{
+							"name": "Get Job",
+							"request": {
+								"method": "GET",
+								"header": [
+									{"key": "Authorization", "value": "Bearer {{access_token}}"}
+								],
+								"url": {
+									"raw": "{{base_url}}/profiler/jobs/{{profiler_job_id}}",
+									"host": ["{{base_url}}"],
+									"path": ["profiler", "jobs", "{{profiler_job_id}}"]
+								},
+								"description": "Get job status and result. Job ID is set after Collect Target or Infer Target."
+							},
+							"response": []
+						}
+					],
+					"description": "Job status and monitoring"
+				}
+			],
+			"description": "Profiler OSINT: cases, targets, collection jobs, artifacts, and inference. Requires PROFILER feature and PROFILER_ENABLED. Workflow: Create Case → Create Target → Collect Target (or Infer Target) → List Artifacts / Get Job."
+		},
+		{
 			"name": "Health Check",
 			"item": [
 				{
@@ -2942,6 +3464,21 @@
 		},
 		{
 			"key": "search_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "profiler_case_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "profiler_target_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "profiler_job_id",
 			"value": "",
 			"type": "string"
 		}

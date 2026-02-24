@@ -411,12 +411,8 @@ def require_feature(feature: str | None = None):
         Raises:
             AuthorizationException: If user doesn't have required feature access
         """
-        # Admin users have all features
+        # Admin users have all features; org admins must have feature in allow list
         if current_user.userType == UserType.ADMIN:
-            return current_user
-
-        # Org admin users have all features
-        if current_user.userType == UserType.ORG_ADMIN:
             return current_user
 
         # If no feature specified, allow all authenticated users
