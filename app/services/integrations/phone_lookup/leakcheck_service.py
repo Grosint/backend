@@ -297,3 +297,146 @@ class LeakCheckService:
                 "error": str(e),
                 "_raw_response": raw_response,
             }
+
+    async def search_leak(
+        self,
+        query_type: str,
+        query_data: str,
+        country_code: str = "+91",
+    ) -> dict[str, Any]:
+        """
+        Search leaked data by type: email, mobile (phone), username, keyword.
+
+        Args:
+            query_type: One of email, mobile, username, keyword
+            query_data: Search value (email, phone, username, or keyword)
+            country_code: Country code for mobile (e.g. +91). Used when query_type is mobile.
+
+        Returns:
+            dict: {found, source, data, confidence, _raw_response}
+        """
+        # Map API type: mobile -> phone
+        api_type = "phone" if query_type == "mobile" else query_type
+
+        if api_type not in ("email", "phone", "username", "keyword"):
+            return {
+                "found": False,
+                "source": "leakcheck",
+                "data": None,
+                "error": f"Invalid query_type: {query_type}",
+                "confidence": 0.0,
+                "_raw_response": {"error": f"Invalid query_type: {query_type}"},
+            }
+
+        try:
+            logger.info(
+                "LeakCheck: Searching %s=%s (cc=%s)",
+                api_type,
+                query_data[:20] + "..." if len(query_data) > 20 else query_data,
+                country_code,
+            )
+
+            if api_type == "phone":
+                # For phone: try original and with country code prefix (e.g. 91 for India)
+                cc_digits = country_code.lstrip("+").strip() or "91"
+                query_data_list = [query_data, f"{cc_digits}{query_data}"]
+                final_response = []
+                all_raw_responses = []
+
+                for index, query in enumerate(query_data_list):
+                    url = f"https://leakcheck.io/api/v2/query/{query}?type=phone"
+                    try:
+                        response = await self.client.request(
+                            "GET",
+                            url,
+                            headers={
+                                "accept": "application/json",
+                                "X-API-Key": settings.LEAK_CHECK_API_KEY,
+                            },
+                            circuit_key="leakcheck_api",
+                        )
+                        response_json = response.json()
+                        all_raw_responses.append(response_json)
+
+                        if response_json.get("success") is False:
+                            continue
+
+                        formatted_data = self._format_response(response_json, index)
+                        if formatted_data:
+                            final_response.extend(formatted_data)
+                    except Exception as e:
+                        logger.warning(
+                            f"LeakCheck phone search failed for query {query}: {e}"
+                        )
+                        all_raw_responses.append({"error": str(e), "query": query})
+
+                raw_response = {
+                    "queries": query_data_list,
+                    "responses": all_raw_responses,
+                }
+                if final_response:
+                    return {
+                        "found": True,
+                        "source": "leakcheck",
+                        "data": final_response,
+                        "confidence": 0.8,
+                        "_raw_response": raw_response,
+                    }
+                return {
+                    "found": False,
+                    "source": "leakcheck",
+                    "data": None,
+                    "confidence": 0.0,
+                    "_raw_response": raw_response,
+                }
+
+            # Generic path for email, username, keyword
+            url = f"https://leakcheck.io/api/v2/query/{query_data}?type={api_type}"
+            response = await self.client.request(
+                "GET",
+                url,
+                headers={
+                    "accept": "application/json",
+                    "X-API-Key": settings.LEAK_CHECK_API_KEY,
+                },
+                circuit_key="leakcheck_api",
+            )
+            response_json = response.json()
+
+            if response_json.get("success") is False:
+                return {
+                    "found": False,
+                    "source": "leakcheck",
+                    "data": None,
+                    "confidence": 0.0,
+                    "_raw_response": response_json,
+                }
+
+            formatted_data = self._format_response(response_json, 0)
+            if formatted_data:
+                return {
+                    "found": True,
+                    "source": "leakcheck",
+                    "data": formatted_data,
+                    "confidence": 0.8,
+                    "_raw_response": response_json,
+                }
+            return {
+                "found": False,
+                "source": "leakcheck",
+                "data": None,
+                "confidence": 0.0,
+                "_raw_response": response_json,
+            }
+
+        except Exception as e:
+            logger.error(f"LeakCheck search_leak failed: {e}", exc_info=True)
+            raw_response = {"error": str(e), "exception_type": type(e).__name__}
+            return {
+                "found": False,
+                "source": "leakcheck",
+                "data": None,
+                "error": str(e),
+                "confidence": 0.0,
+                "_raw_response": raw_response,
+            }

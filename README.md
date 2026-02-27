@@ -136,7 +136,7 @@ Once the server is running, visit:
 
 ### Execution Flow
 
-1. **Request Received**: API endpoint receives request (e.g., `/api/v1/searches/`)
+1. **Request Received**: API endpoint receives request (e.g., `/api/search/phone-lookup`)
 2. **Search Creation**: `SearchService` creates a search record in MongoDB
 3. **Orchestration**: `SearchOrchestrator` determines which adapters to use based on search type
 4. **Adapter Execution**: Each adapter orchestrates multiple external APIs in parallel
@@ -606,39 +606,38 @@ Each adapter can define custom response formatting:
 
 #### Authentication
 
-- `POST /api/v1/auth/token` - Get access token
-- `POST /api/v1/auth/refresh` - Refresh access token
-- `POST /api/v1/auth/logout` - Logout (blacklist token)
+- `POST /api/auth/login` - Login
+- `POST /api/auth/refresh` - Refresh access token
+- `POST /api/auth/logout` - Logout (blacklist token)
 
 #### Users
 
-- `POST /api/v1/users/` - Create user
-- `GET /api/v1/users/me` - Get current user
-- `PUT /api/v1/users/me` - Update current user
-- `GET /api/v1/users/` - List users (admin)
-- `DELETE /api/v1/users/{user_id}` - Delete user (admin)
+- `POST /api/user/` - Create user
+- `GET /api/user/me` - Get current user
+- `PUT /api/user/me` - Update current user
+- `GET /api/user/list` - List users (admin)
+- `DELETE /api/user/{user_id}` - Delete user (admin)
 
-#### Searches
+#### Search
 
-- `POST /api/v1/searches/` - Create and execute search
-- `GET /api/v1/searches/{search_id}` - Get search results
-- `GET /api/v1/searches/` - List searches
-- `GET /api/v1/searches/stats/overview` - Get search statistics
-- `DELETE /api/v1/searches/{search_id}` - Delete search
+- `POST /api/search/phone-lookup` - Phone lookup
+- `POST /api/search/email-lookup` - Email lookup
+- `GET /api/search/search/{search_id}` - Get search results
+- `GET /api/search/searches` - List searches
+- `GET /api/search/search-stats` - Search statistics
 
 #### History
 
-- `GET /api/v1/history/{history_id}` - Get detailed history
+- `GET /api/history/{history_id}` - Get detailed history
 
 ### Example 1: Phone Lookup
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/searches/" \
+curl -X POST "http://localhost:8000/api/search/phone-lookup" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "1234567890",
-    "search_type": "PHONE",
+    "phone": "1234567890",
     "country_code": "+1"
   }'
 ```
@@ -648,11 +647,14 @@ curl -X POST "http://localhost:8000/api/v1/searches/" \
 ```json
 {
   "success": true,
-  "message": "Search created and execution started",
+  "message": "Phone lookup executed successfully...",
   "data": {
     "search_id": "65f8a1b2c3d4e5f6a7b8c9d0",
-    "status": "IN_PROGRESS",
-    "history_id": "65f8a1b2c3d4e5f6a7b8c9d1"
+    "phone": "+11234567890",
+    "country_code": "+1",
+    "status": "COMPLETED",
+    "results_count": 5,
+    "results": [...]
   }
 }
 ```
@@ -660,7 +662,7 @@ curl -X POST "http://localhost:8000/api/v1/searches/" \
 ### Example 2: Get Detailed Results
 
 ```bash
-curl "http://localhost:8000/api/v1/history/65f8a1b2c3d4e5f6a7b8c9d1" \
+curl "http://localhost:8000/api/history/65f8a1b2c3d4e5f6a7b8c9d1" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -721,12 +723,11 @@ curl "http://localhost:8000/api/v1/history/65f8a1b2c3d4e5f6a7b8c9d1" \
 ### Example 3: Email Search with Multiple APIs
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/searches/" \
+curl -X POST "http://localhost:8000/api/search/email-lookup" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "user@example.com",
-    "search_type": "EMAIL"
+    "email": "user@example.com"
   }'
 ```
 
@@ -736,23 +737,21 @@ curl -X POST "http://localhost:8000/api/v1/searches/" \
 2. **SocialMediaAdapter**: Searches Twitter, LinkedIn, Facebook
 3. **SecurityAdapter**: Checks malware, phishing, breach databases
 
-### Example 4: Domain Search
+### Example 4: Vehicle Lookup
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/searches/" \
+curl -X POST "http://localhost:8000/api/search/vehicle-lookup" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "example.com",
-    "search_type": "DOMAIN"
+    "lookup_type": "rc",
+    "vehicle_number": "DL01AB1234"
   }'
 ```
 
 **What happens:**
 
-1. **DomainAdapter**: WHOIS, DNS records, SSL certificate, subdomains
-2. **SocialMediaAdapter**: Social media presence, influence metrics
-3. **SecurityAdapter**: Malware detection, reputation, SSL analysis
+1. **AITAN Vehicle Service**: RC lookup, challan, chassis-to-RC, Fastag history
 
 ---
 

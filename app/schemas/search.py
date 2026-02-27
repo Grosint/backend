@@ -109,3 +109,20 @@ class VirtualEmailLookupRequest(BaseModel):
     """Request schema for virtual/disposable email check"""
 
     email: str = Field(..., description="Email address to check")
+
+
+class DarkWebLeakRequest(BaseModel):
+    """Request schema for dark web leaked data search"""
+
+    query_type: Literal["email", "mobile", "username", "keyword"] = Field(
+        ...,
+        description="Type of search: email, mobile, username, or keyword",
+    )
+    query_data: str = Field(
+        ...,
+        description="Search value (email, phone, username, or keyword)",
+    )
+    country_code: str = Field(
+        "+91",
+        description="Country code for mobile (e.g. +91). Used when query_type is mobile.",
+    )

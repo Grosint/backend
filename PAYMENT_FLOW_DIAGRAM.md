@@ -31,7 +31,7 @@ flowchart TD
     E --> I[Plan Available in Collection]
     H --> I
 
-    I --> J[User Fetches Plans<br/>GET /api/v1/plans/]
+    I --> J[User Fetches Plans<br/>GET /api/plans/]
     J --> K{Filter by isPrepaid}
     K -->|true| L[Show Prepaid Plans]
     K -->|false| M[Show Subscription Plans]
@@ -41,7 +41,7 @@ flowchart TD
 - Plans are stored in MongoDB `plans` collection
 - Prepaid plans don't need Cashfree plan ID
 - Subscription plans require Cashfree plan creation and `cashfreePlanId`
-- Plans can be fetched via `GET /api/v1/plans/` endpoint
+- Plans can be fetched via `GET /api/plans/` endpoint
 - Only active plans (`isActive: true`) are shown by default
 
 ---
@@ -52,7 +52,7 @@ Prepaid payments are one-time purchases that immediately grant credits.
 
 ```mermaid
 flowchart TD
-    A[User Selects Prepaid Plan] --> B[POST /api/v1/payments/create<br/>planId, origin]
+    A[User Selects Prepaid Plan] --> B[POST /api/payments/create<br/>planId, origin]
     B --> C[PaymentService.create_payment]
 
     C --> D[Validate User & Plan]
@@ -69,8 +69,8 @@ flowchart TD
     K --> L[User Redirected to Cashfree]
 
     L --> M{Payment Status?}
-    M -->|Success| N[Cashfree Webhook<br/>POST /api/v1/payments/webhook]
-    M -->|User Returns| O[GET /api/v1/payments/verify/{order_id}]
+    M -->|Success| N[Cashfree Webhook<br/>POST /api/payments/webhook]
+    M -->|User Returns| O[GET /api/payments/verify/{order_id}]
 
     N --> P[PaymentService.process_webhook]
     O --> Q[PaymentService.verify_payment]
@@ -106,7 +106,7 @@ Subscriptions are recurring payments that grant periodic credits.
 
 ```mermaid
 flowchart TD
-    A[User Selects Subscription Plan] --> B[POST /api/v1/subscriptions/create<br/>planId, origin]
+    A[User Selects Subscription Plan] --> B[POST /api/subscriptions/create<br/>planId, origin]
     B --> C[SubscriptionService.create_subscription]
 
     C --> D[Validate User & Plan]
@@ -130,7 +130,7 @@ flowchart TD
     Q --> R[User Authorizes Subscription]
     R --> S[Cashfree Webhook:<br/>SUBSCRIPTION_ACTIVATED]
 
-    S --> T[POST /api/v1/subscriptions/webhook]
+    S --> T[POST /api/subscriptions/webhook]
     T --> U[SubscriptionService.process_webhook]
 
     U --> V{Event Type?}
@@ -163,7 +163,7 @@ flowchart TD
 - Subscriptions create `PERIODIC` type credits
 - First charge happens 2 days after subscription creation
 - Credits are renewed on each billing cycle (monthly)
-- Subscription can be cancelled via `POST /api/v1/subscriptions/{id}/cancel`
+- Subscription can be cancelled via `POST /api/subscriptions/{id}/cancel`
 - Status transitions: INITIALIZED → ACTIVE → (CANCELLED/EXPIRED)
 
 ---
@@ -287,7 +287,7 @@ Both payment and subscription webhooks are processed asynchronously.
 
 ```mermaid
 flowchart TD
-    A[Cashfree Payment Webhook] --> B[POST /api/v1/payments/webhook]
+    A[Cashfree Payment Webhook] --> B[POST /api/payments/webhook]
     B --> C[Extract & Verify Signature]
     C --> D{Signature Valid?}
     D -->|No| E[Return 401: Invalid Signature]
@@ -316,7 +316,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Cashfree Subscription Webhook] --> B[POST /api/v1/subscriptions/webhook]
+    A[Cashfree Subscription Webhook] --> B[POST /api/subscriptions/webhook]
     B --> C[Extract & Verify Signature]
     C --> D{Signature Valid?}
     D -->|No| E[Return 401: Invalid Signature]
@@ -461,27 +461,27 @@ flowchart TD
 ## API Endpoints Reference
 
 ### Plans
-- `GET /api/v1/plans/` - List all plans
-- `GET /api/v1/plans/{plan_id}` - Get plan details
-- `POST /api/v1/plans/` - Create plan (admin)
-- `PUT /api/v1/plans/{plan_id}` - Update plan (admin)
+- `GET /api/plans/` - List all plans
+- `GET /api/plans/{plan_id}` - Get plan details
+- `POST /api/plans/` - Create plan (admin)
+- `PUT /api/plans/{plan_id}` - Update plan (admin)
 
 ### Payments (Prepaid)
-- `POST /api/v1/payments/create` - Create payment order
-- `POST /api/v1/payments/verify/{order_id}` - Verify payment status
+- `POST /api/payments/create` - Create payment order
+- `POST /api/payments/verify/{order_id}` - Verify payment status
 - `GET /api/payments/redirect/{order_id}` - Payment redirect page
-- `POST /api/v1/payments/webhook` - Cashfree payment webhook
+- `POST /api/payments/webhook` - Cashfree payment webhook
 
 ### Subscriptions
-- `POST /api/v1/subscriptions/create` - Create subscription
-- `GET /api/v1/subscriptions/me` - Get user subscriptions
-- `POST /api/v1/subscriptions/{id}/cancel` - Cancel subscription
+- `POST /api/subscriptions/create` - Create subscription
+- `GET /api/subscriptions/me` - Get user subscriptions
+- `POST /api/subscriptions/{id}/cancel` - Cancel subscription
 - `GET /api/subscriptions/redirect/{id}` - Subscription redirect page
-- `POST /api/v1/subscriptions/webhook` - Cashfree subscription webhook
+- `POST /api/subscriptions/webhook` - Cashfree subscription webhook
 
 ### Credits
-- `GET /api/v1/credits/balance` - Get credit balance
-- `GET /api/v1/credits/transactions` - Get transaction history
+- `GET /api/credits/balance` - Get credit balance
+- `GET /api/credits/transactions` - Get transaction history
 
 ---
 

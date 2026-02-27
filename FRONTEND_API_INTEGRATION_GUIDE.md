@@ -18,8 +18,8 @@ Complete API documentation with request/response formats, error handling, and in
 
 ### API Base URL
 ```
-Production: https://your-api-domain.com/api/v1
-Development: http://localhost:8000/api/v1
+Production: https://your-api-domain.com/api
+Development: http://localhost:8000/api
 ```
 
 ### Headers
@@ -62,7 +62,7 @@ interface ErrorResponse {
 ### 1. Signup Init (New Flow)
 **Goal:** User selects **gov** vs **personal** email in UI, but backend derives `isGovId` from email domain patterns.
 
-**Endpoint:** `POST /api/v1/user/signup/init` (preferred) or `POST /api/v1/user/` (alias)
+**Endpoint:** `POST /api/user/signup/init` (preferred) or `POST /api/user/` (alias)
 
 **Request:**
 ```typescript
@@ -96,7 +96,7 @@ interface ErrorResponse {
 - `500` - Server error
 
 ### 2. Send OTP
-**Endpoint:** `POST /api/v1/auth/send-otp`
+**Endpoint:** `POST /api/auth/send-otp`
 
 **Request:**
 ```typescript
@@ -123,7 +123,7 @@ interface ErrorResponse {
 - `500` - Failed to send OTP
 
 ### 3. Verify OTP
-**Endpoint:** `POST /api/v1/auth/verify-otp`
+**Endpoint:** `POST /api/auth/verify-otp`
 
 **Request:**
 ```typescript
@@ -155,7 +155,7 @@ interface ErrorResponse {
 ### 4. Complete Signup (New Flow)
 **Goal:** Collect remaining fields (phone, password, profile info) **after OTP**.
 
-**Endpoint:** `PUT /api/v1/user/signup/complete`
+**Endpoint:** `PUT /api/user/signup/complete`
 
 **Request:**
 ```typescript
@@ -182,7 +182,7 @@ interface ErrorResponse {
 - This endpoint requires **email OTP already verified** (`isEmailOtpVerified=true`), otherwise it will reject.
 
 ### 5. Login
-**Endpoint:** `POST /api/v1/auth/login`
+**Endpoint:** `POST /api/auth/login`
 
 **Request:**
 ```typescript
@@ -213,7 +213,7 @@ interface ErrorResponse {
 - `500` - Server error
 
 ### 6. Refresh Token
-**Endpoint:** `POST /api/v1/auth/refresh`
+**Endpoint:** `POST /api/auth/refresh`
 
 **Request:**
 ```typescript
@@ -241,7 +241,7 @@ interface ErrorResponse {
 - `500` - Server error
 
 ### 7. Logout
-**Endpoint:** `POST /api/v1/auth/logout`
+**Endpoint:** `POST /api/auth/logout`
 
 **Headers:**
 ```
@@ -268,7 +268,7 @@ Authorization: Bearer <access_token>
 ```
 
 ### 8. Get Auth Status
-**Endpoint:** `GET /api/v1/auth/me`
+**Endpoint:** `GET /api/auth/me`
 
 **Headers:**
 ```
@@ -296,7 +296,7 @@ Authorization: Bearer <access_token>
 ## Plan Management APIs
 
 ### 1. List Plans
-**Endpoint:** `GET /api/v1/plans?active_only=true`
+**Endpoint:** `GET /api/plans?active_only=true`
 
 **Query Parameters:**
 - `active_only` (boolean, default: true) - Show only active plans
@@ -329,7 +329,7 @@ Authorization: Bearer <access_token>
 - `500` - Server error
 
 ### 2. Get Plan by ID
-**Endpoint:** `GET /api/v1/plans/{plan_id}`
+**Endpoint:** `GET /api/plans/{plan_id}`
 
 **Success Response (200):**
 ```typescript
@@ -362,7 +362,7 @@ Authorization: Bearer <access_token>
 ## Prepaid Payment APIs
 
 ### 1. Create Payment Order
-**Endpoint:** `POST /api/v1/payments/create`
+**Endpoint:** `POST /api/payments/create`
 
 **Headers:**
 ```
@@ -407,7 +407,7 @@ Content-Type: application/json
 6. Poll or verify payment status using `/payments/verify/{orderId}`
 
 ### 2. Verify Payment
-**Endpoint:** `POST /api/v1/payments/verify/{order_id}`
+**Endpoint:** `POST /api/payments/verify/{order_id}`
 
 **Headers:**
 ```
@@ -461,7 +461,7 @@ async function pollPaymentStatus(orderId) {
 
   const interval = setInterval(async () => {
     attempts++;
-    const response = await fetch(`/api/v1/payments/verify/${orderId}`, {
+    const response = await fetch(`/api/payments/verify/${orderId}`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`
       }
@@ -488,7 +488,7 @@ async function pollPaymentStatus(orderId) {
 ## Subscription APIs
 
 ### 1. Create Subscription
-**Endpoint:** `POST /api/v1/subscriptions/create`
+**Endpoint:** `POST /api/subscriptions/create`
 
 **Headers:**
 ```
@@ -533,7 +533,7 @@ Content-Type: application/json
 6. Subscription is activated via webhook (no polling needed)
 
 ### 2. Get User Subscriptions
-**Endpoint:** `GET /api/v1/subscriptions/me`
+**Endpoint:** `GET /api/subscriptions/me`
 
 **Headers:**
 ```
@@ -567,7 +567,7 @@ Authorization: Bearer <access_token>
 - `500` - Server error
 
 ### 3. Cancel Subscription
-**Endpoint:** `POST /api/v1/subscriptions/{subscription_id}/cancel`
+**Endpoint:** `POST /api/subscriptions/{subscription_id}/cancel`
 
 **Headers:**
 ```
@@ -598,7 +598,7 @@ Authorization: Bearer <access_token>
 ## Credit Management APIs
 
 ### 1. Get Credit Balance
-**Endpoint:** `GET /api/v1/credits/balance`
+**Endpoint:** `GET /api/credits/balance`
 
 **Headers:**
 ```
@@ -642,7 +642,7 @@ Authorization: Bearer <access_token>
 - `500` - Server error
 
 ### 2. Get Credit Transactions
-**Endpoint:** `GET /api/v1/credits/transactions?skip=0&limit=100&txn_type=CREDIT`
+**Endpoint:** `GET /api/credits/transactions?skip=0&limit=100&txn_type=CREDIT`
 
 **Headers:**
 ```
@@ -802,7 +802,7 @@ async function apiRequest<T>(
 }
 
 async function refreshAccessToken(): Promise<string> {
-  const response = await fetch('/api/v1/auth/refresh', {
+  const response = await fetch('/api/auth/refresh', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refresh_token: getRefreshToken() }),
@@ -829,7 +829,7 @@ async function refreshAccessToken(): Promise<string> {
 ```
 I need to integrate a payment system with the following backend API:
 
-BASE_URL: https://api.example.com/api/v1
+BASE_URL: https://api.example.com/api
 
 AUTHENTICATION:
 - All authenticated endpoints require: Authorization: Bearer <access_token>
@@ -888,7 +888,7 @@ Create a complete React/TypeScript implementation with:
 ```
 Create a TypeScript API client for this backend with the following requirements:
 
-API BASE: https://api.example.com/api/v1
+API BASE: https://api.example.com/api
 
 RESPONSE FORMAT:
 All responses: {success: boolean, message: string, timestamp: string, data: T}
@@ -1046,7 +1046,7 @@ Create a complete error handling system with examples.
 
 ```typescript
 // api/client.ts
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 interface ApiResponse<T> {
   success: boolean;

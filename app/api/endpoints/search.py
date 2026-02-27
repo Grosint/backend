@@ -34,6 +34,7 @@ from app.models.search import SearchCreate, SearchStatus, SearchType
 from app.schemas.response import SuccessResponse
 from app.schemas.search import (
     BankLookupRequest,
+    DarkWebLeakRequest,
     EmailLookupRequest,
     IMEILookupRequest,
     IPLookupRequest,
@@ -618,6 +619,66 @@ async def create_virtual_number_search(
     except Exception as e:
         logger.error(
             "Virtual number check failed", extra={"exception": type(e).__name__}
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/dark-web-leak", response_model=SuccessResponse[dict[str, Any]])
+async def create_dark_web_leak_search(
+    request: DarkWebLeakRequest,
+    current_user: TokenData = Depends(get_current_user_token),
+    db=Depends(get_database),
+):
+    """Dark web leaked data search by email, mobile, username, or keyword."""
+    try:
+        logger.info(
+            "Dark web leak search started: type=%s, value=%s",
+            request.query_type,
+            (
+                request.query_data[:20] + "..."
+                if len(request.query_data) > 20
+                else request.query_data
+            ),
+        )
+
+        query = f"type={request.query_type}|value={request.query_data}|cc={request.country_code}"
+
+        search_create = SearchCreate(
+            user_id=(
+                PydanticObjectId(current_user.user_id) if current_user.user_id else None
+            ),
+            search_type=SearchType.DARK_WEB_LEAK,
+            query=query,
+        )
+        search = await SearchService(db).create_search(search_create)
+        result = await SearchOrchestrator(db).execute_search(str(search.id))
+
+        return SuccessResponse[dict[str, Any]](
+            data={
+                "search_id": str(search.id),
+                "query_type": request.query_type,
+                "query_data": request.query_data,
+                "status": result["status"],
+                "results_count": result["results_count"],
+                "failed_count": result["failed_count"],
+                "error_message": result.get("error_message"),
+                "results": result["results"],
+                "created_at": search.created_at.isoformat(),
+                "updated_at": search.updated_at.isoformat(),
+            },
+            success=True,
+            message=f"Dark web leak search executed with {result['results_count']} results",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Dark web leak search failed",
+            extra={
+                "exception": type(e).__name__,
+                "query_type": request.query_type,
+                "user_id": current_user.user_id,
+            },
         )
         raise HTTPException(status_code=500, detail=str(e)) from e
 

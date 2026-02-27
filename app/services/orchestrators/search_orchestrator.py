@@ -8,6 +8,7 @@ from beanie import PydanticObjectId
 from bson import ObjectId
 
 from app.adapters.bank_lookup_adapter import BankLookupAdapter
+from app.adapters.dark_web_leak_adapter import DarkWebLeakAdapter
 from app.adapters.domain_adapter import DomainAdapter
 from app.adapters.email_adapter import EmailAdapter
 from app.adapters.imei_lookup_adapter import IMEILookupAdapter
@@ -48,6 +49,7 @@ class SearchOrchestrator:
         self.imei_lookup_adapter = IMEILookupAdapter()
         self.virtual_number_adapter = VirtualNumberAdapter()
         self.virtual_email_adapter = VirtualEmailAdapter()
+        self.dark_web_leak_adapter = DarkWebLeakAdapter()
 
         # Adapter mapping
         self.adapters = {
@@ -65,6 +67,7 @@ class SearchOrchestrator:
             SearchType.VIRTUAL_EMAIL: [self.virtual_email_adapter],
             SearchType.BANK_ACCOUNT: [self.bank_lookup_adapter],
             SearchType.VERIFY_ID: [self.verify_id_adapter],
+            SearchType.DARK_WEB_LEAK: [self.dark_web_leak_adapter],
         }
 
         # Map search type to adapter method
@@ -83,6 +86,7 @@ class SearchOrchestrator:
             SearchType.VIRTUAL_EMAIL: self._get_virtual_email_search_method,
             SearchType.BANK_ACCOUNT: self._get_bank_search_method,
             SearchType.VERIFY_ID: self._get_verify_id_search_method,
+            SearchType.DARK_WEB_LEAK: self._get_dark_web_leak_search_method,
         }
 
     async def execute_search(self, search_id: str) -> dict[str, Any]:
@@ -130,6 +134,7 @@ class SearchOrchestrator:
                         SearchType.VIRTUAL_EMAIL: "virtual-email",
                         SearchType.BANK_ACCOUNT: "bank-account",
                         SearchType.VERIFY_ID: "verify-id",
+                        SearchType.DARK_WEB_LEAK: "dark-web-leak",
                     }
                     query_type = query_type_map.get(search.search_type, "search")
 
@@ -630,6 +635,31 @@ class SearchOrchestrator:
             return await a.search_verify_id(id_type=it, value=v, dob=d)
 
         return fn
+
+    def _get_dark_web_leak_search_method(
+        self, adapter: Any, query: str
+    ) -> Callable[[], Awaitable[dict[str, Any]]]:
+        query_type, query_data, country_code = self._parse_dark_web_leak_query(query)
+
+        async def fn(a=adapter, qt=query_type, qd=query_data, cc=country_code):
+            return await a.search_leak(query_type=qt, query_data=qd, country_code=cc)
+
+        return fn
+
+    def _parse_dark_web_leak_query(self, query: str) -> tuple[str, str, str]:
+        """Parse dark web leak query: type=email|value=X or type=phone|value=X|cc=+91"""
+        query_type, query_data, country_code = "email", "", "+91"
+        for part in query.split("|"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                k, v = k.strip(), v.strip()
+                if k == "type":
+                    query_type = v or "email"
+                elif k == "value":
+                    query_data = v
+                elif k == "cc":
+                    country_code = v if v.startswith("+") else "+" + v if v else "+91"
+        return query_type, query_data, country_code
 
     def _parse_bank_query(
         self, query: str

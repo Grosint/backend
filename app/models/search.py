@@ -27,6 +27,7 @@ class SearchType(StrEnum):
     VIRTUAL_EMAIL = "virtual-email"
     BANK_ACCOUNT = "bank-account"
     VERIFY_ID = "verify-id"
+    DARK_WEB_LEAK = "dark-web-leak"
 
 
 class SearchStatus(StrEnum):
