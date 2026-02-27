@@ -7,6 +7,26 @@ from pydantic import BaseModel
 
 from app.schemas.response import BaseResponse, PaginatedResponse
 
+# Allowed searchType values for history filtering (queryType stored in History)
+HISTORY_SEARCH_TYPES = (
+    "phone-lookup",
+    "email-lookup",
+    "domain-lookup",
+    "vehicle-rc",
+    "vehicle-fast-tag",
+    "vehicle-all",
+    "vehicle-chasis",
+    "username-lookup",
+    "ip-lookup",
+    "imei-lookup",
+    "virtual-number",
+    "virtual-email",
+    "bank-account",
+    "verify-id",
+    "dark-web-leak",
+    "seeker-lookup",
+)
+
 
 class HistorySourceResultSchema(BaseModel):
     source: str

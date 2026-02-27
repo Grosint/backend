@@ -73,10 +73,11 @@ postman/
 - **Get Search Statistics** - Get search statistics
 
 ### History
-- **List Histories** - Get paginated list of user's search history (metadata only: id, queryType, queryInput, status, createdAt)
+- **List Histories** - Get paginated list of user's search history (metadata only: id, queryType, queryInput, status, createdAt). Optional `searchType` filter. Allowed: phone-lookup, email-lookup, domain-lookup, vehicle-rc, vehicle-fast-tag, vehicle-all, vehicle-chasis, username-lookup, ip-lookup, imei-lookup, virtual-number, virtual-email, bank-account, verify-id, dark-web-leak, seeker-lookup
 - **Get History Details** - Get full history details by ID including flattenedResults for UI rendering
 
 ### Admin
+- **History** - List histories (all users or by user_id) with optional searchType filter. Get history by ID. No auth required. Allowed searchType: phone-lookup, email-lookup, domain-lookup, vehicle-rc, vehicle-fast-tag, vehicle-all, vehicle-chasis, username-lookup, ip-lookup, imei-lookup, virtual-number, virtual-email, bank-account, verify-id, dark-web-leak, seeker-lookup
 - **Authentication** - Admin login endpoints
 - **Test Phone Lookup Service** - Test individual phone lookup services (including AITAN and Befisc)
 - **Test Email Lookup Service** - Test individual email lookup services
