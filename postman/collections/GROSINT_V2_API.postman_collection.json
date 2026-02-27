@@ -774,10 +774,15 @@
 									"key": "size",
 									"value": "10",
 									"description": "Number of items per page (default: 10, min: 1, max: 100)"
+								},
+								{
+									"key": "searchType",
+									"value": "phone-lookup",
+									"description": "Optional. Filter by search type. Allowed: phone-lookup, email-lookup, domain-lookup, vehicle-rc, vehicle-fast-tag, vehicle-all, vehicle-chasis, username-lookup, ip-lookup, imei-lookup, virtual-number, virtual-email, bank-account, verify-id, dark-web-leak, seeker-lookup"
 								}
 							]
 						},
-						"description": "Get paginated list of user's search history with metadata only. Returns: id, queryType, queryInput, status, createdAt. Use the detail endpoint to get full information including flattenedResults."
+						"description": "Get paginated list of user's search history with metadata only. Returns: id, queryType, queryInput, status, createdAt. Use the detail endpoint to get full information including flattenedResults. Optional searchType filter: phone-lookup, email-lookup, domain-lookup, vehicle-rc, vehicle-fast-tag, vehicle-all, vehicle-chasis, username-lookup, ip-lookup, imei-lookup, virtual-number, virtual-email, bank-account, verify-id, dark-web-leak, seeker-lookup."
 					},
 					"response": []
 				},
@@ -820,7 +825,7 @@
 					"response": []
 				}
 			],
-			"description": "History endpoints for viewing user's search history with paginated metadata and detailed results"
+			"description": "History endpoints for viewing user's search history with paginated metadata and detailed results. searchType filter allowed values: phone-lookup, email-lookup, domain-lookup, vehicle-rc, vehicle-fast-tag, vehicle-all, vehicle-chasis, username-lookup, ip-lookup, imei-lookup, virtual-number, virtual-email, bank-account, verify-id, dark-web-leak, seeker-lookup"
 		},
 		{
 			"name": "Seeker",
@@ -1068,6 +1073,60 @@
 						}
 					],
 					"description": "Authentication endpoints to get admin token"
+				},
+				{
+					"name": "History",
+					"item": [
+						{
+							"name": "List Histories (Admin)",
+							"request": {
+								"method": "GET",
+								"url": {
+									"raw": "{{base_url}}/admin/debug/history/?page=1&size=10",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "history", ""],
+									"query": [
+										{
+											"key": "page",
+											"value": "1",
+											"description": "Page number (default: 1, min: 1)"
+										},
+										{
+											"key": "size",
+											"value": "10",
+											"description": "Number of items per page (default: 10, min: 1, max: 100)"
+										},
+										{
+											"key": "user_id",
+											"value": "",
+											"description": "Optional. Filter by user ID. Omit to list all users' history."
+										},
+										{
+											"key": "searchType",
+											"value": "phone-lookup",
+											"description": "Optional. Filter by search type. Allowed: phone-lookup, email-lookup, domain-lookup, vehicle-rc, vehicle-fast-tag, vehicle-all, vehicle-chasis, username-lookup, ip-lookup, imei-lookup, virtual-number, virtual-email, bank-account, verify-id, dark-web-leak, seeker-lookup"
+										}
+									]
+								},
+								"description": "List search history. No auth required. Optionally filter by user_id and/or searchType. Returns paginated metadata. Allowed searchType: phone-lookup, email-lookup, domain-lookup, vehicle-rc, vehicle-fast-tag, vehicle-all, vehicle-chasis, username-lookup, ip-lookup, imei-lookup, virtual-number, virtual-email, bank-account, verify-id, dark-web-leak, seeker-lookup"
+							},
+							"response": []
+						},
+						{
+							"name": "Get History Details (Admin)",
+							"request": {
+								"method": "GET",
+								"url": {
+									"raw": "{{base_url}}/admin/debug/history/{{history_id}}",
+									"host": ["{{base_url}}"],
+									"path": ["admin", "debug", "history", "{{history_id}}"]
+								},
+								"description": "Get full history details by ID. No auth required. Returns complete history with flattenedResults."
+							},
+							"response": []
+						}
+					],
+					"description": "Admin history endpoints. No auth required. List all users' history or filter by user_id/searchType. Get history by ID. searchType allowed: phone-lookup, email-lookup, domain-lookup, vehicle-rc, vehicle-fast-tag, vehicle-all, vehicle-chasis, username-lookup, ip-lookup, imei-lookup, virtual-number, virtual-email, bank-account, verify-id, dark-web-leak, seeker-lookup"
 				},
 				{
 					"name": "Test Phone Lookup Service",

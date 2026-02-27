@@ -12,6 +12,7 @@ from app.core.auth_dependencies import (
     get_current_user_token,
 )
 from app.schemas.history import (
+    HISTORY_SEARCH_TYPES,
     HistoryListItemSchema,
     HistoryListResponse,
     HistorySchema,
@@ -76,19 +77,27 @@ async def list_histories(
     size: int = Query(
         10, ge=1, le=100, description="Number of items per page (default: 10)"
     ),
+    searchType: str | None = Query(
+        None,
+        description=f"Filter by search type. Allowed: {', '.join(HISTORY_SEARCH_TYPES)}",
+    ),
     current_user: TokenData | None = Depends(get_current_user_optional),
 ):
     """
     Get paginated list of user's search history with metadata only.
     Returns only: id, queryType, queryInput, status, createdAt
     Use the detail endpoint to get full information including flattenedResults.
+    Optionally filter by searchType (queryType) for user-wise history by type.
     """
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
     service = HistoryService()
     items, total = await service.get_user_histories(
-        PydanticObjectId(current_user.user_id), page=page, size=size
+        PydanticObjectId(current_user.user_id),
+        page=page,
+        size=size,
+        query_type=searchType,
     )
 
     # Return only metadata for list view

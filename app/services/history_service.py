@@ -208,13 +208,45 @@ class HistoryService:
         *,
         page: int = 1,
         size: int = 20,
+        query_type: str | None = None,
     ) -> tuple[list[History], int]:
         skip = max(0, (page - 1) * size)
-        cursor = History.find(History.userId == user_id).sort("-createdAt")
+        cursor = History.find(History.userId == user_id)
+        if query_type:
+            cursor = cursor.find(History.queryType == query_type)
+        cursor = cursor.sort("-createdAt")
         total = await cursor.count()
         items = await cursor.skip(skip).limit(size).to_list()
 
         # Decrypt all items after loading
+        for item in items:
+            item.decrypt_sensitive_data()
+
+        return items, total
+
+    async def get_histories_admin(
+        self,
+        *,
+        user_id: PydanticObjectId | None = None,
+        page: int = 1,
+        size: int = 20,
+        query_type: str | None = None,
+    ) -> tuple[list[History], int]:
+        """
+        Get histories for admin. When user_id is provided, filter by user.
+        Otherwise return all histories. Optionally filter by query_type.
+        """
+        skip = max(0, (page - 1) * size)
+        if user_id is not None:
+            cursor = History.find(History.userId == user_id)
+        else:
+            cursor = History.find()
+        if query_type:
+            cursor = cursor.find(History.queryType == query_type)
+        cursor = cursor.sort("-createdAt")
+        total = await cursor.count()
+        items = await cursor.skip(skip).limit(size).to_list()
+
         for item in items:
             item.decrypt_sensitive_data()
 

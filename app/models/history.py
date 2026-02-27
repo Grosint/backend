@@ -227,8 +227,17 @@ class History(Document):
                 self.flattenedResults = encryption.decrypt(self.flattenedResults)
 
         except Exception as e:
-            logger.error(f"Error decrypting history data: {e}", exc_info=True)
-            # Don't raise - return data as-is, but log the error
+            logger.warning(
+                "Decryption failed (likely ENCRYPTION_KEY mismatch). Returning empty results. "
+                "history_id=%s error=%s",
+                str(self.id) if hasattr(self, "id") and self.id else "?",
+                str(e)[:100],
+            )
+            # Graceful degradation: empty results so API returns valid schema
+            if isinstance(self.results, str):
+                self.results = []
+            if isinstance(self.flattenedResults, str):
+                self.flattenedResults = []
 
     class Settings:
         name = "histories"

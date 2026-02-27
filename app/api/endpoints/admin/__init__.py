@@ -15,11 +15,15 @@ from app.api.endpoints.admin import (
     simple_lookup,
     user_management,
 )
+from app.api.endpoints.admin import (
+    history as admin_history,
+)
 
 # Create main admin router
 router = APIRouter()
 
 # Include all admin sub-routers
+router.include_router(admin_history.router, prefix="/history", tags=["Admin - History"])
 router.include_router(phone_lookup.router, tags=["Admin Debug - Phone Lookup"])
 router.include_router(email_lookup.router, tags=["Admin Debug - Email Lookup"])
 router.include_router(services.router, tags=["Admin Debug - Services"])
